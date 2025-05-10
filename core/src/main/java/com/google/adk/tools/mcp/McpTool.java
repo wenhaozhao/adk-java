@@ -48,7 +48,7 @@ import java.util.Optional;
  *
  * <p>Raises: ValueError: If mcp_tool or mcp_session is None.
  */
-final class McpTool extends BaseTool {
+public final class McpTool extends BaseTool {
   Tool mcpTool;
   McpSyncClient mcpSession;
   McpSessionManager mcpSessionManager;
