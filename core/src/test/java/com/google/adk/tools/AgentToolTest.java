@@ -1,0 +1,332 @@
+/*
+ * Copyright 2025 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.google.adk.tools;
+
+import static com.google.adk.testing.TestUtils.createTestAgentBuilder;
+import static com.google.adk.testing.TestUtils.createTestLlm;
+import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertThrows;
+
+import com.google.adk.agents.Agent;
+import com.google.adk.agents.InvocationContext;
+import com.google.adk.models.LlmResponse;
+import com.google.adk.sessions.Session;
+import com.google.adk.testing.TestLlm;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.genai.types.Content;
+import com.google.genai.types.FunctionDeclaration;
+import com.google.genai.types.Part;
+import com.google.genai.types.Schema;
+import io.reactivex.rxjava3.core.Flowable;
+import java.util.Map;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
+
+/** Unit tests for {@link AgentTool}. */
+@RunWith(JUnit4.class)
+public final class AgentToolTest {
+
+  @Test
+  public void declaration_withInputSchema_returnsDeclarationWithSchema() {
+    Schema inputSchema =
+        Schema.builder()
+            .type("OBJECT")
+            .properties(ImmutableMap.of("is_magic", Schema.builder().type("BOOLEAN").build()))
+            .required(ImmutableList.of("is_magic"))
+            .build();
+    AgentTool agentTool =
+        AgentTool.create(
+            createTestAgentBuilder(createTestLlm(LlmResponse.builder().build()))
+                .name("agent name")
+                .description("agent description")
+                .inputSchema(inputSchema)
+                .build());
+
+    FunctionDeclaration declaration = agentTool.declaration().get();
+
+    assertThat(declaration)
+        .isEqualTo(
+            FunctionDeclaration.builder()
+                .name("agent name")
+                .description("agent description")
+                .parameters(inputSchema)
+                .build());
+  }
+
+  @Test
+  public void declaration_withoutInputSchema_returnsDeclarationWithRequestParameter() {
+    AgentTool agentTool =
+        AgentTool.create(
+            createTestAgentBuilder(createTestLlm(LlmResponse.builder().build()))
+                .name("agent name")
+                .description("agent description")
+                .build());
+
+    FunctionDeclaration declaration = agentTool.declaration().get();
+
+    assertThat(declaration)
+        .isEqualTo(
+            FunctionDeclaration.builder()
+                .name("agent name")
+                .description("agent description")
+                .parameters(
+                    Schema.builder()
+                        .properties(
+                            ImmutableMap.of("request", Schema.builder().type("STRING").build()))
+                        .required(ImmutableList.of("request"))
+                        .build())
+                .build());
+  }
+
+  @Test
+  public void call_withInputSchema_invalidInput_throwsException() throws Exception {
+    Schema inputSchema =
+        Schema.builder()
+            .type("OBJECT")
+            .properties(
+                ImmutableMap.of(
+                    "is_magic",
+                    Schema.builder().type("BOOLEAN").build(),
+                    "name",
+                    Schema.builder().type("STRING").build()))
+            .required(ImmutableList.of("is_magic", "name"))
+            .build();
+    Agent testAgent =
+        createTestAgentBuilder(createTestLlm(LlmResponse.builder().build()))
+            .name("agent name")
+            .description("agent description")
+            .inputSchema(inputSchema)
+            .build();
+    AgentTool agentTool = AgentTool.create(testAgent);
+    ToolContext toolContext = createToolContext(testAgent);
+
+    assertThat(
+            assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                    agentTool.runAsync(
+                        ImmutableMap.of("is_magic", true, "name_invalid", "test_name"),
+                        toolContext)))
+        .hasMessageThat()
+        .contains("Input arg: name_invalid does not match agent input schema");
+    assertThat(
+            assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                    agentTool.runAsync(
+                        ImmutableMap.of("is_magic", "invalid_type", "name", "test_name"),
+                        toolContext)))
+        .hasMessageThat()
+        .contains("Input arg: is_magic does not match agent input schema");
+    assertThat(
+            assertThrows(
+                IllegalArgumentException.class,
+                () -> agentTool.runAsync(ImmutableMap.of("is_magic", true), toolContext)))
+        .hasMessageThat()
+        .contains("Input args does not contain required name");
+  }
+
+  @Test
+  public void call_withOutputSchema_invalidOutput_throwsException() throws Exception {
+    Schema outputSchema =
+        Schema.builder()
+            .type("OBJECT")
+            .properties(
+                ImmutableMap.of(
+                    "is_valid",
+                    Schema.builder().type("BOOLEAN").build(),
+                    "message",
+                    Schema.builder().type("STRING").build()))
+            .required(ImmutableList.of("is_valid", "message"))
+            .build();
+    Agent testAgent =
+        createTestAgentBuilder(
+                createTestLlm(
+                    LlmResponse.builder()
+                        .content(
+                            Content.fromParts(
+                                Part.fromText(
+                                    "{\"is_valid\": \"invalid type\", "
+                                        + "\"message\": \"success\"}")))
+                        .build()))
+            .name("agent name")
+            .description("agent description")
+            .outputSchema(outputSchema)
+            .build();
+    AgentTool agentTool = AgentTool.create(testAgent);
+    ToolContext toolContext = createToolContext(testAgent);
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                agentTool.runAsync(ImmutableMap.of("request", "test"), toolContext).blockingGet());
+    assertThat(exception)
+        .hasMessageThat()
+        .contains("Output arg: is_valid does not match agent output schema");
+  }
+
+  @Test
+  public void call_withInputAndOutputSchema_successful() throws Exception {
+    Schema inputSchema =
+        Schema.builder()
+            .type("OBJECT")
+            .properties(ImmutableMap.of("is_magic", Schema.builder().type("BOOLEAN").build()))
+            .required(ImmutableList.of("is_magic"))
+            .build();
+    Schema outputSchema =
+        Schema.builder()
+            .type("OBJECT")
+            .properties(
+                ImmutableMap.of(
+                    "is_valid",
+                    Schema.builder().type("BOOLEAN").build(),
+                    "message",
+                    Schema.builder().type("STRING").build()))
+            .required(ImmutableList.of("is_valid", "message"))
+            .build();
+    Agent testAgent =
+        createTestAgentBuilder(
+                createTestLlm(
+                    LlmResponse.builder()
+                        .content(
+                            Content.fromParts(
+                                Part.fromText(
+                                    "{\"is_valid\": true, " + "\"message\": \"success\"}")))
+                        .build()))
+            .name("agent name")
+            .description("agent description")
+            .inputSchema(inputSchema)
+            .outputSchema(outputSchema)
+            .build();
+    AgentTool agentTool = AgentTool.create(testAgent);
+    ToolContext toolContext = createToolContext(testAgent);
+
+    Map<String, Object> result =
+        agentTool.runAsync(ImmutableMap.of("is_magic", true), toolContext).blockingGet();
+
+    assertThat(result).containsExactly("is_valid", true, "message", "success");
+  }
+
+  @Test
+  public void call_withoutSchema_returnsFirstTextPartFromLastEvent() throws Exception {
+    Agent testAgent =
+        createTestAgentBuilder(
+                createTestLlm(
+                    Flowable.just(
+                        LlmResponse.builder()
+                            .content(Content.fromParts(Part.fromText("Partial response")))
+                            .partial(true)
+                            .build()),
+                    Flowable.just(
+                        LlmResponse.builder()
+                            .content(
+                                Content.fromParts(
+                                    Part.fromText("First text part is returned"),
+                                    Part.fromText("This should be ignored")))
+                            .build())))
+            .name("agent name")
+            .description("agent description")
+            .build();
+    AgentTool agentTool = AgentTool.create(testAgent);
+    ToolContext toolContext = createToolContext(testAgent);
+
+    Map<String, Object> result =
+        agentTool.runAsync(ImmutableMap.of("request", "magic"), toolContext).blockingGet();
+
+    assertThat(result).containsExactly("result", "First text part is returned");
+  }
+
+  @Test
+  public void call_emptyModelResponse_returnsEmptyMap() throws Exception {
+    Agent testAgent =
+        createTestAgentBuilder(
+                createTestLlm(LlmResponse.builder().content(Content.builder().build()).build()))
+            .name("agent name")
+            .description("agent description")
+            .build();
+    AgentTool agentTool = AgentTool.create(testAgent);
+    ToolContext toolContext = createToolContext(testAgent);
+
+    Map<String, Object> result =
+        agentTool.runAsync(ImmutableMap.of("request", "magic"), toolContext).blockingGet();
+
+    assertThat(result).isEmpty();
+  }
+
+  @Test
+  public void call_withInputSchema_argsAreSentToAgent() throws Exception {
+    TestLlm testLlm =
+        createTestLlm(
+            LlmResponse.builder()
+                .content(Content.fromParts(Part.fromText("test response")))
+                .build());
+    Agent testAgent =
+        createTestAgentBuilder(testLlm)
+            .name("agent name")
+            .description("agent description")
+            .inputSchema(
+                Schema.builder()
+                    .type("OBJECT")
+                    .properties(
+                        ImmutableMap.of("is_magic", Schema.builder().type("BOOLEAN").build()))
+                    .required(ImmutableList.of("is_magic"))
+                    .build())
+            .build();
+    AgentTool agentTool = AgentTool.create(testAgent);
+    ToolContext toolContext = createToolContext(testAgent);
+
+    Map<String, Object> unused =
+        agentTool.runAsync(ImmutableMap.of("is_magic", true), toolContext).blockingGet();
+
+    assertThat(testLlm.getLastRequest().contents())
+        .containsExactly(Content.fromParts(Part.fromText("{is_magic=true}")));
+  }
+
+  @Test
+  public void call_withoutInputSchema_requestIsSentToAgent() throws Exception {
+    TestLlm testLlm =
+        createTestLlm(
+            LlmResponse.builder()
+                .content(Content.fromParts(Part.fromText("test response")))
+                .build());
+    Agent testAgent =
+        createTestAgentBuilder(testLlm).name("agent name").description("agent description").build();
+    AgentTool agentTool = AgentTool.create(testAgent);
+    ToolContext toolContext = createToolContext(testAgent);
+
+    Map<String, Object> unused =
+        agentTool.runAsync(ImmutableMap.of("request", "magic"), toolContext).blockingGet();
+
+    assertThat(testLlm.getLastRequest().contents())
+        .containsExactly(Content.fromParts(Part.fromText("magic")));
+  }
+
+  private static ToolContext createToolContext(Agent agent) {
+    return ToolContext.builder(
+            InvocationContext.create(
+                /* sessionService= */ null,
+                /* artifactService= */ null,
+                agent,
+                Session.builder("123").build(),
+                /* liveRequestQueue= */ null,
+                /* runConfig= */ null))
+        .build();
+  }
+}

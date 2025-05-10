@@ -1,0 +1,118 @@
+/*
+ * Copyright 2025 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.google.adk.agents;
+
+import com.google.auto.value.AutoValue;
+import com.google.common.collect.ImmutableList;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
+import com.google.genai.types.AudioTranscriptionConfig;
+import com.google.genai.types.SpeechConfig;
+import java.util.logging.Logger;
+import org.jspecify.annotations.Nullable;
+
+/** Configuration to modify an agent's LLM's underlying behavior. */
+@AutoValue
+public abstract class RunConfig {
+  private static final Logger logger = Logger.getLogger(RunConfig.class.getName());
+
+  /** Streaming mode for the runner. Required for BaseAgent.runLive() to work. */
+  public enum StreamingMode {
+    NONE,
+    SSE,
+    BIDI
+  }
+
+  /**
+   * Modality of the agent's response. Used for Runner.runLive() to know when to include transcribed
+   * audio in the invocation context.
+   */
+  public enum ResponseModality {
+    TEXT,
+    AUDIO
+  }
+
+  public abstract @Nullable SpeechConfig speechConfig();
+
+  public abstract ImmutableList<ResponseModality> responseModalities();
+
+  public abstract boolean saveInputBlobsAsArtifacts();
+
+  public abstract StreamingMode streamingMode(); // TODO: implement streaming mode
+
+  public abstract @Nullable AudioTranscriptionConfig outputAudioTranscription();
+
+  public abstract int maxLlmCalls();
+
+  public static Builder builder() {
+    return new AutoValue_RunConfig.Builder()
+        .setSaveInputBlobsAsArtifacts(false)
+        .setResponseModalities(ImmutableList.of())
+        .setStreamingMode(StreamingMode.NONE)
+        .setMaxLlmCalls(500);
+  }
+
+  public static Builder builder(RunConfig runConfig) {
+    return new AutoValue_RunConfig.Builder()
+        .setSaveInputBlobsAsArtifacts(runConfig.saveInputBlobsAsArtifacts())
+        .setStreamingMode(runConfig.streamingMode())
+        .setMaxLlmCalls(runConfig.maxLlmCalls())
+        .setResponseModalities(runConfig.responseModalities())
+        .setSpeechConfig(runConfig.speechConfig())
+        .setOutputAudioTranscription(runConfig.outputAudioTranscription());
+  }
+
+  /** Builder for {@link RunConfig}. */
+  @AutoValue.Builder
+  public abstract static class Builder {
+
+    @CanIgnoreReturnValue
+    public abstract Builder setSpeechConfig(SpeechConfig speechConfig);
+
+    @CanIgnoreReturnValue
+    public abstract Builder setResponseModalities(
+        ImmutableList<ResponseModality> responseModalities);
+
+    @CanIgnoreReturnValue
+    public abstract Builder setSaveInputBlobsAsArtifacts(boolean saveInputBlobsAsArtifacts);
+
+    @CanIgnoreReturnValue
+    public abstract Builder setStreamingMode(StreamingMode streamingMode);
+
+    @CanIgnoreReturnValue
+    public abstract Builder setOutputAudioTranscription(
+        AudioTranscriptionConfig outputAudioTranscription);
+
+    @CanIgnoreReturnValue
+    public abstract Builder setMaxLlmCalls(int maxLlmCalls);
+
+    abstract RunConfig autoBuild();
+
+    public RunConfig build() {
+      RunConfig runConfig = autoBuild();
+      if (runConfig.maxLlmCalls() < 0) {
+        logger.warning(
+            "maxLlmCalls is negative. This will result in no enforcement on total"
+                + " number of llm calls that will be made for a run. This may not be ideal, as this"
+                + " could result in a never ending communication between the model and the agent in"
+                + " certain cases.");
+      } else if (runConfig.maxLlmCalls() == Integer.MAX_VALUE) {
+        throw new IllegalArgumentException("maxLlmCalls should be less than " + Integer.MAX_VALUE);
+      }
+      return runConfig;
+    }
+  }
+}
