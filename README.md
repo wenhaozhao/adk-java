@@ -1,8 +1,6 @@
 # Agent Development Kit (ADK) for Java
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Maven][maven-version-image]][maven-version-link]
-[![Javadoc][javadoc-image]][javadoc-link]
 [![r/agentdevelopmentkit](https://img.shields.io/badge/Reddit-r%2Fagentdevelopmentkit-FF4500?style=flat&logo=reddit&logoColor=white)](https://www.reddit.com/r/agentdevelopmentkit/)
 
 <html>
