@@ -32,7 +32,7 @@ import org.apache.http.impl.client.HttpClients;
 import org.jspecify.annotations.Nullable;
 
 /** Interface for an API client which issues HTTP requests to the GenAI APIs. */
-abstract class ApiClient {
+public abstract class ApiClient {
   CloseableHttpClient httpClient;
   // For Google AI APIs
   final Optional<String> apiKey;

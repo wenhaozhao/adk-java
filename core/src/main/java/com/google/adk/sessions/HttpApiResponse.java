@@ -23,7 +23,7 @@ import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 
 /** Wraps a real HTTP response to expose the methods needed by the GenAI SDK. */
-final class HttpApiResponse extends ApiResponse {
+public final class HttpApiResponse extends ApiResponse {
 
   private final CloseableHttpResponse response;
 

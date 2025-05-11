@@ -39,7 +39,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /** Utility class for handling function calls. */
-final class Functions {
+public final class Functions {
 
   private static final String AF_FUNCTION_CALL_ID_PREFIX = "adk-";
 

@@ -54,7 +54,7 @@ import java.util.logging.Logger;
  * and real-time media blobs (like audio chunks) while continuously receiving responses from the
  * model.
  */
-final class GeminiLlmConnection implements BaseLlmConnection {
+public final class GeminiLlmConnection implements BaseLlmConnection {
 
   private static final Logger logger = Logger.getLogger(GeminiLlmConnection.class.getName());
 
