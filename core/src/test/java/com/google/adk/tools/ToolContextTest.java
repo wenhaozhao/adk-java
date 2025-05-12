@@ -6,7 +6,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.google.adk.agents.Agent;
+import com.google.adk.agents.LlmAgent;
 import com.google.adk.agents.InvocationContext;
 import com.google.adk.artifacts.BaseArtifactService;
 import com.google.adk.artifacts.ListArtifactsResponse;
@@ -26,13 +26,13 @@ public final class ToolContextTest {
   private InvocationContext mockInvocationContext;
   private BaseArtifactService mockArtifactService;
   private Session testSession;
-  private Agent mockAgent;
+  private LlmAgent mockAgent;
 
   @Before
   public void setUp() {
     mockInvocationContext = mock(InvocationContext.class);
     mockArtifactService = mock(BaseArtifactService.class);
-    mockAgent = mock(Agent.class);
+    mockAgent = mock(LlmAgent.class);
     // Create a real Session object instead of mocking it.
     testSession = Session.builder("testSession").appName("testApp").userId("testUser").build();
 

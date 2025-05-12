@@ -1,6 +1,5 @@
 package com.google.adk.web;
 
-import com.google.adk.agents.Agent;
 import com.google.adk.agents.BaseAgent;
 import com.google.adk.web.config.AgentLoadingProperties;
 import java.io.File;
@@ -51,7 +50,7 @@ public class AgentCompilerLoader {
    *
    * <p>This constructor initializes the loader and attempts to locate the ADK (Agent Development
    * Kit) core JAR. The ADK core JAR is essential for compiling agent source code, as it contains
-   * the necessary base classes and interfaces (e.g., {@link com.google.adk.agents.Agent}, {@link
+   * the necessary base classes and interfaces (e.g., {@link com.google.adk.agents.LlmAgent}, {@link
    * com.google.adk.agents.BaseAgent}). The method {@link #locateAndPrepareAdkCoreJar()} is called
    * to find this JAR, which might involve extracting it if it's nested within another JAR (common
    * in Spring Boot applications).
@@ -66,9 +65,9 @@ public class AgentCompilerLoader {
 
   private String locateAndPrepareAdkCoreJar() {
     try {
-      URL agentClassUrl = Agent.class.getProtectionDomain().getCodeSource().getLocation();
+      URL agentClassUrl = BaseAgent.class.getProtectionDomain().getCodeSource().getLocation();
       if (agentClassUrl == null) {
-        logger.warn("Could not get location for Agent.class. ADK Core JAR might not be found.");
+        logger.warn("Could not get location for BaseAgent.class. ADK Core JAR might not be found.");
         return "";
       }
 
@@ -86,7 +85,7 @@ public class AgentCompilerLoader {
         }
         int separator = urlPath.indexOf("!/");
         if (separator == -1) {
-          logger.warn("Malformed JAR URL for Agent.class: {}", agentClassUrl);
+          logger.warn("Malformed JAR URL for BaseAgent.class: {}", agentClassUrl);
           return "";
         }
         String outerJarPath = urlPath.substring(0, separator);

@@ -1,7 +1,7 @@
 package com.google.adk.web;
 
-import com.google.adk.agents.Agent;
 import com.google.adk.agents.BaseAgent;
+import com.google.adk.agents.LlmAgent;
 import com.google.adk.tools.AgentTool;
 import com.google.adk.tools.BaseTool;
 import com.google.adk.tools.FunctionTool;
@@ -87,8 +87,8 @@ public class AgentGraphGenerator {
       }
     }
 
-    if (agent instanceof Agent) {
-      Agent llmAgent = (Agent) agent;
+    if (agent instanceof LlmAgent) {
+      LlmAgent llmAgent = (LlmAgent) agent;
       List<BaseTool> tools = llmAgent.tools();
       if (tools != null) {
         for (BaseTool tool : tools) {

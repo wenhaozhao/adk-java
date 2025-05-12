@@ -18,7 +18,7 @@ package com.google.adk.flows.llmflows;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.adk.JsonBaseModel;
-import com.google.adk.agents.Agent;
+import com.google.adk.agents.LlmAgent;
 import com.google.adk.agents.InvocationContext;
 import com.google.adk.events.Event;
 import com.google.adk.models.LlmRequest;
@@ -45,13 +45,13 @@ public final class Contents implements RequestProcessor {
   @Override
   public Single<RequestProcessor.RequestProcessingResult> processRequest(
       InvocationContext context, LlmRequest request) {
-    if (!(context.agent() instanceof Agent)) {
+    if (!(context.agent() instanceof LlmAgent)) {
       return Single.just(
           RequestProcessor.RequestProcessingResult.create(request, context.session().events()));
     }
-    Agent llmAgent = (Agent) context.agent();
+    LlmAgent llmAgent = (LlmAgent) context.agent();
 
-    if (llmAgent.includeContents() == Agent.IncludeContents.NONE) {
+    if (llmAgent.includeContents() == LlmAgent.IncludeContents.NONE) {
       return Single.just(
           RequestProcessor.RequestProcessingResult.create(
               request.toBuilder().contents(ImmutableList.of()).build(), ImmutableList.of()));

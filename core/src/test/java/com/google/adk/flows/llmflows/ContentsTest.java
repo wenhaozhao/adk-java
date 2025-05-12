@@ -19,7 +19,7 @@ package com.google.adk.flows.llmflows;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
-import com.google.adk.agents.Agent;
+import com.google.adk.agents.LlmAgent;
 import com.google.adk.agents.InvocationContext;
 import com.google.adk.agents.RunConfig;
 import com.google.adk.artifacts.InMemoryArtifactService;
@@ -503,7 +503,7 @@ public final class ContentsTest {
   }
 
   private List<Content> runContentsProcessor(List<Event> events) {
-    Agent agent = Agent.builder().name(AGENT).build();
+    LlmAgent agent = LlmAgent.builder().name(AGENT).build();
     Session session =
         Session.builder("test-session")
             .appName("test-app")

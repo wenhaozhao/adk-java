@@ -16,7 +16,7 @@
 
 package com.google.adk.flows.llmflows;
 
-import com.google.adk.agents.Agent;
+import com.google.adk.agents.LlmAgent;
 import com.google.adk.agents.InvocationContext;
 import com.google.adk.models.LlmRequest;
 import com.google.adk.sessions.Session;
@@ -38,14 +38,14 @@ public final class Instructions implements RequestProcessor {
   @Override
   public Single<RequestProcessor.RequestProcessingResult> processRequest(
       InvocationContext context, LlmRequest request) {
-    if (!(context.agent() instanceof Agent)) {
+    if (!(context.agent() instanceof LlmAgent)) {
       throw new IllegalArgumentException("Agent in InvocationContext is not an instance of Agent.");
     }
-    Agent agent = (Agent) context.agent();
+    LlmAgent agent = (LlmAgent) context.agent();
 
     LlmRequest.Builder builder = request.toBuilder();
-    if (agent.rootAgent() instanceof Agent) {
-      Agent rootAgent = (Agent) agent.rootAgent();
+    if (agent.rootAgent() instanceof LlmAgent) {
+      LlmAgent rootAgent = (LlmAgent) agent.rootAgent();
 
       if (rootAgent.globalInstruction().isPresent()) {
         builder.appendInstructions(

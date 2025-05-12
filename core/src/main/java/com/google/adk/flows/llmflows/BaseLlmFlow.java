@@ -16,7 +16,7 @@
 
 package com.google.adk.flows.llmflows;
 
-import com.google.adk.agents.Agent;
+import com.google.adk.agents.LlmAgent;
 import com.google.adk.agents.BaseAgent;
 import com.google.adk.agents.CallbackContext;
 import com.google.adk.agents.InvocationContext;
@@ -82,7 +82,7 @@ public abstract class BaseLlmFlow implements BaseFlow {
       updatedRequest = result.updatedRequest();
     }
 
-    Agent agent = (Agent) context.agent();
+    LlmAgent agent = (LlmAgent) context.agent();
     LlmRequest.Builder updatedRequestBuilder = updatedRequest.toBuilder();
     for (BaseTool tool : agent.tools()) {
       tool.processLlmRequest(updatedRequestBuilder, ToolContext.builder(context).build());
@@ -155,7 +155,7 @@ public abstract class BaseLlmFlow implements BaseFlow {
   /** Calls the LLM to generate content. This method handles optional before and after callbacks. */
   private Flowable<LlmResponse> callLlm(
       InvocationContext context, LlmRequest llmRequest, Event modelResponseEvent) {
-    Agent agent = (Agent) context.agent();
+    LlmAgent agent = (LlmAgent) context.agent();
 
     return handleBeforeModelCallback(context, llmRequest, modelResponseEvent)
         .flatMapPublisher(
@@ -181,7 +181,7 @@ public abstract class BaseLlmFlow implements BaseFlow {
 
   private Single<Optional<LlmResponse>> handleBeforeModelCallback(
       InvocationContext context, LlmRequest llmRequest, Event modelResponseEvent) {
-    Agent agent = (Agent) context.agent();
+    LlmAgent agent = (LlmAgent) context.agent();
     return agent
         .beforeModelCallback()
         .map(
@@ -198,7 +198,7 @@ public abstract class BaseLlmFlow implements BaseFlow {
 
   private Single<LlmResponse> handleAfterModelCallback(
       InvocationContext context, LlmResponse llmResponse, Event modelResponseEvent) {
-    Agent agent = (Agent) context.agent();
+    LlmAgent agent = (LlmAgent) context.agent();
     return agent
         .afterModelCallback()
         .map(
@@ -295,7 +295,7 @@ public abstract class BaseLlmFlow implements BaseFlow {
       return Flowable.fromIterable(preResult.events());
     }
 
-    Agent agent = (Agent) invocationContext.agent();
+    LlmAgent agent = (LlmAgent) invocationContext.agent();
     BaseLlm llm =
         agent.resolvedModel().model().isPresent()
             ? agent.resolvedModel().model().get()

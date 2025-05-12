@@ -38,15 +38,15 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/** Unit tests for {@link Agent}. */
+/** Unit tests for {@link LlmAgent}. */
 @RunWith(JUnit4.class)
-public final class AgentTest {
+public final class LlmAgentTest {
 
   @Test
   public void testRun_withNoCallbacks() {
     Content modelContent = Content.fromParts(Part.fromText("Real LLM response"));
     TestLlm testLlm = createTestLlm(createLlmResponse(modelContent));
-    Agent agent = createTestAgent(testLlm);
+    LlmAgent agent = createTestAgent(testLlm);
     InvocationContext invocationContext = createInvocationContext(agent);
 
     List<Event> events = agent.runAsync(invocationContext).toList().blockingGet();
@@ -60,7 +60,7 @@ public final class AgentTest {
     Content modelContent = Content.fromParts(Part.fromText("Real LLM response"));
     Content beforeAgentContent = Content.fromParts(Part.fromText("before agent content"));
     TestLlm testLlm = createTestLlm(createLlmResponse(modelContent));
-    Agent agent =
+    LlmAgent agent =
         createTestAgentBuilder(testLlm)
             .beforeAgentCallback(context -> Maybe.just(beforeAgentContent))
             .build();
@@ -77,7 +77,7 @@ public final class AgentTest {
     Content modelContent = Content.fromParts(Part.fromText("Real LLM response"));
     Content afterAgentContent = Content.fromParts(Part.fromText("after agent content"));
     TestLlm testLlm = createTestLlm(createLlmResponse(modelContent));
-    Agent agent =
+    LlmAgent agent =
         createTestAgentBuilder(testLlm)
             .afterAgentCallback(context -> Maybe.just(afterAgentContent))
             .build();
@@ -95,7 +95,7 @@ public final class AgentTest {
     Content modelContent = Content.fromParts(Part.fromText("Real LLM response"));
     TestLlm testLlm = createTestLlm(createLlmResponse(modelContent));
 
-    Agent agent =
+    LlmAgent agent =
         createTestAgentBuilder(testLlm)
             .beforeAgentCallback(
                 callbackContext -> {
@@ -130,7 +130,7 @@ public final class AgentTest {
     Content modelContent = Content.fromParts(Part.fromText("Real LLM response"));
     TestLlm testLlm = createTestLlm(createLlmResponse(modelContent));
 
-    Agent agent =
+    LlmAgent agent =
         createTestAgentBuilder(testLlm)
             .beforeAgentCallback(
                 callbackContext ->
@@ -157,7 +157,7 @@ public final class AgentTest {
     Content modelContent = Content.fromParts(Part.fromText("Real LLM response"));
     TestLlm testLlm = createTestLlm(createLlmResponse(modelContent));
 
-    Agent agent =
+    LlmAgent agent =
         createTestAgentBuilder(testLlm)
             .beforeAgentCallbackSync(callbackContext -> Optional.empty())
             .afterAgentCallbackSync(
@@ -181,7 +181,7 @@ public final class AgentTest {
     Content modelContent = Content.fromParts(Part.fromText("Real LLM response"));
     TestLlm testLlm = createTestLlm(createLlmResponse(modelContent));
     Content beforeAgentContent = Content.fromParts(Part.fromText("before agent content"));
-    Agent agent =
+    LlmAgent agent =
         createTestAgentBuilder(testLlm)
             .beforeAgentCallback(
                 callbackContext -> {
@@ -205,7 +205,7 @@ public final class AgentTest {
   public void testRun_withBeforeAgentCallback_modifiesStateOnly() {
     Content modelContent = Content.fromParts(Part.fromText("Real LLM response"));
     TestLlm testLlm = createTestLlm(createLlmResponse(modelContent));
-    Agent agent =
+    LlmAgent agent =
         createTestAgentBuilder(testLlm)
             .beforeAgentCallback(
                 callbackContext -> {
@@ -234,7 +234,7 @@ public final class AgentTest {
   public void testRun_withBeforeAgentCallback_returnsNothing() {
     Content modelContent = Content.fromParts(Part.fromText("Real LLM response"));
     TestLlm testLlm = createTestLlm(createLlmResponse(modelContent));
-    Agent agent =
+    LlmAgent agent =
         createTestAgentBuilder(testLlm)
             .beforeAgentCallback(
                 callbackContext -> {
@@ -258,7 +258,7 @@ public final class AgentTest {
   public void testRun_withOutputKey_savesState() {
     Content modelContent = Content.fromParts(Part.fromText("Saved output"));
     TestLlm testLlm = createTestLlm(createLlmResponse(modelContent));
-    Agent agent = createTestAgentBuilder(testLlm).outputKey("myOutput").build();
+    LlmAgent agent = createTestAgentBuilder(testLlm).outputKey("myOutput").build();
     InvocationContext invocationContext = createInvocationContext(agent);
 
     List<Event> events = agent.runAsync(invocationContext).toList().blockingGet();
@@ -274,7 +274,7 @@ public final class AgentTest {
   public void testRun_withOutputKey_savesMultiPartState() {
     Content modelContent = Content.fromParts(Part.fromText("Part 1."), Part.fromText(" Part 2."));
     TestLlm testLlm = createTestLlm(createLlmResponse(modelContent));
-    Agent agent = createTestAgentBuilder(testLlm).outputKey("myMultiPartOutput").build();
+    LlmAgent agent = createTestAgentBuilder(testLlm).outputKey("myMultiPartOutput").build();
     InvocationContext invocationContext = createInvocationContext(agent);
 
     List<Event> events = agent.runAsync(invocationContext).toList().blockingGet();
@@ -291,7 +291,7 @@ public final class AgentTest {
   public void testRun_withoutOutputKey_doesNotSaveState() {
     Content modelContent = Content.fromParts(Part.fromText("Some output"));
     TestLlm testLlm = createTestLlm(createLlmResponse(modelContent));
-    Agent agent = createTestAgentBuilder(testLlm).build();
+    LlmAgent agent = createTestAgentBuilder(testLlm).build();
     InvocationContext invocationContext = createInvocationContext(agent);
 
     List<Event> events = agent.runAsync(invocationContext).toList().blockingGet();

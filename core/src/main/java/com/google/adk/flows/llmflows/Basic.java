@@ -18,7 +18,7 @@ package com.google.adk.flows.llmflows;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
-import com.google.adk.agents.Agent;
+import com.google.adk.agents.LlmAgent;
 import com.google.adk.agents.InvocationContext;
 import com.google.adk.models.LlmRequest;
 import com.google.common.collect.ImmutableList;
@@ -35,10 +35,10 @@ public final class Basic implements RequestProcessor {
   @Override
   public Single<RequestProcessor.RequestProcessingResult> processRequest(
       InvocationContext context, LlmRequest request) {
-    if (!(context.agent() instanceof Agent)) {
+    if (!(context.agent() instanceof LlmAgent)) {
       throw new IllegalArgumentException("Agent in InvocationContext is not an instance of Agent.");
     }
-    Agent agent = (Agent) context.agent();
+    LlmAgent agent = (LlmAgent) context.agent();
     String modelName =
         agent.resolvedModel().model().isPresent()
             ? agent.resolvedModel().model().get().model()

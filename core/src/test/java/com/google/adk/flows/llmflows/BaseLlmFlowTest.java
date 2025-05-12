@@ -24,7 +24,7 @@ import static com.google.adk.testing.TestUtils.createTestLlm;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.truth.Truth.assertThat;
 
-import com.google.adk.agents.Agent;
+import com.google.adk.agents.LlmAgent;
 import com.google.adk.agents.InvocationContext;
 import com.google.adk.events.Event;
 import com.google.adk.flows.llmflows.RequestProcessor.RequestProcessingResult;
@@ -258,7 +258,7 @@ public final class BaseLlmFlowTest {
   public void run_withCallbacks_receivesCorrectContext() {
     Content realContent = Content.fromParts(Part.fromText("Real LLM response"));
     TestLlm testLlm = createTestLlm(createLlmResponse(realContent));
-    Agent agent =
+    LlmAgent agent =
         createTestAgentBuilder(testLlm)
             .beforeModelCallback(
                 (callbackContext, request) -> {

@@ -19,7 +19,7 @@ package com.google.adk.testing;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.stream.Collectors.joining;
 
-import com.google.adk.agents.Agent;
+import com.google.adk.agents.LlmAgent;
 import com.google.adk.agents.BaseAgent;
 import com.google.adk.agents.InvocationContext;
 import com.google.adk.agents.RunConfig;
@@ -160,13 +160,13 @@ public final class TestUtils {
   }
 
   // TODO: b/414071046 Deprecate.
-  public static Agent createTestAgent(BaseLlm llm) {
+  public static LlmAgent createTestAgent(BaseLlm llm) {
     return createTestAgentBuilder(llm).build();
   }
 
   // TODO: b/414071046 Make this return TestAgent. It can be used with toBuilder().
-  public static Agent.Builder createTestAgentBuilder(BaseLlm llm) {
-    return Agent.builder().name("test agent").description("test agent description").model(llm);
+  public static LlmAgent.Builder createTestAgentBuilder(BaseLlm llm) {
+    return LlmAgent.builder().name("test agent").description("test agent description").model(llm);
   }
 
   public static TestLlm createTestLlm(LlmResponse response) {

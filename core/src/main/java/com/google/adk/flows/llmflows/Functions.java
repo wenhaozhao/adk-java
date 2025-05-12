@@ -16,7 +16,7 @@
 
 package com.google.adk.flows.llmflows;
 
-import com.google.adk.agents.Agent;
+import com.google.adk.agents.LlmAgent;
 import com.google.adk.agents.InvocationContext;
 import com.google.adk.events.Event;
 import com.google.adk.events.EventActions;
@@ -220,8 +220,8 @@ public final class Functions {
       BaseTool tool,
       Map<String, Object> functionArgs,
       ToolContext toolContext) {
-    if (invocationContext.agent() instanceof Agent) {
-      Agent agent = (Agent) invocationContext.agent();
+    if (invocationContext.agent() instanceof LlmAgent) {
+      LlmAgent agent = (LlmAgent) invocationContext.agent();
       return agent
           .beforeToolCallback()
           .map(callback -> callback.call(invocationContext, tool, functionArgs, toolContext))
@@ -236,8 +236,8 @@ public final class Functions {
       Map<String, Object> functionArgs,
       ToolContext toolContext,
       Map<String, Object> functionResult) {
-    if (invocationContext.agent() instanceof Agent) {
-      Agent agent = (Agent) invocationContext.agent();
+    if (invocationContext.agent() instanceof LlmAgent) {
+      LlmAgent agent = (LlmAgent) invocationContext.agent();
       return agent
           .afterToolCallback()
           .map(

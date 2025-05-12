@@ -22,7 +22,7 @@ import static com.google.adk.testing.TestUtils.createTestLlm;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
-import com.google.adk.agents.Agent;
+import com.google.adk.agents.LlmAgent;
 import com.google.adk.agents.BaseAgent;
 import com.google.adk.agents.InvocationContext;
 import com.google.adk.agents.RunConfig;
@@ -61,7 +61,7 @@ public final class BasicTest {
 
   private Basic basicProcessor;
   private TestLlm testLlm;
-  private Agent testAgent;
+  private LlmAgent testAgent;
   private InvocationContext testContext;
   private LlmRequest initialRequest;
 
@@ -91,8 +91,8 @@ public final class BasicTest {
 
   @Test
   public void processRequest_usesAgentConfigAndSchema() {
-    Agent agentWithConfig =
-        Agent.builder()
+    LlmAgent agentWithConfig =
+        LlmAgent.builder()
             .name("agentWithConfig")
             .model(testLlm)
             .generateContentConfig(TEST_GEN_CONFIG)
@@ -120,7 +120,7 @@ public final class BasicTest {
         RunConfig.builder()
             .setResponseModalities(ImmutableList.of(RunConfig.ResponseModality.TEXT))
             .build();
-    Agent agentWithConfig = Agent.builder().name("agentWithConfig").model(testLlm).build();
+    LlmAgent agentWithConfig = LlmAgent.builder().name("agentWithConfig").model(testLlm).build();
     InvocationContext contextWithRunConfig = createInvocationContext(agentWithConfig, runConfig);
 
     RequestProcessingResult result =
@@ -167,7 +167,7 @@ public final class BasicTest {
         RunConfig.builder()
             .setResponseModalities(ImmutableList.of(RunConfig.ResponseModality.TEXT))
             .build();
-    Agent agentWithConfig = Agent.builder().name("agentWithConfig").model(testLlm).build();
+    LlmAgent agentWithConfig = LlmAgent.builder().name("agentWithConfig").model(testLlm).build();
     InvocationContext contextWithRunConfig = createInvocationContext(agentWithConfig, runConfig);
 
     RequestProcessingResult result =
@@ -185,7 +185,7 @@ public final class BasicTest {
   @Test
   public void processRequest_buildsLiveConnectConfigFromRunConfig_speechConfig() {
     RunConfig runConfig = RunConfig.builder().setSpeechConfig(TEST_SPEECH_CONFIG).build();
-    Agent agentWithConfig = Agent.builder().name("agentWithConfig").model(testLlm).build();
+    LlmAgent agentWithConfig = LlmAgent.builder().name("agentWithConfig").model(testLlm).build();
     InvocationContext contextWithRunConfig = createInvocationContext(agentWithConfig, runConfig);
 
     RequestProcessingResult result =
@@ -203,7 +203,7 @@ public final class BasicTest {
   public void processRequest_buildsLiveConnectConfigFromRunConfig_outputAudioTranscription() {
     RunConfig runConfig =
         RunConfig.builder().setOutputAudioTranscription(TEST_AUDIO_TRANSCRIPTION_CONFIG).build();
-    Agent agentWithConfig = Agent.builder().name("agentWithConfig").model(testLlm).build();
+    LlmAgent agentWithConfig = LlmAgent.builder().name("agentWithConfig").model(testLlm).build();
     InvocationContext contextWithRunConfig = createInvocationContext(agentWithConfig, runConfig);
 
     RequestProcessingResult result =
@@ -226,7 +226,7 @@ public final class BasicTest {
             .setSpeechConfig(TEST_SPEECH_CONFIG)
             .setOutputAudioTranscription(TEST_AUDIO_TRANSCRIPTION_CONFIG)
             .build();
-    Agent agentWithConfig = Agent.builder().name("agentWithConfig").model(testLlm).build();
+    LlmAgent agentWithConfig = LlmAgent.builder().name("agentWithConfig").model(testLlm).build();
     InvocationContext contextWithRunConfig = createInvocationContext(agentWithConfig, runConfig);
 
     RequestProcessingResult result =

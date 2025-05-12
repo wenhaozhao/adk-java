@@ -2,7 +2,7 @@ package com.google.adk.tools;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import com.google.adk.agents.Agent;
+import com.google.adk.agents.LlmAgent;
 import com.google.adk.events.Event;
 import com.google.adk.models.LlmRequest;
 import com.google.adk.models.LlmResponse;
@@ -32,7 +32,7 @@ public final class LongRunningFunctionToolTest {
   // string.
 
   private TestLlm testLlm;
-  private Agent agent;
+  private LlmAgent agent;
   private InMemoryRunner runner;
   private Session session;
 
@@ -120,7 +120,7 @@ public final class LongRunningFunctionToolTest {
       List<LlmResponse> llmResponses, FunctionTool tool, String description) {
     testLlm = new TestLlm(llmResponses);
     agent =
-        Agent.builder()
+        LlmAgent.builder()
             .name("root_agent")
             .model(testLlm)
             .tools(ImmutableList.of(tool))

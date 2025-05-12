@@ -68,7 +68,7 @@ public final class SequentialAgentTest {
   public void runAsync_withSingleLlmSubAgent_returnsEventsFromSubAgent() {
     Content modelContent = Content.fromParts(Part.fromText("Real LLM response"));
     TestLlm testLlm = createTestLlm(createLlmResponse(modelContent));
-    Agent subAgent = createTestAgent(testLlm);
+    LlmAgent subAgent = createTestAgent(testLlm);
     SequentialAgent sequentialAgent =
         SequentialAgent.builder().name("seqAgent").subAgents(ImmutableList.of(subAgent)).build();
     InvocationContext invocationContext = createInvocationContext(sequentialAgent);

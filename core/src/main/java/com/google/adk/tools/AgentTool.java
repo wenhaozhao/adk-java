@@ -18,7 +18,7 @@ package com.google.adk.tools;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.adk.agents.Agent;
+import com.google.adk.agents.LlmAgent;
 import com.google.adk.events.Event;
 import com.google.adk.runner.InMemoryRunner;
 import com.google.adk.runner.Runner;
@@ -40,13 +40,13 @@ import java.util.Optional;
 public class AgentTool extends BaseTool {
   private static final ObjectMapper objectMapper = new ObjectMapper();
 
-  private Agent agent;
+  private LlmAgent agent;
 
-  public static AgentTool create(Agent agent) {
+  public static AgentTool create(LlmAgent agent) {
     return new AgentTool(agent);
   }
 
-  protected AgentTool(Agent agent) {
+  protected AgentTool(LlmAgent agent) {
     super(agent.name(), agent.description());
     this.agent = agent;
   }

@@ -17,7 +17,7 @@
 package com.google.adk.runner;
 
 import com.google.adk.CollectionUtils;
-import com.google.adk.agents.Agent;
+import com.google.adk.agents.LlmAgent;
 import com.google.adk.agents.BaseAgent;
 import com.google.adk.agents.InvocationContext;
 import com.google.adk.agents.LiveRequestQueue;
@@ -226,11 +226,11 @@ public class Runner {
     BaseAgent current = agentToRun;
     while (current != null) {
       // Agents eligible to transfer must have an LLM-based agent parent.
-      if (!(current instanceof Agent)) {
+      if (!(current instanceof LlmAgent)) {
         return false;
       }
       // If any agent can't transfer to its parent, the chain is broken.
-      Agent agent = (Agent) current;
+      LlmAgent agent = (LlmAgent) current;
       if (agent.disallowTransferToParent()) {
         return false;
       }

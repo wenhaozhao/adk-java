@@ -52,7 +52,7 @@ import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 
 /** The LLM-based agent. */
-public class Agent extends BaseAgent {
+public class LlmAgent extends BaseAgent {
 
   /**
    * Enum to define if contents of previous events should be included in requests to the underlying
@@ -86,7 +86,7 @@ public class Agent extends BaseAgent {
   private volatile Model resolvedModel;
   private final BaseLlmFlow llmFlow;
 
-  private Agent(Builder builder) {
+  private LlmAgent(Builder builder) {
     super(
         builder.name,
         builder.description,
@@ -122,12 +122,12 @@ public class Agent extends BaseAgent {
     Preconditions.checkArgument(!this.name().isEmpty(), "Agent name cannot be empty.");
   }
 
-  /** Returns a {@link Builder} for {@link Agent}. */
+  /** Returns a {@link Builder} for {@link LlmAgent}. */
   public static Builder builder() {
     return new Builder();
   }
 
-  /** Builder for {@link Agent}. */
+  /** Builder for {@link LlmAgent}. */
   public static class Builder {
     private String name;
     private String description;
@@ -383,8 +383,8 @@ public class Agent extends BaseAgent {
       return this;
     }
 
-    public Agent build() {
-      return new Agent(this);
+    public LlmAgent build() {
+      return new LlmAgent(this);
     }
   }
 
@@ -517,8 +517,8 @@ public class Agent extends BaseAgent {
     // 2. If not defined locally, search ancestors.
     BaseAgent current = this.parentAgent();
     while (current != null) {
-      if (current instanceof Agent) {
-        return ((Agent) current).resolvedModel();
+      if (current instanceof LlmAgent) {
+        return ((LlmAgent) current).resolvedModel();
       }
       current = current.parentAgent();
     }

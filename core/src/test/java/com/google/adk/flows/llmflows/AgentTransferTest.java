@@ -23,7 +23,7 @@ import static com.google.adk.testing.TestUtils.createTestLlm;
 import static com.google.adk.testing.TestUtils.simplifyEvents;
 import static com.google.common.truth.Truth.assertThat;
 
-import com.google.adk.agents.Agent;
+import com.google.adk.agents.LlmAgent;
 import com.google.adk.agents.InvocationContext;
 import com.google.adk.agents.LoopAgent;
 import com.google.adk.agents.RunConfig;
@@ -108,8 +108,8 @@ public final class AgentTransferTest {
             Flowable.just(createLlmResponse(response1)),
             Flowable.just(createLlmResponse(response2)));
 
-    Agent subAgent1 = createTestAgentBuilder(testLlm).name("sub_agent_1").build();
-    Agent rootAgent =
+    LlmAgent subAgent1 = createTestAgentBuilder(testLlm).name("sub_agent_1").build();
+    LlmAgent rootAgent =
         createTestAgentBuilder(testLlm)
             .name("root_agent")
             .subAgents(ImmutableList.of(subAgent1))
@@ -143,13 +143,13 @@ public final class AgentTransferTest {
             Flowable.just(createLlmResponse(response1)),
             Flowable.just(createLlmResponse(response2)));
 
-    Agent subAgent1 =
+    LlmAgent subAgent1 =
         createTestAgentBuilder(testLlm)
             .name("sub_agent_1")
             .disallowTransferToParent(true)
             .disallowTransferToPeers(true)
             .build();
-    Agent rootAgent =
+    LlmAgent rootAgent =
         createTestAgentBuilder(testLlm)
             .name("root_agent")
             .subAgents(ImmutableList.of(subAgent1))
@@ -185,18 +185,18 @@ public final class AgentTransferTest {
             Flowable.just(createLlmResponse(response1)),
             Flowable.just(createLlmResponse(response2)));
 
-    Agent subAgent11 =
+    LlmAgent subAgent11 =
         createTestAgentBuilder(testLlm)
             .name("sub_agent_1_1")
             .disallowTransferToParent(true)
             .disallowTransferToPeers(true)
             .build();
-    Agent subAgent1 =
+    LlmAgent subAgent1 =
         createTestAgentBuilder(testLlm)
             .name("sub_agent_1")
             .subAgents(ImmutableList.of(subAgent11))
             .build();
-    Agent rootAgent =
+    LlmAgent rootAgent =
         createTestAgentBuilder(testLlm)
             .name("root_agent")
             .subAgents(ImmutableList.of(subAgent1))
@@ -234,13 +234,13 @@ public final class AgentTransferTest {
             Flowable.just(createLlmResponse(response2)),
             Flowable.just(createLlmResponse(response3)));
 
-    Agent subAgent11 =
+    LlmAgent subAgent11 =
         createTestAgentBuilder(testLlm)
             .name("sub_agent_1_1")
             .disallowTransferToParent(true)
             .disallowTransferToPeers(true)
             .build();
-    Agent subAgent12 =
+    LlmAgent subAgent12 =
         createTestAgentBuilder(testLlm)
             .name("sub_agent_1_2")
             .disallowTransferToParent(true)
@@ -253,7 +253,7 @@ public final class AgentTransferTest {
             .subAgents(ImmutableList.of(subAgent11, subAgent12))
             .build();
 
-    Agent rootAgent =
+    LlmAgent rootAgent =
         createTestAgentBuilder(testLlm)
             .name("root_agent")
             .subAgents(ImmutableList.of(subAgent1))
@@ -294,19 +294,19 @@ public final class AgentTransferTest {
             Flowable.just(createLlmResponse(response3)),
             Flowable.just(createLlmResponse(response4)));
 
-    Agent subAgent11 =
+    LlmAgent subAgent11 =
         createTestAgentBuilder(testLlm)
             .name("sub_agent_1_1")
             .disallowTransferToParent(true)
             .disallowTransferToPeers(true)
             .build();
-    Agent subAgent121 = createTestAgentBuilder(testLlm).name("sub_agent_1_2_1").build();
-    Agent subAgent12 =
+    LlmAgent subAgent121 = createTestAgentBuilder(testLlm).name("sub_agent_1_2_1").build();
+    LlmAgent subAgent12 =
         createTestAgentBuilder(testLlm)
             .name("sub_agent_1_2")
             .subAgents(ImmutableList.of(subAgent121))
             .build();
-    Agent subAgent13 =
+    LlmAgent subAgent13 =
         createTestAgentBuilder(testLlm)
             .name("sub_agent_1_3")
             .disallowTransferToParent(true)
@@ -318,7 +318,7 @@ public final class AgentTransferTest {
             .subAgents(ImmutableList.of(subAgent11, subAgent12, subAgent13))
             .build();
 
-    Agent rootAgent =
+    LlmAgent rootAgent =
         createTestAgentBuilder(testLlm)
             .name("root_agent")
             .subAgents(ImmutableList.of(subAgent1))
@@ -364,13 +364,13 @@ public final class AgentTransferTest {
             Flowable.just(createLlmResponse(response4)),
             Flowable.just(createLlmResponse(response5)));
 
-    Agent subAgent11 =
+    LlmAgent subAgent11 =
         createTestAgentBuilder(testLlm)
             .name("sub_agent_1_1")
             .disallowTransferToParent(true)
             .disallowTransferToPeers(true)
             .build();
-    Agent subAgent12 =
+    LlmAgent subAgent12 =
         createTestAgentBuilder(testLlm)
             .name("sub_agent_1_2")
             .disallowTransferToParent(true)
@@ -384,7 +384,7 @@ public final class AgentTransferTest {
             .subAgents(ImmutableList.of(subAgent11, subAgent12))
             .build();
 
-    Agent rootAgent =
+    LlmAgent rootAgent =
         createTestAgentBuilder(testLlm)
             .name("root_agent")
             .subAgents(ImmutableList.of(subAgent1))
@@ -410,7 +410,7 @@ public final class AgentTransferTest {
     assertThat(simplifyEvents(actualEvents)).containsExactly("root_agent: response5");
   }
 
-  private Runner getRunnerAndCreateSession(Agent agent, Session session) {
+  private Runner getRunnerAndCreateSession(LlmAgent agent, Session session) {
     Runner runner = new InMemoryRunner(agent, session.appName());
     // Ensure the session exists before running the agent.
     var unused =

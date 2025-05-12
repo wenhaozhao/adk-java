@@ -16,7 +16,7 @@
 
 package com.google.adk.flows.llmflows;
 
-import com.google.adk.agents.Agent;
+import com.google.adk.agents.LlmAgent;
 import com.google.adk.agents.BaseAgent;
 import com.google.adk.agents.InvocationContext;
 import com.google.adk.events.EventActions;
@@ -38,11 +38,11 @@ public final class AgentTransfer implements RequestProcessor {
   public Single<RequestProcessor.RequestProcessingResult> processRequest(
       InvocationContext context, LlmRequest request) {
     BaseAgent baseAgent = context.agent();
-    if (!(baseAgent instanceof Agent)) {
+    if (!(baseAgent instanceof LlmAgent)) {
       throw new IllegalArgumentException(
           "Base agent in InvocationContext is not an instance of Agent.");
     }
-    Agent agent = (Agent) baseAgent;
+    LlmAgent agent = (LlmAgent) baseAgent;
 
     List<BaseAgent> transferTargets = getTransferTargets(agent);
     if (transferTargets.isEmpty()) {
@@ -71,7 +71,7 @@ public final class AgentTransfer implements RequestProcessor {
         "Agent name: %s\nAgent description: %s", targetAgent.name(), targetAgent.description());
   }
 
-  private String buildTargetAgentsInstructions(Agent agent, List<BaseAgent> transferTargets) {
+  private String buildTargetAgentsInstructions(LlmAgent agent, List<BaseAgent> transferTargets) {
     StringBuilder sb = new StringBuilder();
     sb.append("You have a list of other agents to transfer to:\n");
     for (BaseAgent targetAgent : transferTargets) {
@@ -96,13 +96,13 @@ public final class AgentTransfer implements RequestProcessor {
     return sb.toString();
   }
 
-  private List<BaseAgent> getTransferTargets(Agent agent) {
+  private List<BaseAgent> getTransferTargets(LlmAgent agent) {
     List<BaseAgent> transferTargets = new ArrayList<>();
     transferTargets.addAll(agent.subAgents()); // Add all sub-agents
 
     BaseAgent parent = agent.parentAgent();
     // Agents eligible to transfer must have an LLM-based agent parent.
-    if (!(parent instanceof Agent)) {
+    if (!(parent instanceof LlmAgent)) {
       return transferTargets;
     }
 

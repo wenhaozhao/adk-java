@@ -21,7 +21,7 @@ import static com.google.adk.testing.TestUtils.createTestLlm;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
-import com.google.adk.agents.Agent;
+import com.google.adk.agents.LlmAgent;
 import com.google.adk.agents.InvocationContext;
 import com.google.adk.models.LlmResponse;
 import com.google.adk.sessions.Session;
@@ -107,7 +107,7 @@ public final class AgentToolTest {
                     Schema.builder().type("STRING").build()))
             .required(ImmutableList.of("is_magic", "name"))
             .build();
-    Agent testAgent =
+    LlmAgent testAgent =
         createTestAgentBuilder(createTestLlm(LlmResponse.builder().build()))
             .name("agent name")
             .description("agent description")
@@ -155,7 +155,7 @@ public final class AgentToolTest {
                     Schema.builder().type("STRING").build()))
             .required(ImmutableList.of("is_valid", "message"))
             .build();
-    Agent testAgent =
+    LlmAgent testAgent =
         createTestAgentBuilder(
                 createTestLlm(
                     LlmResponse.builder()
@@ -201,7 +201,7 @@ public final class AgentToolTest {
                     Schema.builder().type("STRING").build()))
             .required(ImmutableList.of("is_valid", "message"))
             .build();
-    Agent testAgent =
+    LlmAgent testAgent =
         createTestAgentBuilder(
                 createTestLlm(
                     LlmResponse.builder()
@@ -226,7 +226,7 @@ public final class AgentToolTest {
 
   @Test
   public void call_withoutSchema_returnsFirstTextPartFromLastEvent() throws Exception {
-    Agent testAgent =
+    LlmAgent testAgent =
         createTestAgentBuilder(
                 createTestLlm(
                     Flowable.just(
@@ -255,7 +255,7 @@ public final class AgentToolTest {
 
   @Test
   public void call_emptyModelResponse_returnsEmptyMap() throws Exception {
-    Agent testAgent =
+    LlmAgent testAgent =
         createTestAgentBuilder(
                 createTestLlm(LlmResponse.builder().content(Content.builder().build()).build()))
             .name("agent name")
@@ -277,7 +277,7 @@ public final class AgentToolTest {
             LlmResponse.builder()
                 .content(Content.fromParts(Part.fromText("test response")))
                 .build());
-    Agent testAgent =
+    LlmAgent testAgent =
         createTestAgentBuilder(testLlm)
             .name("agent name")
             .description("agent description")
@@ -306,7 +306,7 @@ public final class AgentToolTest {
             LlmResponse.builder()
                 .content(Content.fromParts(Part.fromText("test response")))
                 .build());
-    Agent testAgent =
+    LlmAgent testAgent =
         createTestAgentBuilder(testLlm).name("agent name").description("agent description").build();
     AgentTool agentTool = AgentTool.create(testAgent);
     ToolContext toolContext = createToolContext(testAgent);
@@ -318,7 +318,7 @@ public final class AgentToolTest {
         .containsExactly(Content.fromParts(Part.fromText("magic")));
   }
 
-  private static ToolContext createToolContext(Agent agent) {
+  private static ToolContext createToolContext(LlmAgent agent) {
     return ToolContext.builder(
             InvocationContext.create(
                 /* sessionService= */ null,
