@@ -143,6 +143,7 @@ public class AgentTool extends BaseTool {
     } else {
       builder.parameters(
           Schema.builder()
+              .type("OBJECT")
               .properties(ImmutableMap.of("request", Schema.builder().type("STRING").build()))
               .required(ImmutableList.of("request"))
               .build());

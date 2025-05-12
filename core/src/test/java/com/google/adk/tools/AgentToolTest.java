@@ -87,6 +87,7 @@ public final class AgentToolTest {
                 .description("agent description")
                 .parameters(
                     Schema.builder()
+                        .type("OBJECT")
                         .properties(
                             ImmutableMap.of("request", Schema.builder().type("STRING").build()))
                         .required(ImmutableList.of("request"))
