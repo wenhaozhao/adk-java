@@ -86,6 +86,8 @@ public abstract class LlmResponse extends JsonBaseModel {
   @JsonProperty("interrupted")
   public abstract Optional<Boolean> interrupted();
 
+  public abstract Builder toBuilder();
+
   /** Builder for constructing {@link LlmResponse} instances. */
   @AutoValue.Builder
   public abstract static class Builder {
