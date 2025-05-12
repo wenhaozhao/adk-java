@@ -16,6 +16,9 @@
 
 package com.google.adk.models;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.google.adk.JsonBaseModel;
 import com.google.auto.value.AutoValue;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.genai.types.Candidate;
@@ -25,10 +28,14 @@ import com.google.genai.types.GenerateContentResponsePromptFeedback;
 import com.google.genai.types.GroundingMetadata;
 import java.util.List;
 import java.util.Optional;
+import javax.annotation.Nullable;
 
 /** Represents a response received from the LLM. */
 @AutoValue
-public abstract class LlmResponse {
+@JsonDeserialize(builder = AutoValue_LlmResponse.Builder.class)
+public abstract class LlmResponse extends JsonBaseModel {
+
+  LlmResponse() {}
 
   /**
    * Returns the content of the first candidate in the response, if available.
@@ -37,6 +44,7 @@ public abstract class LlmResponse {
    *     GenerateContentResponse} if the response contains at least one candidate., or an empty
    *     optional if no candidates are present in the response.
    */
+  @JsonProperty("content")
   public abstract Optional<Content> content();
 
   /**
@@ -44,6 +52,7 @@ public abstract class LlmResponse {
    *
    * @return An {@link Optional} containing {@link GroundingMetadata} or empty.
    */
+  @JsonProperty("grounding_metadata")
   public abstract Optional<GroundingMetadata> groundingMetadata();
 
   /**
@@ -51,6 +60,7 @@ public abstract class LlmResponse {
    *
    * <p>Only used for streaming mode and when the content is plain text.
    */
+  @JsonProperty("partial")
   public abstract Optional<Boolean> partial();
 
   /**
@@ -58,23 +68,63 @@ public abstract class LlmResponse {
    *
    * <p>Only used for streaming mode.
    */
+  @JsonProperty("turn_complete")
   public abstract Optional<Boolean> turnComplete();
 
   /** Error code if the response is an error. Code varies by model. */
+  @JsonProperty("error_code")
   public abstract Optional<String> errorCode();
 
   /** Error message if the response is an error. */
+  @JsonProperty("error_message")
   public abstract Optional<String> errorMessage();
 
   /**
    * Indicates that LLM was interrupted when generating the content. Usually it's due to user
    * interruption during a bidi streaming.
    */
+  @JsonProperty("interrupted")
   public abstract Optional<Boolean> interrupted();
 
   /** Builder for constructing {@link LlmResponse} instances. */
   @AutoValue.Builder
   public abstract static class Builder {
+
+    @JsonProperty("content")
+    public abstract Builder content(Content content);
+
+    @JsonProperty("interrupted")
+    public abstract Builder interrupted(@Nullable Boolean interrupted);
+
+    public abstract Builder interrupted(Optional<Boolean> interrupted);
+
+    @JsonProperty("grounding_metadata")
+    public abstract Builder groundingMetadata(@Nullable GroundingMetadata groundingMetadata);
+
+    public abstract Builder groundingMetadata(Optional<GroundingMetadata> groundingMetadata);
+
+    @JsonProperty("partial")
+    public abstract Builder partial(@Nullable Boolean partial);
+
+    public abstract Builder partial(Optional<Boolean> partial);
+
+    @JsonProperty("turn_complete")
+    public abstract Builder turnComplete(@Nullable Boolean turnComplete);
+
+    public abstract Builder turnComplete(Optional<Boolean> turnComplete);
+
+    @JsonProperty("error_code")
+    public abstract Builder errorCode(@Nullable String errorCode);
+
+    @JsonProperty("error_code")
+    public abstract Builder errorCode(Optional<String> errorCode);
+
+    @JsonProperty("error_message")
+    public abstract Builder errorMessage(@Nullable String errorMessage);
+
+    @JsonProperty("error_message")
+    public abstract Builder errorMessage(Optional<String> errorMessage);
+
     @CanIgnoreReturnValue
     public final Builder response(GenerateContentResponse response) {
       Optional<List<Candidate>> candidatesOpt = response.candidates();
@@ -102,25 +152,12 @@ public abstract class LlmResponse {
       return this;
     }
 
-    public abstract Builder content(Content content);
+    abstract LlmResponse autoBuild();
 
-    public abstract Builder interrupted(boolean interrupted);
-
-    public abstract Builder groundingMetadata(Optional<GroundingMetadata> groundingMetadata);
-
-    public abstract Builder partial(Boolean partial);
-
-    public abstract Builder turnComplete(boolean turnComplete);
-
-    public abstract Builder errorCode(String errorCode);
-
-    public abstract Builder errorCode(Optional<String> errorCode);
-
-    public abstract Builder errorMessage(String errorMessage);
-
-    public abstract Builder errorMessage(Optional<String> errorMessage);
-
-    public abstract LlmResponse build();
+    public LlmResponse build() {
+      LlmResponse response = autoBuild();
+      return response;
+    }
   }
 
   public static Builder builder() {
