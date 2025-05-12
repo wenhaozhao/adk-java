@@ -350,6 +350,15 @@
             <goals>
               <goal>prepare-agent</goal>
             </goals>
+            <configuration>
+              <excludes>
+                <exclude>*MockitoMock*</exclude>
+                <exclude>*$$EnhancerByMockitoWithCGLIB$$*</exclude>
+                <exclude>*$$FastClassByMockitoWithCGLIB$$*</exclude>
+                <exclude>com/sun/tools/attach/*</exclude>
+                <exclude>sun/util/resources/cldr/provider/*</exclude>
+              </excludes>
+            </configuration>
           </execution>
           <execution>
             <id>report</id>
