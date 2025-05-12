@@ -235,7 +235,7 @@ public abstract class BaseLlmFlow implements BaseFlow {
     }
     Event modelResponseEvent =
         Event.builder()
-            .id(Event.generateEventId())
+            .id(eventId)
             .invocationId(context.invocationId())
             .author(context.agent().name())
             .branch(context.branch())
