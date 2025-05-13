@@ -16,11 +16,12 @@
 
 package com.google.adk.flows.llmflows;
 
-import com.google.adk.agents.LlmAgent;
+import com.google.adk.Telemetry;
 import com.google.adk.agents.BaseAgent;
 import com.google.adk.agents.CallbackContext;
 import com.google.adk.agents.InvocationContext;
 import com.google.adk.agents.LiveRequest;
+import com.google.adk.agents.LlmAgent;
 import com.google.adk.agents.RunConfig.StreamingMode;
 import com.google.adk.events.Event;
 import com.google.adk.exceptions.LlmCallsLimitExceededException;
@@ -36,7 +37,11 @@ import com.google.adk.tools.BaseTool;
 import com.google.adk.tools.ToolContext;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import com.google.genai.types.Content;
 import com.google.genai.types.FunctionCall;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.context.Scope;
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.CompletableObserver;
 import io.reactivex.rxjava3.core.Flowable;
@@ -49,10 +54,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** A basic flow that calls the LLM in a loop until a final response is generated. */
 public abstract class BaseLlmFlow implements BaseFlow {
-  // TODO: b/414451154 - Trace runLive and callLlm methods.
+  private static final Logger log = LoggerFactory.getLogger(BaseLlmFlow.class);
 
   protected final List<RequestProcessor> requestProcessors;
   protected final List<ResponseProcessor> responseProcessors;
@@ -169,13 +176,34 @@ public abstract class BaseLlmFlow implements BaseFlow {
                       ? agent.resolvedModel().model().get()
                       : LlmRegistry.getLlm(agent.resolvedModel().modelName().get());
 
-              Flowable<LlmResponse> llmResponseFlowable =
-                  llm.generateContent(
-                      llmRequest, context.runConfig().streamingMode() == StreamingMode.SSE);
-              return llmResponseFlowable.concatMap(
-                  llmResponse ->
-                      handleAfterModelCallback(context, llmResponse, modelResponseEvent)
-                          .toFlowable());
+              return Flowable.defer(
+                      () -> {
+                        Span llmCallSpan =
+                            Telemetry.getTracer().spanBuilder("call_llm").startSpan();
+
+                        try (Scope scope = llmCallSpan.makeCurrent()) {
+                          return llm.generateContent(
+                                  llmRequest,
+                                  context.runConfig().streamingMode() == StreamingMode.SSE)
+                              .doOnNext(
+                                  llmResp -> {
+                                    try (Scope innerScope = llmCallSpan.makeCurrent()) {
+                                      Telemetry.traceCallLlm(
+                                          context, modelResponseEvent.id(), llmRequest, llmResp);
+                                    }
+                                  })
+                              .doOnError(
+                                  error -> {
+                                    llmCallSpan.setStatus(StatusCode.ERROR, error.getMessage());
+                                    llmCallSpan.recordException(error);
+                                  })
+                              .doFinally(llmCallSpan::end);
+                        }
+                      })
+                  .concatMap(
+                      llmResp ->
+                          handleAfterModelCallback(context, llmResp, modelResponseEvent)
+                              .toFlowable());
             });
   }
 
@@ -286,11 +314,12 @@ public abstract class BaseLlmFlow implements BaseFlow {
   @Override
   public Flowable<Event> runLive(InvocationContext invocationContext) {
     LlmRequest llmRequest = LlmRequest.builder().build();
-    String eventId = Event.generateEventId();
+
+    String eventIdForSendData = Event.generateEventId();
 
     // Preprocess before calling the LLM.
     RequestProcessingResult preResult = preprocess(invocationContext, llmRequest);
-    llmRequest = preResult.updatedRequest();
+    LlmRequest processedLlmRequest = preResult.updatedRequest();
     if (invocationContext.endInvocation()) {
       return Flowable.fromIterable(preResult.events());
     }
@@ -300,13 +329,41 @@ public abstract class BaseLlmFlow implements BaseFlow {
         agent.resolvedModel().model().isPresent()
             ? agent.resolvedModel().model().get()
             : LlmRegistry.getLlm(agent.resolvedModel().modelName().get());
-    BaseLlmConnection connection = llm.connect(llmRequest);
-    Completable historySent =
-        llmRequest.contents().isEmpty()
+    BaseLlmConnection connection = llm.connect(processedLlmRequest);
+
+    final List<Content> historyContentsToSend = processedLlmRequest.contents();
+
+    Completable historySentCompletable =
+        historyContentsToSend.isEmpty()
             ? Completable.complete()
-            : connection.sendHistory(llmRequest.contents());
+            : Completable.defer(
+                () -> {
+                  Span sendDataSpan = Telemetry.getTracer().spanBuilder("send_data").startSpan();
+                  try (Scope scope = sendDataSpan.makeCurrent()) {
+                    return connection
+                        .sendHistory(historyContentsToSend)
+                        .doOnComplete(
+                            () -> {
+                              try (Scope innerScope = sendDataSpan.makeCurrent()) {
+                                Telemetry.traceSendData(
+                                    invocationContext, eventIdForSendData, historyContentsToSend);
+                              }
+                            })
+                        .doOnError(
+                            error -> {
+                              sendDataSpan.setStatus(StatusCode.ERROR, error.getMessage());
+                              sendDataSpan.recordException(error);
+                              try (Scope innerScope = sendDataSpan.makeCurrent()) {
+                                Telemetry.traceSendData(
+                                    invocationContext, eventIdForSendData, historyContentsToSend);
+                              }
+                            })
+                        .doFinally(sendDataSpan::end); // End span on completion or error
+                  }
+                });
+
     Flowable<LiveRequest> liveRequests = invocationContext.liveRequestQueue().get().get();
-    historySent
+    historySentCompletable
         .observeOn(
             agent.executor().map(executor -> Schedulers.from(executor)).orElse(Schedulers.io()))
         .andThen(
@@ -326,11 +383,13 @@ public abstract class BaseLlmFlow implements BaseFlow {
 
               @Override
               public void onComplete() {
+                log.debug("Live request sending completed, closing connection from sender side.");
                 connection.close();
               }
 
               @Override
               public void onError(Throwable e) {
+                log.error("Error in live request sending stream, closing connection.", e);
                 connection.close(e);
               }
             });
@@ -338,8 +397,11 @@ public abstract class BaseLlmFlow implements BaseFlow {
     return connection
         .receive()
         .flatMapSingle(
-            llmResponse ->
-                postprocess(invocationContext, eventId, preResult.updatedRequest(), llmResponse))
+            llmResponse -> {
+              String liveLlmResponseEventId = Event.generateEventId();
+              return postprocess(
+                  invocationContext, liveLlmResponseEventId, processedLlmRequest, llmResponse);
+            })
         .flatMap(
             postResult -> {
               Flowable<Event> events = Flowable.fromIterable(postResult.events());
@@ -355,7 +417,7 @@ public abstract class BaseLlmFlow implements BaseFlow {
               }
               return events;
             })
-        .startWithIterable(preResult.events());
+        .startWithIterable(preResult.events()); // Emit pre-processing events first
   }
 
   private Event buildModelResponseEvent(
