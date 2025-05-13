@@ -27,6 +27,7 @@ import com.google.auth.oauth2.GoogleCredentials;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
 import com.google.genai.types.Content;
+import com.google.genai.types.FinishReason;
 import com.google.genai.types.GroundingMetadata;
 import com.google.genai.types.HttpOptions;
 import com.google.genai.types.Part;
@@ -418,7 +419,9 @@ public final class VertexAiSessionService implements BaseSessionService {
                         })
                     .orElse(null))
             .timestamp(Instant.parse((String) apiEvent.get("timestamp")).toEpochMilli())
-            .errorCode(Optional.ofNullable(apiEvent.get("errorCode")).map(value -> (String) value))
+            .errorCode(
+                Optional.ofNullable(apiEvent.get("errorCode"))
+                    .map(value -> new FinishReason((String) value)))
             .errorMessage(
                 Optional.ofNullable(apiEvent.get("errorMessage")).map(value -> (String) value))
             .branch(Optional.ofNullable(apiEvent.get("branch")).map(value -> (String) value))

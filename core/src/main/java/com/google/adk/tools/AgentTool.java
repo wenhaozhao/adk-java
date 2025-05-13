@@ -22,13 +22,13 @@ import com.google.adk.agents.LlmAgent;
 import com.google.adk.events.Event;
 import com.google.adk.runner.InMemoryRunner;
 import com.google.adk.runner.Runner;
-import com.google.common.base.Ascii;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.genai.types.Content;
 import com.google.genai.types.FunctionDeclaration;
 import com.google.genai.types.Part;
 import com.google.genai.types.Schema;
+import com.google.genai.types.Type;
 import io.reactivex.rxjava3.core.Single;
 import java.util.HashMap;
 import java.util.List;
@@ -59,37 +59,39 @@ public class AgentTool extends BaseTool {
   @SuppressWarnings("unchecked") // For tool parameter type casting.
   private static Boolean matchType(Object value, Schema schema, Boolean isInput)
       throws IllegalArgumentException {
-    String type = Ascii.toUpperCase(schema.type().get());
     // Based on types from https://cloud.google.com/vertex-ai/docs/reference/rest/v1/Schema
-    if (type.equals("STRING")) {
-      return value instanceof String;
-    } else if (type.equals("INTEGER")) {
-      return value instanceof Integer;
-    } else if (type.equals("BOOLEAN")) {
-      return value instanceof Boolean;
-    } else if (type.equals("NUMBER")) {
-      return value instanceof Number;
-    } else if (type.equals("ARRAY")) {
-      if (value instanceof List) {
-        for (Object element : (List<?>) value) {
-          if (!matchType(element, schema.items().get(), isInput)) {
-            return false;
+    Type.Known type = schema.type().get().knownEnum();
+    switch (type) {
+      case STRING:
+        return value instanceof String;
+      case INTEGER:
+        return value instanceof Integer;
+      case BOOLEAN:
+        return value instanceof Boolean;
+      case NUMBER:
+        return value instanceof Number;
+      case ARRAY:
+        if (value instanceof List) {
+          for (Object element : (List<?>) value) {
+            if (!matchType(element, schema.items().get(), isInput)) {
+              return false;
+            }
           }
+          return true;
         }
-        return true;
-      }
-      return false;
-    } else if (type.equals("OBJECT")) {
-      if (value instanceof Map) {
-        validateMapOnSchema((Map<String, Object>) value, schema, isInput);
-        return true;
-      } else {
         return false;
-      }
-    } else {
-      throw new IllegalArgumentException(
-          "Unsupported type: " + type + " is not a Open API data type.");
+      case OBJECT:
+        if (value instanceof Map) {
+          validateMapOnSchema((Map<String, Object>) value, schema, isInput);
+          return true;
+        } else {
+          return false;
+        }
+      case TYPE_UNSPECIFIED:
+        throw new IllegalArgumentException(
+            "Unsupported type: " + type + " is not a Open API data type.");
     }
+    return false;
   }
 
   protected static void validateMapOnSchema(

@@ -33,6 +33,7 @@ import com.google.adk.testing.TestLlm;
 import com.google.common.collect.ImmutableList;
 import com.google.genai.types.AudioTranscriptionConfig;
 import com.google.genai.types.GenerateContentConfig;
+import com.google.genai.types.Modality;
 import com.google.genai.types.Schema;
 import com.google.genai.types.SpeechConfig;
 import com.google.genai.types.VoiceConfig;
@@ -118,7 +119,7 @@ public final class BasicTest {
   public void processRequest_buildsLiveConnectConfigFromRunConfig() {
     RunConfig runConfig =
         RunConfig.builder()
-            .setResponseModalities(ImmutableList.of(RunConfig.ResponseModality.TEXT))
+            .setResponseModalities(ImmutableList.of(new Modality(Modality.Known.TEXT)))
             .build();
     LlmAgent agentWithConfig = LlmAgent.builder().name("agentWithConfig").model(testLlm).build();
     InvocationContext contextWithRunConfig = createInvocationContext(agentWithConfig, runConfig);
@@ -129,7 +130,7 @@ public final class BasicTest {
     LlmRequest updatedRequest = result.updatedRequest();
     assertThat(updatedRequest.liveConnectConfig()).isNotNull();
     assertThat(updatedRequest.liveConnectConfig().responseModalities().get())
-        .containsExactly(RunConfig.ResponseModality.TEXT.toString());
+        .containsExactly(new Modality(Modality.Known.TEXT));
     assertThat(result.events()).isEmpty();
   }
 
@@ -165,7 +166,7 @@ public final class BasicTest {
   public void processRequest_buildsLiveConnectConfigFromRunConfig_responseModalities() {
     RunConfig runConfig =
         RunConfig.builder()
-            .setResponseModalities(ImmutableList.of(RunConfig.ResponseModality.TEXT))
+            .setResponseModalities(ImmutableList.of(new Modality(Modality.Known.TEXT)))
             .build();
     LlmAgent agentWithConfig = LlmAgent.builder().name("agentWithConfig").model(testLlm).build();
     InvocationContext contextWithRunConfig = createInvocationContext(agentWithConfig, runConfig);
@@ -176,7 +177,7 @@ public final class BasicTest {
     LlmRequest updatedRequest = result.updatedRequest();
     assertThat(updatedRequest.liveConnectConfig()).isNotNull();
     assertThat(updatedRequest.liveConnectConfig().responseModalities().get())
-        .containsExactly(RunConfig.ResponseModality.TEXT.toString());
+        .containsExactly(new Modality(Modality.Known.TEXT));
     assertThat(updatedRequest.liveConnectConfig().speechConfig()).isEmpty();
     assertThat(updatedRequest.liveConnectConfig().outputAudioTranscription()).isEmpty();
     assertThat(result.events()).isEmpty();
@@ -222,7 +223,7 @@ public final class BasicTest {
   public void processRequest_buildsLiveConnectConfigFromRunConfig_allFields() {
     RunConfig runConfig =
         RunConfig.builder()
-            .setResponseModalities(ImmutableList.of(RunConfig.ResponseModality.AUDIO))
+            .setResponseModalities(ImmutableList.of(new Modality(Modality.Known.AUDIO)))
             .setSpeechConfig(TEST_SPEECH_CONFIG)
             .setOutputAudioTranscription(TEST_AUDIO_TRANSCRIPTION_CONFIG)
             .build();
@@ -235,7 +236,7 @@ public final class BasicTest {
     LlmRequest updatedRequest = result.updatedRequest();
     assertThat(updatedRequest.liveConnectConfig()).isNotNull();
     assertThat(updatedRequest.liveConnectConfig().responseModalities().get())
-        .containsExactly(RunConfig.ResponseModality.AUDIO.toString());
+        .containsExactly(new Modality(Modality.Known.AUDIO));
     assertThat(updatedRequest.liveConnectConfig().speechConfig()).hasValue(TEST_SPEECH_CONFIG);
     assertThat(updatedRequest.liveConnectConfig().outputAudioTranscription())
         .hasValue(TEST_AUDIO_TRANSCRIPTION_CONFIG);

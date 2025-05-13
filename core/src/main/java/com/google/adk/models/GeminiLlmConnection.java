@@ -23,6 +23,7 @@ import com.google.genai.AsyncSession;
 import com.google.genai.Client;
 import com.google.genai.types.Blob;
 import com.google.genai.types.Content;
+import com.google.genai.types.FinishReason;
 import com.google.genai.types.FunctionCall;
 import com.google.genai.types.FunctionResponse;
 import com.google.genai.types.LiveConnectConfig;
@@ -160,7 +161,9 @@ public final class GeminiLlmConnection implements BaseLlmConnection {
       return Optional.empty();
     } else {
       logger.log(Level.WARNING, "Received unknown or empty server message: {0}", message.toJson());
-      builder.errorCode("UNKNOWN_MESSAGE_TYPE").errorMessage("Received unknown server message.");
+      builder
+          .errorCode(new FinishReason("Unknown server message."))
+          .errorMessage("Received unknown server message.");
     }
 
     return Optional.of(builder.build());

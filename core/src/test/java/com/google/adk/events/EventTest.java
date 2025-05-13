@@ -8,6 +8,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.genai.types.Content;
+import com.google.genai.types.FinishReason;
 import com.google.genai.types.FunctionCall;
 import com.google.genai.types.Part;
 import java.time.Instant;
@@ -45,7 +46,7 @@ public final class EventTest {
           .longRunningToolIds(ImmutableSet.of("tool_id"))
           .partial(true)
           .turnComplete(true)
-          .errorCode("error_code")
+          .errorCode(new FinishReason("error_code"))
           .errorMessage("error_message")
           .interrupted(true)
           .timestamp(123456789L)
@@ -58,7 +59,7 @@ public final class EventTest {
     assertThat(EVENT.longRunningToolIds().get()).containsExactly("tool_id");
     assertThat(EVENT.partial().get()).isTrue();
     assertThat(EVENT.turnComplete().get()).isTrue();
-    assertThat(EVENT.errorCode()).hasValue("error_code");
+    assertThat(EVENT.errorCode()).hasValue(new FinishReason("error_code"));
     assertThat(EVENT.errorMessage()).hasValue("error_message");
     assertThat(EVENT.interrupted()).hasValue(true);
     assertThat(EVENT.timestamp()).isEqualTo(123456789L);

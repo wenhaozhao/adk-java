@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.adk.JsonBaseModel;
 import com.google.common.collect.ImmutableList;
 import com.google.genai.types.Content;
+import com.google.genai.types.FinishReason;
 import com.google.genai.types.FunctionCall;
 import com.google.genai.types.Part;
 import java.util.Optional;
@@ -65,7 +66,7 @@ public final class LlmResponseTest {
             .content(sampleContent)
             .partial(true)
             .turnComplete(false)
-            .errorCode(Optional.of("ERR_123"))
+            .errorCode(new FinishReason("ERR_123"))
             .errorMessage(Optional.of("An error occurred."))
             .interrupted(Optional.of(true))
             .build();
@@ -89,7 +90,7 @@ public final class LlmResponseTest {
     assertThat(deserializedResponse.content()).hasValue(sampleContent);
     assertThat(deserializedResponse.partial()).hasValue(true);
     assertThat(deserializedResponse.turnComplete()).hasValue(false);
-    assertThat(deserializedResponse.errorCode()).hasValue("ERR_123");
+    assertThat(deserializedResponse.errorCode()).hasValue(new FinishReason("ERR_123"));
     assertThat(deserializedResponse.errorMessage()).hasValue("An error occurred.");
     assertThat(deserializedResponse.interrupted()).hasValue(true);
   }
@@ -170,7 +171,7 @@ public final class LlmResponseTest {
         LlmResponse.builder()
             .content(sampleContent)
             .turnComplete(true)
-            .errorCode("FATAL_ERROR")
+            .errorCode(new FinishReason("FATAL_ERROR"))
             .build();
 
     String json = originalResponse.toJson();
@@ -193,7 +194,7 @@ public final class LlmResponseTest {
         .isEqualTo("Partial data");
     assertThat(deserializedResponse.partial()).isEmpty();
     assertThat(deserializedResponse.turnComplete()).hasValue(true);
-    assertThat(deserializedResponse.errorCode()).hasValue("FATAL_ERROR");
+    assertThat(deserializedResponse.errorCode()).hasValue(new FinishReason("FATAL_ERROR"));
     assertThat(deserializedResponse.errorMessage()).isEmpty();
     assertThat(deserializedResponse.interrupted()).isEmpty();
   }

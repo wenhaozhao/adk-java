@@ -20,6 +20,7 @@ import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.genai.types.AudioTranscriptionConfig;
+import com.google.genai.types.Modality;
 import com.google.genai.types.SpeechConfig;
 import java.util.logging.Logger;
 import org.jspecify.annotations.Nullable;
@@ -36,18 +37,10 @@ public abstract class RunConfig {
     BIDI
   }
 
-  /**
-   * Modality of the agent's response. Used for Runner.runLive() to know when to include transcribed
-   * audio in the invocation context.
-   */
-  public enum ResponseModality {
-    TEXT,
-    AUDIO
-  }
 
   public abstract @Nullable SpeechConfig speechConfig();
 
-  public abstract ImmutableList<ResponseModality> responseModalities();
+  public abstract ImmutableList<Modality> responseModalities();
 
   public abstract boolean saveInputBlobsAsArtifacts();
 
@@ -83,8 +76,7 @@ public abstract class RunConfig {
     public abstract Builder setSpeechConfig(SpeechConfig speechConfig);
 
     @CanIgnoreReturnValue
-    public abstract Builder setResponseModalities(
-        ImmutableList<ResponseModality> responseModalities);
+    public abstract Builder setResponseModalities(ImmutableList<Modality> responseModalities);
 
     @CanIgnoreReturnValue
     public abstract Builder setSaveInputBlobsAsArtifacts(boolean saveInputBlobsAsArtifacts);

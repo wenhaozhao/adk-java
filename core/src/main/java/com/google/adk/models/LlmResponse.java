@@ -16,13 +16,16 @@
 
 package com.google.adk.models;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import com.google.adk.JsonBaseModel;
 import com.google.auto.value.AutoValue;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.genai.types.Candidate;
 import com.google.genai.types.Content;
+import com.google.genai.types.FinishReason;
 import com.google.genai.types.GenerateContentResponse;
 import com.google.genai.types.GenerateContentResponsePromptFeedback;
 import com.google.genai.types.GroundingMetadata;
@@ -32,7 +35,7 @@ import javax.annotation.Nullable;
 
 /** Represents a response received from the LLM. */
 @AutoValue
-@JsonDeserialize(builder = AutoValue_LlmResponse.Builder.class)
+@JsonDeserialize(builder = LlmResponse.Builder.class)
 public abstract class LlmResponse extends JsonBaseModel {
 
   LlmResponse() {}
@@ -73,7 +76,7 @@ public abstract class LlmResponse extends JsonBaseModel {
 
   /** Error code if the response is an error. Code varies by model. */
   @JsonProperty("error_code")
-  public abstract Optional<String> errorCode();
+  public abstract Optional<FinishReason> errorCode();
 
   /** Error message if the response is an error. */
   @JsonProperty("error_message")
@@ -90,7 +93,13 @@ public abstract class LlmResponse extends JsonBaseModel {
 
   /** Builder for constructing {@link LlmResponse} instances. */
   @AutoValue.Builder
+  @JsonPOJOBuilder(buildMethodName = "build", withPrefix = "")
   public abstract static class Builder {
+
+    @JsonCreator
+    static LlmResponse.Builder jacksonBuilder() {
+      return LlmResponse.builder();
+    }
 
     @JsonProperty("content")
     public abstract Builder content(Content content);
@@ -116,15 +125,13 @@ public abstract class LlmResponse extends JsonBaseModel {
     public abstract Builder turnComplete(Optional<Boolean> turnComplete);
 
     @JsonProperty("error_code")
-    public abstract Builder errorCode(@Nullable String errorCode);
+    public abstract Builder errorCode(@Nullable FinishReason errorCode);
 
-    @JsonProperty("error_code")
-    public abstract Builder errorCode(Optional<String> errorCode);
+    public abstract Builder errorCode(Optional<FinishReason> errorCode);
 
     @JsonProperty("error_message")
     public abstract Builder errorMessage(@Nullable String errorMessage);
 
-    @JsonProperty("error_message")
     public abstract Builder errorMessage(Optional<String> errorMessage);
 
     @CanIgnoreReturnValue
@@ -144,10 +151,12 @@ public abstract class LlmResponse extends JsonBaseModel {
             response.promptFeedback();
         if (promptFeedbackOpt.isPresent()) {
           GenerateContentResponsePromptFeedback promptFeedback = promptFeedbackOpt.get();
-          promptFeedback.blockReason().ifPresent(this::errorCode);
+          promptFeedback
+              .blockReason()
+              .ifPresent(reason -> this.errorCode(new FinishReason(reason.toString())));
           promptFeedback.blockReasonMessage().ifPresent(this::errorMessage);
         } else {
-          this.errorCode("UNKNOWN_ERROR");
+          this.errorCode(new FinishReason("Unknown error."));
           this.errorMessage("Unknown error.");
         }
       }

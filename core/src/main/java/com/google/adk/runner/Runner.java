@@ -29,6 +29,7 @@ import com.google.adk.sessions.Session;
 import com.google.common.collect.ImmutableList;
 import com.google.genai.types.AudioTranscriptionConfig;
 import com.google.genai.types.Content;
+import com.google.genai.types.Modality;
 import com.google.genai.types.Part;
 import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.core.Single;
@@ -175,11 +176,12 @@ public class Runner {
         && liveRequestQueue.isPresent()) {
       // Default to AUDIO modality if not specified.
       if (CollectionUtils.isNullOrEmpty(runConfig.responseModalities())) {
-        runConfigBuilder.setResponseModalities(ImmutableList.of(RunConfig.ResponseModality.AUDIO));
+        runConfigBuilder.setResponseModalities(
+            ImmutableList.of(new Modality(Modality.Known.AUDIO)));
         if (runConfig.outputAudioTranscription() == null) {
           runConfigBuilder.setOutputAudioTranscription(AudioTranscriptionConfig.builder().build());
         }
-      } else if (!runConfig.responseModalities().contains(RunConfig.ResponseModality.TEXT)) {
+      } else if (!runConfig.responseModalities().contains(new Modality(Modality.Known.TEXT))) {
         if (runConfig.outputAudioTranscription() == null) {
           runConfigBuilder.setOutputAudioTranscription(AudioTranscriptionConfig.builder().build());
         }

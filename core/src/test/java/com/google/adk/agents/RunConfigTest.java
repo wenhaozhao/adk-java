@@ -5,6 +5,7 @@ import static org.junit.Assert.assertThrows;
 
 import com.google.common.collect.ImmutableList;
 import com.google.genai.types.AudioTranscriptionConfig;
+import com.google.genai.types.Modality;
 import com.google.genai.types.SpeechConfig;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -21,7 +22,7 @@ public final class RunConfigTest {
     RunConfig runConfig =
         RunConfig.builder() // Use the static builder method
             .setSpeechConfig(speechConfig)
-            .setResponseModalities(ImmutableList.of(RunConfig.ResponseModality.TEXT))
+            .setResponseModalities(ImmutableList.of(new Modality(Modality.Known.TEXT)))
             .setSaveInputBlobsAsArtifacts(true)
             .setStreamingMode(RunConfig.StreamingMode.SSE)
             .setOutputAudioTranscription(audioTranscriptionConfig)
@@ -29,7 +30,7 @@ public final class RunConfigTest {
             .build();
 
     assertThat(runConfig.speechConfig()).isEqualTo(speechConfig);
-    assertThat(runConfig.responseModalities()).containsExactly(RunConfig.ResponseModality.TEXT);
+    assertThat(runConfig.responseModalities()).containsExactly(new Modality(Modality.Known.TEXT));
     assertThat(runConfig.saveInputBlobsAsArtifacts()).isTrue();
     assertThat(runConfig.streamingMode()).isEqualTo(RunConfig.StreamingMode.SSE);
     assertThat(runConfig.outputAudioTranscription()).isEqualTo(audioTranscriptionConfig);
@@ -74,7 +75,7 @@ public final class RunConfigTest {
     RunConfig runConfig =
         RunConfig.builder() // Use the static builder method
             .setSpeechConfig(speechConfig)
-            .setResponseModalities(ImmutableList.of(RunConfig.ResponseModality.AUDIO))
+            .setResponseModalities(ImmutableList.of(new Modality(Modality.Known.AUDIO)))
             .setSaveInputBlobsAsArtifacts(true)
             .setStreamingMode(RunConfig.StreamingMode.BIDI)
             .setOutputAudioTranscription(audioTranscriptionConfig)
@@ -82,7 +83,7 @@ public final class RunConfigTest {
             .build();
 
     assertThat(runConfig.speechConfig()).isEqualTo(speechConfig);
-    assertThat(runConfig.responseModalities()).containsExactly(RunConfig.ResponseModality.AUDIO);
+    assertThat(runConfig.responseModalities()).containsExactly(new Modality(Modality.Known.AUDIO));
     assertThat(runConfig.saveInputBlobsAsArtifacts()).isTrue();
     assertThat(runConfig.streamingMode()).isEqualTo(RunConfig.StreamingMode.BIDI);
     assertThat(runConfig.outputAudioTranscription()).isEqualTo(audioTranscriptionConfig);

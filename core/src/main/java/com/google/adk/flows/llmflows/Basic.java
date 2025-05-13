@@ -16,10 +16,8 @@
 
 package com.google.adk.flows.llmflows;
 
-import static com.google.common.collect.ImmutableList.toImmutableList;
-
-import com.google.adk.agents.LlmAgent;
 import com.google.adk.agents.InvocationContext;
+import com.google.adk.agents.LlmAgent;
 import com.google.adk.models.LlmRequest;
 import com.google.common.collect.ImmutableList;
 import com.google.genai.types.GenerateContentConfig;
@@ -45,11 +43,7 @@ public final class Basic implements RequestProcessor {
             : agent.resolvedModel().modelName().get();
 
     LiveConnectConfig.Builder liveConnectConfigBuilder =
-        LiveConnectConfig.builder()
-            .responseModalities(
-                context.runConfig().responseModalities().stream()
-                    .map(Enum::toString)
-                    .collect(toImmutableList()));
+        LiveConnectConfig.builder().responseModalities(context.runConfig().responseModalities());
     Optional.ofNullable(context.runConfig().speechConfig())
         .ifPresent(liveConnectConfigBuilder::speechConfig);
     Optional.ofNullable(context.runConfig().outputAudioTranscription())

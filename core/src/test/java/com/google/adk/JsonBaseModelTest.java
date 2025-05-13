@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.genai.types.Content;
+import com.google.genai.types.FinishReason;
 import com.google.genai.types.Part;
 import java.util.Optional;
 import org.junit.Test;
@@ -47,7 +48,7 @@ public class JsonBaseModelTest {
             .actions(EventActions.builder().stateDelta(ImmutableMap.of("key", "value")).build())
             .partial(true)
             .turnComplete(false)
-            .errorCode("TEST_ERROR")
+            .errorCode(new FinishReason("TEST_ERROR"))
             .errorMessage("This is a test error")
             .interrupted(true)
             .longRunningToolIds(ImmutableSet.of("tool_id_1", "tool_id_2"))

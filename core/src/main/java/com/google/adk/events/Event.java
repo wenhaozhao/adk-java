@@ -26,6 +26,7 @@ import com.google.adk.JsonBaseModel;
 import com.google.common.collect.ImmutableList;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.genai.types.Content;
+import com.google.genai.types.FinishReason;
 import com.google.genai.types.FunctionCall;
 import com.google.genai.types.FunctionResponse;
 import com.google.genai.types.GroundingMetadata;
@@ -49,7 +50,7 @@ public class Event extends JsonBaseModel {
   private Optional<Set<String>> longRunningToolIds = Optional.empty();
   private Optional<Boolean> partial = Optional.empty();
   private Optional<Boolean> turnComplete = Optional.empty();
-  private Optional<String> errorCode = Optional.empty();
+  private Optional<FinishReason> errorCode = Optional.empty();
   private Optional<String> errorMessage = Optional.empty();
   private Optional<Boolean> interrupted = Optional.empty();
   private Optional<String> branch = Optional.empty();
@@ -146,11 +147,11 @@ public class Event extends JsonBaseModel {
   }
 
   @JsonProperty("error_code")
-  public Optional<String> errorCode() {
+  public Optional<FinishReason> errorCode() {
     return errorCode;
   }
 
-  public void setErrorCode(Optional<String> errorCode) {
+  public void setErrorCode(Optional<FinishReason> errorCode) {
     this.errorCode = errorCode;
   }
 
@@ -271,7 +272,7 @@ public class Event extends JsonBaseModel {
     private Optional<Set<String>> longRunningToolIds = Optional.empty();
     private Optional<Boolean> partial = Optional.empty();
     private Optional<Boolean> turnComplete = Optional.empty();
-    private Optional<String> errorCode = Optional.empty();
+    private Optional<FinishReason> errorCode = Optional.empty();
     private Optional<String> errorMessage = Optional.empty();
     private Optional<Boolean> interrupted = Optional.empty();
     private Optional<String> branch = Optional.empty();
@@ -306,7 +307,7 @@ public class Event extends JsonBaseModel {
 
     @CanIgnoreReturnValue
     @JsonProperty("content")
-    public Builder content(Content value) {
+    public Builder content(@Nullable Content value) {
       this.content = Optional.ofNullable(value);
       return this;
     }
@@ -330,7 +331,7 @@ public class Event extends JsonBaseModel {
 
     @CanIgnoreReturnValue
     @JsonProperty("long_running_tool_ids")
-    public Builder longRunningToolIds(Set<String> value) {
+    public Builder longRunningToolIds(@Nullable Set<String> value) {
       this.longRunningToolIds = Optional.ofNullable(value);
       return this;
     }
@@ -343,8 +344,8 @@ public class Event extends JsonBaseModel {
 
     @CanIgnoreReturnValue
     @JsonProperty("partial")
-    public Builder partial(boolean value) {
-      this.partial = Optional.of(value);
+    public Builder partial(@Nullable Boolean value) {
+      this.partial = Optional.ofNullable(value);
       return this;
     }
 
@@ -356,8 +357,8 @@ public class Event extends JsonBaseModel {
 
     @CanIgnoreReturnValue
     @JsonProperty("turn_complete")
-    public Builder turnComplete(boolean value) {
-      this.turnComplete = Optional.of(value);
+    public Builder turnComplete(@Nullable Boolean value) {
+      this.turnComplete = Optional.ofNullable(value);
       return this;
     }
 
@@ -369,13 +370,13 @@ public class Event extends JsonBaseModel {
 
     @CanIgnoreReturnValue
     @JsonProperty("error_code")
-    public Builder errorCode(@Nullable String value) {
+    public Builder errorCode(@Nullable FinishReason value) {
       this.errorCode = Optional.ofNullable(value);
       return this;
     }
 
     @CanIgnoreReturnValue
-    public Builder errorCode(Optional<String> value) {
+    public Builder errorCode(Optional<FinishReason> value) {
       this.errorCode = value;
       return this;
     }
@@ -395,8 +396,8 @@ public class Event extends JsonBaseModel {
 
     @CanIgnoreReturnValue
     @JsonProperty("interrupted")
-    public Builder interrupted(boolean value) {
-      this.interrupted = Optional.of(value);
+    public Builder interrupted(@Nullable Boolean value) {
+      this.interrupted = Optional.ofNullable(value);
       return this;
     }
 
