@@ -17,7 +17,7 @@
 package com.google.adk.tools;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.adk.JsonBaseModel;
 import com.google.adk.agents.LlmAgent;
 import com.google.adk.events.Event;
 import com.google.adk.runner.InMemoryRunner;
@@ -38,17 +38,22 @@ import java.util.Optional;
 
 /** AgentTool implements a tool that allows an agent to call another agent. */
 public class AgentTool extends BaseTool {
-  private static final ObjectMapper objectMapper = new ObjectMapper();
 
-  private LlmAgent agent;
+  private final LlmAgent agent;
+  private final boolean skipSummarization;
 
-  public static AgentTool create(LlmAgent agent) {
-    return new AgentTool(agent);
+  public static AgentTool create(LlmAgent agent, boolean skipSummarization) {
+    return new AgentTool(agent, skipSummarization);
   }
 
-  protected AgentTool(LlmAgent agent) {
+  public static AgentTool create(LlmAgent agent) {
+    return new AgentTool(agent, false);
+  }
+
+  protected AgentTool(LlmAgent agent, boolean skipSummarization) {
     super(agent.name(), agent.description());
     this.agent = agent;
+    this.skipSummarization = skipSummarization;
   }
 
   @SuppressWarnings("unchecked") // For tool parameter type casting.
@@ -129,7 +134,7 @@ public class AgentTool extends BaseTool {
   @SuppressWarnings("unchecked") // For tool parameter type casting.
   protected static Map<String, Object> validateOutputSchema(String output, Schema schema)
       throws IllegalArgumentException, JsonProcessingException {
-    Map<String, Object> outputMap = objectMapper.readValue(output, HashMap.class);
+    Map<String, Object> outputMap = JsonBaseModel.getMapper().readValue(output, HashMap.class);
     validateMapOnSchema(outputMap, schema, false);
     return outputMap;
   }
@@ -154,6 +159,11 @@ public class AgentTool extends BaseTool {
   @Override
   public Single<Map<String, Object>> runAsync(
       Map<String, Object> args, ToolContext toolContext) {
+
+    if (this.skipSummarization) {
+      toolContext.actions().setSkipSummarization(true);
+    }
+
     Content content;
     if (this.agent.inputSchema().isPresent()) {
       validateMapOnSchema(args, this.agent.inputSchema().get(), true);

@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import javax.annotation.Nullable;
 
 /** Represents the actions attached to an event. */
 // TODO - b/414081262 make json wire camelCase
@@ -42,6 +43,10 @@ public class EventActions {
   @JsonProperty("skip_summarization")
   public Optional<Boolean> skipSummarization() {
     return skipSummarization;
+  }
+
+  public void setSkipSummarization(@Nullable Boolean skipSummarization) {
+    this.skipSummarization = Optional.ofNullable(skipSummarization);
   }
 
   public void setSkipSummarization(Optional<Boolean> skipSummarization) {

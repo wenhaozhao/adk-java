@@ -86,6 +86,12 @@ public class ToolContext extends CallbackContext {
     return new Builder(invocationContext);
   }
 
+  public Builder toBuilder() {
+    return new Builder(invocationContext)
+        .actions(eventActions)
+        .functionCallId(functionCallId.orElse(null));
+  }
+
   /** Builder for {@link ToolContext}. */
   public static final class Builder {
     private final InvocationContext invocationContext;

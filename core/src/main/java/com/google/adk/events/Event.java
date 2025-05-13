@@ -228,7 +228,8 @@ public class Event extends JsonBaseModel {
 
   @JsonIgnore
   public final boolean finalResponse() {
-    if (longRunningToolIds().isPresent() && !longRunningToolIds().get().isEmpty()) {
+    if (actions().skipSummarization().orElse(false)
+        || (longRunningToolIds().isPresent() && !longRunningToolIds().get().isEmpty())) {
       return true;
     }
     return functionCalls().isEmpty() && functionResponses().isEmpty() && !partial().orElse(false);
