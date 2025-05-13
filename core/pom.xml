@@ -51,7 +51,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <java.version>17</java.version>
     <maven.compiler.release>${java.version}</maven.compiler.release>
-    <mcp-schema.version>0.8.1</mcp-schema.version>
+    <mcp-schema.version>0.10.0</mcp-schema.version>
     <errorprone.version>2.38.0</errorprone.version>
     <google.auth.version>1.33.1</google.auth.version>
     <java.apache.httpcore.version>4.10.1</java.apache.httpcore.version>
