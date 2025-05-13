@@ -1,0 +1,45 @@
+# Simple test to verify code compiles with required Java versions.
+name: validation
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'core/**'
+      - 'dev/**'
+      # Add other module paths here
+
+jobs:
+  build-modules:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        java-version: ['17', '21']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java ${{ matrix.java-version }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java-version }}
+
+      - name: Cache Maven packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ matrix.java-version }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: | # Fallback keys if exact match is not found
+            ${{ runner.os }}-maven-${{ matrix.java-version }}-
+            ${{ runner.os }}-maven-
+
+      - name: Compile core module with Java ${{ matrix.java-version }}
+        working-directory: ./core
+        run: mvn clean compile
+
+      - name: Compile dev module with Java ${{ matrix.java-version }}
+        working-directory: ./dev
+        run: mvn clean compile
