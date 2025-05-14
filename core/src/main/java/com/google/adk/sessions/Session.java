@@ -23,10 +23,10 @@ import com.google.adk.JsonBaseModel;
 import com.google.adk.events.Event;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /** A {@link Session} object that encapsulates the {@link State} and {@link Event}s of a session. */
 @JsonDeserialize(builder = Session.Builder.class)
@@ -37,7 +37,7 @@ public final class Session extends JsonBaseModel {
 
   private final String userId;
 
-  private final Map<String, Object> state;
+  private final State state;
 
   private final List<Event> events;
 
@@ -52,7 +52,7 @@ public final class Session extends JsonBaseModel {
     private String id;
     private String appName;
     private String userId;
-    private Map<String, Object> state = new State(new HashMap<>());
+    private State state = new State(new ConcurrentHashMap<>());
     private List<Event> events = new ArrayList<>();
     private Instant lastUpdateTime = Instant.EPOCH;
 
@@ -75,8 +75,8 @@ public final class Session extends JsonBaseModel {
     }
 
     @JsonProperty("state")
-    public Builder state(Map<String, Object> state) {
-      this.state = state;
+    public Builder state(ConcurrentMap<String, Object> state) {
+      this.state = new State(state);
       return this;
     }
 
@@ -126,7 +126,7 @@ public final class Session extends JsonBaseModel {
   }
 
   @JsonProperty("state")
-  public Map<String, Object> state() {
+  public ConcurrentMap<String, Object> state() {
     return state;
   }
 
@@ -171,7 +171,7 @@ public final class Session extends JsonBaseModel {
       String appName,
       String userId,
       String id,
-      Map<String, Object> state,
+      State state,
       List<Event> events,
       Instant lastUpdateTime) {
     this.id = id;

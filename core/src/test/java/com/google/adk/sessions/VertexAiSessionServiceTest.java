@@ -27,6 +27,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.http.HttpEntity;
@@ -131,7 +133,7 @@ public class VertexAiSessionServiceTest {
     return Session.builder("1")
         .appName("123")
         .userId("user")
-        .state((Map<String, Object>) sessionJson.get("sessionState"))
+        .state(new ConcurrentHashMap<>((Map<String, Object>) sessionJson.get("sessionState")))
         .lastUpdateTime(Instant.parse((String) sessionJson.get("updateTime")))
         .events(
             Arrays.asList(
@@ -147,7 +149,9 @@ public class VertexAiSessionServiceTest {
                     .actions(
                         EventActions.builder()
                             .transferToAgent("agent")
-                            .stateDelta((Map<String, Object>) sessionJson.get("sessionState"))
+                            .stateDelta(
+                                new ConcurrentHashMap<>(
+                                    (Map<String, Object>) sessionJson.get("sessionState")))
                             .build())
                     .partial(false)
                     .turnComplete(true)
@@ -209,7 +213,8 @@ public class VertexAiSessionServiceTest {
                           newSessionId));
                   newSessionData.put("userId", requestDict.get("userId"));
                   newSessionData.put(
-                      "sessionState", requestDict.getOrDefault("sessionState", new HashMap<>()));
+                      "sessionState",
+                      requestDict.getOrDefault("sessionState", new ConcurrentHashMap<>()));
                   newSessionData.put("updateTime", "2024-12-12T12:12:12.123456Z");
 
                   sessionMap.put(newSessionId, mapper.writeValueAsString(newSessionData));
@@ -342,7 +347,8 @@ public class VertexAiSessionServiceTest {
 
   @Test
   public void createSession_success() throws Exception {
-    ImmutableMap<String, Object> sessionStateMap = ImmutableMap.of("new_key", "new_value");
+    ConcurrentMap<String, Object> sessionStateMap =
+        new ConcurrentHashMap<>(ImmutableMap.of("new_key", "new_value"));
     Single<Session> sessionSingle =
         vertexAiSessionService.createSession("123", "test_user", sessionStateMap, null);
     Session createdSession = sessionSingle.blockingGet();
@@ -391,7 +397,8 @@ public class VertexAiSessionServiceTest {
 
   @Test
   public void createSessionAndGetSession_success() throws Exception {
-    ImmutableMap<String, Object> sessionStateMap = ImmutableMap.of("key", "value");
+    ConcurrentMap<String, Object> sessionStateMap =
+        new ConcurrentHashMap<>(ImmutableMap.of("key", "value"));
     Single<Session> sessionSingle =
         vertexAiSessionService.createSession("123", "user", sessionStateMap, null);
     Session createdSession = sessionSingle.blockingGet();

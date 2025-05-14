@@ -19,6 +19,7 @@ import io.reactivex.rxjava3.core.Maybe;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Before;
 import org.junit.Test;
@@ -130,7 +131,7 @@ public final class LongRunningFunctionToolTest {
     session =
         runner
             .sessionService()
-            .createSession(runner.appName(), "test-user-id", ImmutableMap.of(), null)
+            .createSession(runner.appName(), "test-user-id", new ConcurrentHashMap<>(), null)
             .blockingGet();
   }
 

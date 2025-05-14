@@ -25,7 +25,6 @@ import io.reactivex.rxjava3.core.Maybe;
 import io.reactivex.rxjava3.core.Single;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -73,7 +72,7 @@ public final class InMemorySessionService implements BaseSessionService {
   public Single<Session> createSession(
       String appName,
       String userId,
-      @Nullable Map<String, Object> state,
+      @Nullable ConcurrentMap<String, Object> state,
       @Nullable String sessionId) {
     Objects.requireNonNull(appName, "appName cannot be null");
     Objects.requireNonNull(userId, "userId cannot be null");
@@ -85,7 +84,8 @@ public final class InMemorySessionService implements BaseSessionService {
             .orElseGet(() -> UUID.randomUUID().toString());
 
     // Ensure state map and events list are mutable for the new session
-    Map<String, Object> initialState = (state == null) ? new HashMap<>() : new HashMap<>(state);
+    ConcurrentMap<String, Object> initialState =
+        (state == null) ? new ConcurrentHashMap<>() : new ConcurrentHashMap<>(state);
     List<Event> initialEvents = new ArrayList<>();
 
     // Assuming Session constructor or setters allow setting these mutable collections
@@ -300,7 +300,7 @@ public final class InMemorySessionService implements BaseSessionService {
     return Session.builder(original.id())
         .appName(original.appName())
         .userId(original.userId())
-        .state(new HashMap<>(original.state()))
+        .state(new ConcurrentHashMap<>(original.state()))
         .events(new ArrayList<>(original.events()))
         .lastUpdateTime(original.lastUpdateTime())
         .build();

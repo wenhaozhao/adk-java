@@ -10,6 +10,7 @@ import com.google.genai.types.FinishReason;
 import com.google.genai.types.FunctionCall;
 import com.google.genai.types.Part;
 import java.time.Instant;
+import java.util.concurrent.ConcurrentHashMap;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -26,13 +27,17 @@ public final class EventTest {
   private static final EventActions EVENT_ACTIONS =
       EventActions.builder()
           .skipSummarization(true)
-          .stateDelta(ImmutableMap.of("key", "value"))
+          .stateDelta(new ConcurrentHashMap<>(ImmutableMap.of("key", "value")))
           .artifactDelta(
-              ImmutableMap.of("artifact_key", Part.builder().text("artifact_value").build()))
+              new ConcurrentHashMap<>(
+                  ImmutableMap.of("artifact_key", Part.builder().text("artifact_value").build())))
           .transferToAgent("agent_id")
           .escalate(true)
           .requestedAuthConfigs(
-              ImmutableMap.of("auth_config_key", ImmutableMap.of("auth_key", "auth_value")))
+              new ConcurrentHashMap<>(
+                  ImmutableMap.of(
+                      "auth_config_key",
+                      new ConcurrentHashMap<>(ImmutableMap.of("auth_key", "auth_value")))))
           .build();
   private static final Event EVENT =
       Event.builder()

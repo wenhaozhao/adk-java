@@ -44,6 +44,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -104,11 +106,11 @@ public final class VertexAiSessionService implements BaseSessionService {
   public Single<Session> createSession(
       String appName,
       String userId,
-      @Nullable Map<String, Object> state,
+      @Nullable ConcurrentMap<String, Object> state,
       @Nullable String sessionId) {
 
     reasoningEngineId = parseReasoningEngineId(appName);
-    sessionJsonMap = new HashMap<>();
+    sessionJsonMap = new ConcurrentHashMap<>();
     sessionJsonMap.put("userId", userId);
     if (state != null) {
       sessionJsonMap.put("sessionState", state);
@@ -156,14 +158,15 @@ public final class VertexAiSessionService implements BaseSessionService {
     JsonNode getSessionResponseMap = getJsonResponse(getSessionApiResponse);
     Instant updateTimestamp =
         Instant.parse((String) getSessionResponseMap.get("updateTime").asText());
-    Map<String, Object> sessionState = new HashMap<>();
+    ConcurrentMap<String, Object> sessionState = new ConcurrentHashMap<>();
     try {
       if (getSessionResponseMap != null && getSessionResponseMap.has("sessionState")) {
         JsonNode sessionStateNode = getSessionResponseMap.get("sessionState");
         if (sessionStateNode != null) {
           sessionState =
               objectMapper.readValue(
-                  sessionStateNode.toString(), new TypeReference<Map<String, Object>>() {});
+                  sessionStateNode.toString(),
+                  new TypeReference<ConcurrentMap<String, Object>>() {});
         }
       }
     } catch (JsonProcessingException e) {
@@ -214,7 +217,7 @@ public final class VertexAiSessionService implements BaseSessionService {
           Session.builder(sessionId)
               .appName(appName)
               .userId(userId)
-              .state(new HashMap<>())
+              .state(new ConcurrentHashMap<>())
               .lastUpdateTime(updateTimestamp)
               .build();
       sessions.add(session);
@@ -270,16 +273,14 @@ public final class VertexAiSessionService implements BaseSessionService {
 
     Instant updateTimestamp =
         Instant.parse((String) getSessionResponseMap.get("updateTime").asText());
-    Map<String, Object> sessionState = new HashMap<>();
+    ConcurrentMap<String, Object> sessionState;
     try {
-      Object sessionStateValue = getSessionResponseMap.get("sessionState");
-      if (sessionStateValue != null) {
-        sessionState =
-            objectMapper.readValue(
-                sessionStateValue.toString(), new TypeReference<Map<String, Object>>() {});
-      }
+      sessionState =
+          objectMapper.readValue(
+              getSessionResponseMap.get("sessionState").toString(),
+              new TypeReference<ConcurrentMap<String, Object>>() {});
     } catch (JsonProcessingException e) {
-      logger.log(Level.WARNING, "Error while parsing session state: " + e.getMessage());
+      sessionState = new ConcurrentHashMap<>();
     }
     Session session =
         Session.builder(sessId)
@@ -486,12 +487,12 @@ public final class VertexAiSessionService implements BaseSessionService {
           Optional.ofNullable(actionsMap.get("skipSummarization")).map(value -> (Boolean) value));
       eventActions.setStateDelta(
           actionsMap.get("stateDelta") != null
-              ? (Map<String, Object>) actionsMap.get("stateDelta")
-              : new HashMap<>());
+              ? new ConcurrentHashMap<>((Map<String, Object>) actionsMap.get("stateDelta"))
+              : new ConcurrentHashMap<>());
       eventActions.setArtifactDelta(
           actionsMap.get("artifactDelta") != null
-              ? (Map<String, Part>) actionsMap.get("artifactDelta")
-              : new HashMap<>());
+              ? new ConcurrentHashMap<>((Map<String, Part>) actionsMap.get("artifactDelta"))
+              : new ConcurrentHashMap<>());
       eventActions.setTransferToAgent(
           actionsMap.get("transferAgent") != null
               ? (String) actionsMap.get("transferAgent")
@@ -500,8 +501,9 @@ public final class VertexAiSessionService implements BaseSessionService {
           Optional.ofNullable(actionsMap.get("escalate")).map(value -> (Boolean) value));
       eventActions.setRequestedAuthConfigs(
           actionsMap.get("requestedAuthConfigs") != null
-              ? (Map<String, Map<String, Object>>) actionsMap.get("requestedAuthConfigs")
-              : new HashMap<>());
+              ? (ConcurrentMap<String, ConcurrentMap<String, Object>>)
+                  actionsMap.get("requestedAuthConfigs")
+              : new ConcurrentHashMap<>());
     }
 
     Event event =

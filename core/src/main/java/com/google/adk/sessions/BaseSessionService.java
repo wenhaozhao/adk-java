@@ -23,9 +23,9 @@ import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Maybe;
 import io.reactivex.rxjava3.core.Single;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentMap;
 import javax.annotation.Nullable;
 
 /**
@@ -51,7 +51,7 @@ public interface BaseSessionService {
   Single<Session> createSession(
       String appName,
       String userId,
-      @Nullable Map<String, Object> state,
+      @Nullable ConcurrentMap<String, Object> state,
       @Nullable String sessionId);
 
   /**
@@ -165,9 +165,9 @@ public interface BaseSessionService {
 
     EventActions actions = event.actions();
     if (actions != null) {
-      Map<String, Object> stateDelta = actions.stateDelta();
+      ConcurrentMap<String, Object> stateDelta = actions.stateDelta();
       if (stateDelta != null && !stateDelta.isEmpty()) {
-        Map<String, Object> sessionState = session.state();
+        ConcurrentMap<String, Object> sessionState = session.state();
         if (sessionState != null) {
           stateDelta.forEach(
               (key, value) -> {

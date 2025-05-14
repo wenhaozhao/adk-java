@@ -19,10 +19,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.genai.types.Part;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import javax.annotation.Nullable;
 
 /** Represents the actions attached to an event. */
@@ -31,11 +31,12 @@ import javax.annotation.Nullable;
 public class EventActions {
 
   private Optional<Boolean> skipSummarization = Optional.empty();
-  private Map<String, Object> stateDelta = new HashMap<>();
-  private Map<String, Part> artifactDelta = new HashMap<>();
+  private ConcurrentMap<String, Object> stateDelta = new ConcurrentHashMap<>();
+  private ConcurrentMap<String, Part> artifactDelta = new ConcurrentHashMap<>();
   private Optional<String> transferToAgent = Optional.empty();
   private Optional<Boolean> escalate = Optional.empty();
-  private Map<String, Map<String, Object>> requestedAuthConfigs = new HashMap<>();
+  private ConcurrentMap<String, ConcurrentMap<String, Object>> requestedAuthConfigs =
+      new ConcurrentHashMap<>();
 
   /** Default constructor for Jackson. */
   public EventActions() {}
@@ -58,20 +59,20 @@ public class EventActions {
   }
 
   @JsonProperty("stateDelta")
-  public Map<String, Object> stateDelta() {
+  public ConcurrentMap<String, Object> stateDelta() {
     return stateDelta;
   }
 
-  public void setStateDelta(Map<String, Object> stateDelta) {
+  public void setStateDelta(ConcurrentMap<String, Object> stateDelta) {
     this.stateDelta = stateDelta;
   }
 
   @JsonProperty("artifactDelta")
-  public Map<String, Part> artifactDelta() {
+  public ConcurrentMap<String, Part> artifactDelta() {
     return artifactDelta;
   }
 
-  public void setArtifactDelta(Map<String, Part> artifactDelta) {
+  public void setArtifactDelta(ConcurrentMap<String, Part> artifactDelta) {
     this.artifactDelta = artifactDelta;
   }
 
@@ -102,11 +103,12 @@ public class EventActions {
   }
 
   @JsonProperty("requestedAuthConfigs")
-  public Map<String, Map<String, Object>> requestedAuthConfigs() {
+  public ConcurrentMap<String, ConcurrentMap<String, Object>> requestedAuthConfigs() {
     return requestedAuthConfigs;
   }
 
-  public void setRequestedAuthConfigs(Map<String, Map<String, Object>> requestedAuthConfigs) {
+  public void setRequestedAuthConfigs(
+      ConcurrentMap<String, ConcurrentMap<String, Object>> requestedAuthConfigs) {
     this.requestedAuthConfigs = requestedAuthConfigs;
   }
 
@@ -149,21 +151,22 @@ public class EventActions {
   /** Builder for {@link EventActions}. */
   public static class Builder {
     private Optional<Boolean> skipSummarization = Optional.empty();
-    private Map<String, Object> stateDelta = new HashMap<>();
-    private Map<String, Part> artifactDelta = new HashMap<>();
+    private ConcurrentMap<String, Object> stateDelta = new ConcurrentHashMap<>();
+    private ConcurrentMap<String, Part> artifactDelta = new ConcurrentHashMap<>();
     private Optional<String> transferToAgent = Optional.empty();
     private Optional<Boolean> escalate = Optional.empty();
-    private Map<String, Map<String, Object>> requestedAuthConfigs = new HashMap<>();
+    private ConcurrentMap<String, ConcurrentMap<String, Object>> requestedAuthConfigs =
+        new ConcurrentHashMap<>();
 
     public Builder() {}
 
     private Builder(EventActions eventActions) {
       this.skipSummarization = eventActions.skipSummarization();
-      this.stateDelta = new HashMap<>(eventActions.stateDelta());
-      this.artifactDelta = new HashMap<>(eventActions.artifactDelta());
+      this.stateDelta = new ConcurrentHashMap<>(eventActions.stateDelta());
+      this.artifactDelta = new ConcurrentHashMap<>(eventActions.artifactDelta());
       this.transferToAgent = eventActions.transferToAgent();
       this.escalate = eventActions.escalate();
-      this.requestedAuthConfigs = new HashMap<>(eventActions.requestedAuthConfigs());
+      this.requestedAuthConfigs = new ConcurrentHashMap<>(eventActions.requestedAuthConfigs());
     }
 
     @CanIgnoreReturnValue
@@ -175,14 +178,14 @@ public class EventActions {
 
     @CanIgnoreReturnValue
     @JsonProperty("stateDelta")
-    public Builder stateDelta(Map<String, Object> value) {
+    public Builder stateDelta(ConcurrentMap<String, Object> value) {
       this.stateDelta = value;
       return this;
     }
 
     @CanIgnoreReturnValue
     @JsonProperty("artifactDelta")
-    public Builder artifactDelta(Map<String, Part> value) {
+    public Builder artifactDelta(ConcurrentMap<String, Part> value) {
       this.artifactDelta = value;
       return this;
     }
@@ -203,7 +206,8 @@ public class EventActions {
 
     @CanIgnoreReturnValue
     @JsonProperty("requestedAuthConfigs")
-    public Builder requestedAuthConfigs(Map<String, Map<String, Object>> value) {
+    public Builder requestedAuthConfigs(
+        ConcurrentMap<String, ConcurrentMap<String, Object>> value) {
       this.requestedAuthConfigs = value;
       return this;
     }

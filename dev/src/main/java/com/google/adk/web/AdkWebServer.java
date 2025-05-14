@@ -591,7 +591,8 @@ public class AdkWebServer implements WebMvcConfigurer {
       try {
         Session createdSession =
             sessionService
-                .createSession(effectiveAppName, userId, initialState, sessionId)
+                .createSession(
+                    effectiveAppName, userId, new ConcurrentHashMap<>(initialState), sessionId)
                 .blockingGet();
 
         if (createdSession == null) {
@@ -640,7 +641,8 @@ public class AdkWebServer implements WebMvcConfigurer {
 
         Session createdSession =
             sessionService
-                .createSession(effectiveAppName, userId, initialState, null)
+                .createSession(
+                    effectiveAppName, userId, new ConcurrentHashMap<>(initialState), null)
                 .blockingGet();
 
         if (createdSession == null) {

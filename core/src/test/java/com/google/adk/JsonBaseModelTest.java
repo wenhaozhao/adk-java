@@ -27,6 +27,7 @@ import com.google.genai.types.Content;
 import com.google.genai.types.FinishReason;
 import com.google.genai.types.Part;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -44,7 +45,11 @@ public class JsonBaseModelTest {
             .author("user")
             .content(
                 Content.builder().parts(ImmutableList.of(Part.fromText("Hello, world!"))).build())
-            .actions(EventActions.builder().stateDelta(ImmutableMap.of("key", "value")).build())
+            .actions(
+                EventActions.builder()
+                    .stateDelta(
+                        new ConcurrentHashMap<String, Object>(ImmutableMap.of("key", "value")))
+                    .build())
             .partial(true)
             .turnComplete(false)
             .errorCode(new FinishReason("TEST_ERROR"))

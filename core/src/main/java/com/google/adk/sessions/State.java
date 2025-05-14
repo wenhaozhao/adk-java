@@ -17,26 +17,28 @@
 package com.google.adk.sessions;
 
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /** A {@link State} object that also keeps track of the changes to the state. */
-public final class State implements Map<String, Object> {
+@SuppressWarnings("ShouldNotSubclass")
+public final class State implements ConcurrentMap<String, Object> {
 
   public static final String APP_PREFIX = "app:";
   public static final String USER_PREFIX = "user:";
   public static final String TEMP_PREFIX = "temp:";
 
-  private final Map<String, Object> state;
-  private final Map<String, Object> delta;
+  private final ConcurrentMap<String, Object> state;
+  private final ConcurrentMap<String, Object> delta;
 
-  public State(Map<String, Object> state) {
-    this(state, new HashMap<>());
+  public State(ConcurrentMap<String, Object> state) {
+    this(state, new ConcurrentHashMap<>());
   }
 
-  public State(Map<String, Object> state, Map<String, Object> delta) {
+  public State(ConcurrentMap<String, Object> state, ConcurrentMap<String, Object> delta) {
     this.state = state;
     this.delta = delta;
   }
@@ -101,6 +103,15 @@ public final class State implements Map<String, Object> {
   }
 
   @Override
+  public Object putIfAbsent(String key, Object value) {
+    Object existingValue = state.putIfAbsent(key, value);
+    if (existingValue == null) {
+      delta.put(key, value);
+    }
+    return existingValue;
+  }
+
+  @Override
   public void putAll(Map<? extends String, ? extends Object> m) {
     state.putAll(m);
     delta.putAll(m);
@@ -109,6 +120,29 @@ public final class State implements Map<String, Object> {
   @Override
   public Object remove(Object key) {
     return state.remove(key);
+  }
+
+  @Override
+  public boolean remove(Object key, Object value) {
+    return state.remove(key, value);
+  }
+
+  @Override
+  public boolean replace(String key, Object oldValue, Object newValue) {
+    boolean replaced = state.replace(key, oldValue, newValue);
+    if (replaced) {
+      delta.put(key, newValue);
+    }
+    return replaced;
+  }
+
+  @Override
+  public Object replace(String key, Object value) {
+    Object oldValue = state.replace(key, value);
+    if (oldValue != null) {
+      delta.put(key, value);
+    }
+    return oldValue;
   }
 
   @Override
