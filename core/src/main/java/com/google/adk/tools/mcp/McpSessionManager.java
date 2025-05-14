@@ -55,9 +55,7 @@ public class McpSessionManager {
     } else if (connectionParams instanceof SseServerParams) {
       SseServerParams sseServerParams = (SseServerParams) connectionParams;
       transport =
-          HttpClientSseClientTransport.builder(sseServerParams.url())
-              .sseEndpoint(sseServerParams.isToolbox() ? "/mcp/sse" : "/sse")
-              .build();
+          HttpClientSseClientTransport.builder(sseServerParams.url()).sseEndpoint("sse").build();
     } else {
       throw new IllegalArgumentException(
           "Connection parameters must be either ServerParameters or SseServerParams, but got "

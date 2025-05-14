@@ -29,9 +29,6 @@ public abstract class SseServerParams {
   /** The URL of the SSE server. */
   public abstract String url();
 
-  /** If this is an MCP Toolbox server. */
-  public abstract Boolean isToolbox();
-
   /** Optional headers to include in the SSE connection request. */
   @Nullable
   public abstract ImmutableMap<String, Object> headers();
@@ -46,8 +43,7 @@ public abstract class SseServerParams {
   public static Builder builder() {
     return new AutoValue_SseServerParams.Builder()
         .timeout(Duration.ofSeconds(5))
-        .sseReadTimeout(Duration.ofMinutes(5))
-        .isToolbox(false);
+        .sseReadTimeout(Duration.ofMinutes(5));
   }
 
   /** Builder for {@link SseServerParams}. */
@@ -55,9 +51,6 @@ public abstract class SseServerParams {
   public abstract static class Builder {
     /** Sets the URL of the SSE server. */
     public abstract Builder url(String url);
-
-    /** Sets whether this is an MCP Toolbox server. */
-    public abstract Builder isToolbox(Boolean isToolbox);
 
     /** Sets the headers for the SSE connection request. */
     public abstract Builder headers(@Nullable Map<String, Object> headers);
