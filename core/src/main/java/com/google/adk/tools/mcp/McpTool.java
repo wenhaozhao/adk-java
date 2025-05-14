@@ -18,6 +18,8 @@ package com.google.adk.tools.mcp;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.adk.tools.BaseTool;
 import com.google.adk.tools.ToolContext;
@@ -27,9 +29,12 @@ import com.google.genai.types.Schema;
 import io.modelcontextprotocol.client.McpSyncClient;
 import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
+import io.modelcontextprotocol.spec.McpSchema.Content;
 import io.modelcontextprotocol.spec.McpSchema.JsonSchema;
+import io.modelcontextprotocol.spec.McpSchema.TextContent;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
 import io.reactivex.rxjava3.core.Single;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -94,14 +99,65 @@ public final class McpTool extends BaseTool {
   }
 
   @Override
-  public Single<Map<String, Object>> runAsync(
-      Map<String, Object> args, ToolContext toolContext) {
-    // TODO(b/413489523): Handle CallToolResult.
+  public Single<Map<String, Object>> runAsync(Map<String, Object> args, ToolContext toolContext) {
     return Single.<Map<String, Object>>fromCallable(
             () -> {
-              CallToolResult unused =
+              CallToolResult callResult =
                   mcpSession.callTool(new CallToolRequest(this.name(), ImmutableMap.copyOf(args)));
-              return ImmutableMap.of();
+
+              if (callResult == null) {
+                return ImmutableMap.of("error", "MCP framework error: CallToolResult was null");
+              }
+
+              List<Content> contents = callResult.content();
+              Boolean isToolError = callResult.isError();
+
+              if (isToolError != null && isToolError) {
+                String errorMessage = "Tool execution failed.";
+                if (contents != null
+                    && !contents.isEmpty()
+                    && contents.get(0) instanceof TextContent) {
+                  TextContent textContent = (TextContent) contents.get(0);
+                  if (textContent.text() != null && !textContent.text().isEmpty()) {
+                    errorMessage += " Details: " + textContent.text();
+                  }
+                }
+                return ImmutableMap.of("error", errorMessage);
+              }
+
+              if (contents == null || contents.isEmpty()) {
+                return ImmutableMap.of();
+              }
+
+              Content firstContent = contents.get(0);
+
+              if (firstContent instanceof TextContent) {
+                TextContent textContent = (TextContent) firstContent;
+                String textOutput = textContent.text();
+
+                if (textOutput == null) {
+                  return ImmutableMap.of();
+                }
+
+                try {
+                  Map<String, Object> resultMap =
+                      objectMapper.readValue(
+                          textOutput, new TypeReference<Map<String, Object>>() {});
+                  return ImmutableMap.copyOf(resultMap);
+                } catch (JsonProcessingException e) {
+                  return ImmutableMap.of("text_output", textOutput);
+                }
+
+              } else {
+                return ImmutableMap.of(
+                    "error",
+                    "Tool '"
+                        + this.name()
+                        + "' returned an unexpected content type: "
+                        + firstContent.getClass().getName(),
+                    "content_details",
+                    firstContent.toString());
+              }
             })
         .retryWhen(
             errors ->
