@@ -297,7 +297,7 @@ public final class AgentToolTest {
         agentTool.runAsync(ImmutableMap.of("is_magic", true), toolContext).blockingGet();
 
     assertThat(testLlm.getLastRequest().contents())
-        .containsExactly(Content.fromParts(Part.fromText("{is_magic=true}")));
+        .containsExactly(Content.fromParts(Part.fromText("{\"is_magic\":true}")));
   }
 
   @Test

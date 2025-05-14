@@ -18,6 +18,7 @@ package com.google.adk.tools;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.adk.JsonBaseModel;
+import com.google.adk.agents.BaseAgent;
 import com.google.adk.agents.LlmAgent;
 import com.google.adk.events.Event;
 import com.google.adk.runner.InMemoryRunner;
@@ -39,18 +40,18 @@ import java.util.Optional;
 /** AgentTool implements a tool that allows an agent to call another agent. */
 public class AgentTool extends BaseTool {
 
-  private final LlmAgent agent;
+  private final BaseAgent agent;
   private final boolean skipSummarization;
 
-  public static AgentTool create(LlmAgent agent, boolean skipSummarization) {
+  public static AgentTool create(BaseAgent agent, boolean skipSummarization) {
     return new AgentTool(agent, skipSummarization);
   }
 
-  public static AgentTool create(LlmAgent agent) {
+  public static AgentTool create(BaseAgent agent) {
     return new AgentTool(agent, false);
   }
 
-  protected AgentTool(LlmAgent agent, boolean skipSummarization) {
+  protected AgentTool(BaseAgent agent, boolean skipSummarization) {
     super(agent.name(), agent.description());
     this.agent = agent;
     this.skipSummarization = skipSummarization;
@@ -145,8 +146,14 @@ public class AgentTool extends BaseTool {
   public Optional<FunctionDeclaration> declaration() {
     FunctionDeclaration.Builder builder =
         FunctionDeclaration.builder().description(this.description()).name(this.name());
-    if (this.agent.inputSchema().isPresent()) {
-      builder.parameters(this.agent.inputSchema().get());
+
+    Optional<Schema> agentInputSchema = Optional.empty();
+    if (agent instanceof LlmAgent llmAgent) {
+      agentInputSchema = llmAgent.inputSchema();
+    }
+
+    if (agentInputSchema.isPresent()) {
+      builder.parameters(agentInputSchema.get());
     } else {
       builder.parameters(
           Schema.builder()
@@ -166,14 +173,21 @@ public class AgentTool extends BaseTool {
       toolContext.actions().setSkipSummarization(true);
     }
 
-    Content content;
-    if (this.agent.inputSchema().isPresent()) {
-      validateMapOnSchema(args, this.agent.inputSchema().get(), true);
-      content =
-          Content.builder()
-              .role("user")
-              .parts(ImmutableList.of(Part.builder().text(args.toString()).build()))
-              .build();
+    Optional<Schema> agentInputSchema = Optional.empty();
+    if (agent instanceof LlmAgent llmAgent) {
+      agentInputSchema = llmAgent.inputSchema();
+    }
+
+    final Content content;
+    if (agentInputSchema.isPresent()) {
+      validateMapOnSchema(args, agentInputSchema.get(), true);
+      try {
+        content =
+            Content.fromParts(Part.fromText(JsonBaseModel.getMapper().writeValueAsString(args)));
+      } catch (JsonProcessingException e) {
+        return Single.error(
+            new RuntimeException("Error serializing tool arguments to JSON: " + args, e));
+      }
     } else {
       Object input = args.get("request");
       content =
@@ -195,14 +209,29 @@ public class AgentTool extends BaseTool {
         .defaultIfEmpty(Optional.empty())
         .map(
             optionalLastEvent -> {
-              if (!optionalLastEvent.isPresent()
-                  || !optionalLastEvent.get().content().flatMap(Content::parts).isPresent()) {
+              if (optionalLastEvent.isEmpty()) {
                 return ImmutableMap.of();
               }
               Event lastEvent = optionalLastEvent.get();
-              String output = lastEvent.content().get().parts().get().get(0).text().get();
-              if (this.agent.outputSchema().isPresent()) {
-                return validateOutputSchema(output, this.agent.outputSchema().get());
+              Optional<String> outputText =
+                  lastEvent
+                      .content()
+                      .flatMap(Content::parts)
+                      .filter(parts -> !parts.isEmpty())
+                      .flatMap(parts -> parts.get(0).text());
+
+              if (outputText.isEmpty()) {
+                return ImmutableMap.of();
+              }
+              String output = outputText.get();
+
+              Optional<Schema> agentOutputSchema = Optional.empty();
+              if (agent instanceof LlmAgent llmAgent) {
+                agentOutputSchema = llmAgent.outputSchema();
+              }
+
+              if (agentOutputSchema.isPresent()) {
+                return validateOutputSchema(output, agentOutputSchema.get());
               } else {
                 return ImmutableMap.of("result", output);
               }
