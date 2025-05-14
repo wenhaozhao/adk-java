@@ -36,6 +36,8 @@ import org.springframework.stereotype.Service;
  *   <li>Locating the ADK core JAR file.
  *   <li>Compiling agent source code using the Eclipse JDT batch compiler.
  *   <li>Loading compiled agents into memory.
+ *   <li>Supporting agents in subdirectories (agent apps) and as individual .java files directly
+ *       under the root source directory.
  * </ul>
  */
 @Service
@@ -127,22 +129,25 @@ public class AgentCompilerLoader {
    *   <li>Checks if the agent source directory is configured. If not, it returns an empty map.
    *   <li>Creates a temporary directory to store the compiled agent classes. This directory is
    *       marked for deletion on JVM exit.
-   *   <li>Iterates through each subdirectory in the agent source root. Each subdirectory is assumed
-   *       to represent a distinct "agent app".
-   *   <li>For each agent app:
+   *   <li>Iterates through each entry (subdirectory or .java file) in the agent source root. Each
+   *       such entry is considered an "agent unit".
+   *   <li>For each agent unit:
    *       <ul>
-   *         <li>Collects all {@code .java} files within the app's directory.
+   *         <li>Collects all relevant {@code .java} files (all files in a subdirectory, or the
+   *             single .java file if the unit is a root file).
    *         <li>If Java files are found, it compiles them using the Eclipse JDT batch compiler
-   *             (ECJ) via the {@link #compileSourcesWithECJ(List, Path)} method. The compilation
-   *             classpath includes the ADK core JAR (located by {@link
-   *             #locateAndPrepareAdkCoreJar()}) and any user-defined classpath entries.
+   *             (ECJ) into a dedicated subdirectory within the compiled agents' output directory.
+   *             The compilation classpath includes the ADK core JAR and any user-defined classpath
+   *             entries.
    *         <li>If compilation is successful, it creates a new {@link URLClassLoader} pointing to
-   *             the output directory of the compiled classes and any additional classpath entries.
-   *         <li>It then scans the compiled {@code .class} files, looking for classes that contain a
-   *             public static field named {@code ROOT_AGENT} of a type assignable to {@link
-   *             BaseAgent}.
+   *             the output directory of the compiled classes for that unit and any additional
+   *             classpath entries.
+   *         <li>It then scans the compiled {@code .class} files for that unit, looking for classes
+   *             that contain a public static field named {@code ROOT_AGENT} of a type assignable to
+   *             {@link BaseAgent}.
    *         <li>If such a field is found and its value is not null, the {@link BaseAgent} instance
-   *             is retrieved and added to the map of loaded agents, keyed by its name.
+   *             is retrieved and added to the map of loaded agents, keyed by its name. A warning is
+   *             logged if an agent with the same name already exists.
    *       </ul>
    * </ol>
    *
@@ -171,109 +176,138 @@ public class AgentCompilerLoader {
     logger.info("Compiling agents from {} to {}", agentsSourceRoot, compiledAgentsOutputDir);
 
     Map<String, BaseAgent> loadedAgents = new HashMap<>();
-    List<Path> appSourceDirs;
+
     try (Stream<Path> stream = Files.list(agentsSourceRoot)) {
-      appSourceDirs = stream.filter(Files::isDirectory).collect(Collectors.toList());
-    }
+      List<Path> entries = stream.collect(Collectors.toList());
 
-    for (Path appSourceDir : appSourceDirs) {
-      String agentFileName = appSourceDir.getFileName().toString();
-      logger.info("Processing agent app: {}", agentFileName);
-      Path appOutputDir = compiledAgentsOutputDir.resolve(agentFileName);
-      Files.createDirectories(appOutputDir);
+      for (Path entry : entries) {
+        List<String> javaFilesToCompile = new ArrayList<>();
+        String agentUnitName; // Used for logging and creating unique output subdirectories
 
-      List<String> javaFilesToCompile;
-      try (Stream<Path> javaFilesStream =
-          Files.walk(appSourceDir)
-              .filter(p -> p.toString().endsWith(".java") && Files.isRegularFile(p))) {
-        javaFilesToCompile =
-            javaFilesStream.map(p -> p.toAbsolutePath().toString()).collect(Collectors.toList());
-      }
+        if (Files.isDirectory(entry)) {
+          agentUnitName = entry.getFileName().toString();
+          logger.info("Processing agent sources from directory: {}", agentUnitName);
+          try (Stream<Path> javaFilesStream =
+              Files.walk(entry)
+                  .filter(p -> p.toString().endsWith(".java") && Files.isRegularFile(p))) {
+            javaFilesToCompile =
+                javaFilesStream
+                    .map(p -> p.toAbsolutePath().toString())
+                    .collect(Collectors.toList());
+          }
+        } else if (Files.isRegularFile(entry) && entry.getFileName().toString().endsWith(".java")) {
+          String fileName = entry.getFileName().toString();
+          agentUnitName = fileName.substring(0, fileName.length() - ".java".length());
+          logger.info("Processing agent source file: {}", entry.getFileName());
+          javaFilesToCompile.add(entry.toAbsolutePath().toString());
+        } else {
+          logger.trace("Skipping non-agent entry in agent source root: {}", entry.getFileName());
+          continue;
+        }
 
-      if (javaFilesToCompile.isEmpty()) {
-        logger.info("No .java files found in app: {}", agentFileName);
-        continue;
-      }
+        if (javaFilesToCompile.isEmpty()) {
+          logger.info("No .java files found for agent unit: {}", agentUnitName);
+          continue;
+        }
 
-      boolean compilationSuccess = compileSourcesWithECJ(javaFilesToCompile, appOutputDir);
+        Path unitSpecificOutputDir = compiledAgentsOutputDir.resolve(agentUnitName);
+        Files.createDirectories(unitSpecificOutputDir);
 
-      if (compilationSuccess) {
-        try {
-          List<URL> classLoaderUrls = new ArrayList<>();
-          classLoaderUrls.add(appOutputDir.toUri().toURL());
+        boolean compilationSuccess =
+            compileSourcesWithECJ(javaFilesToCompile, unitSpecificOutputDir);
 
-          if (properties.getCompileClasspath() != null
-              && !properties.getCompileClasspath().isEmpty()) {
-            for (String cpEntry : properties.getCompileClasspath().split(File.pathSeparator)) {
-              try {
-                classLoaderUrls.add(Paths.get(cpEntry).toUri().toURL());
-              } catch (MalformedURLException e) {
-                logger.warn("Invalid classpath entry for classloader: {}", cpEntry, e);
+        if (compilationSuccess) {
+          try {
+            List<URL> classLoaderUrls = new ArrayList<>();
+            classLoaderUrls.add(unitSpecificOutputDir.toUri().toURL());
+
+            if (properties.getCompileClasspath() != null
+                && !properties.getCompileClasspath().isEmpty()) {
+              for (String cpEntry : properties.getCompileClasspath().split(File.pathSeparator)) {
+                try {
+                  classLoaderUrls.add(Paths.get(cpEntry).toUri().toURL());
+                } catch (MalformedURLException e) {
+                  logger.warn("Invalid classpath entry for classloader: {}", cpEntry, e);
+                }
               }
             }
-          }
 
-          URLClassLoader agentClassLoader =
-              new URLClassLoader(
-                  classLoaderUrls.toArray(new URL[0]), AgentCompilerLoader.class.getClassLoader());
+            URLClassLoader agentClassLoader =
+                new URLClassLoader(
+                    classLoaderUrls.toArray(new URL[0]),
+                    AgentCompilerLoader.class.getClassLoader());
 
-          Files.walk(appOutputDir)
-              .filter(p -> p.toString().endsWith(".class"))
-              .forEach(
-                  classFile -> {
-                    try {
-                      String relativePath = appOutputDir.relativize(classFile).toString();
-                      String className =
-                          relativePath
-                              .substring(0, relativePath.length() - ".class".length())
-                              .replace(File.separatorChar, '.');
-
-                      Class<?> loadedClass = agentClassLoader.loadClass(className);
-                      Field rootAgentField = null;
+            Files.walk(unitSpecificOutputDir)
+                .filter(p -> p.toString().endsWith(".class"))
+                .forEach(
+                    classFile -> {
                       try {
-                        rootAgentField = loadedClass.getField("ROOT_AGENT");
-                      } catch (NoSuchFieldException e) {
-                        // Common, not every class will have it.
-                        return;
-                      }
+                        String relativePath =
+                            unitSpecificOutputDir.relativize(classFile).toString();
+                        String className =
+                            relativePath
+                                .substring(0, relativePath.length() - ".class".length())
+                                .replace(File.separatorChar, '.');
 
-                      if (Modifier.isStatic(rootAgentField.getModifiers())
-                          && BaseAgent.class.isAssignableFrom(rootAgentField.getType())) {
-                        BaseAgent agentInstance = (BaseAgent) rootAgentField.get(null);
-                        if (agentInstance != null) {
-                          loadedAgents.put(agentInstance.name(), agentInstance);
-                          logger.info(
-                              "Successfully loaded agent '{}' from app: {} using class {}",
-                              agentInstance.name(),
-                              agentFileName,
-                              className);
-                        } else {
-                          logger.warn(
-                              "ROOT_AGENT field in class {} was null for app {}",
-                              className,
-                              agentFileName);
+                        Class<?> loadedClass = agentClassLoader.loadClass(className);
+                        Field rootAgentField = null;
+                        try {
+                          rootAgentField = loadedClass.getField("ROOT_AGENT");
+                        } catch (NoSuchFieldException e) {
+                          // Common, not every class will have it.
+                          return;
                         }
+
+                        if (Modifier.isStatic(rootAgentField.getModifiers())
+                            && BaseAgent.class.isAssignableFrom(rootAgentField.getType())) {
+                          BaseAgent agentInstance = (BaseAgent) rootAgentField.get(null);
+                          if (agentInstance != null) {
+                            if (loadedAgents.containsKey(agentInstance.name())) {
+                              logger.warn(
+                                  "Found another agent with name {}. This will overwrite the"
+                                      + " original agent loaded with this name from unit {} using"
+                                      + " class {}",
+                                  agentInstance.name(),
+                                  agentUnitName,
+                                  className);
+                            }
+                            loadedAgents.put(agentInstance.name(), agentInstance);
+                            logger.info(
+                                "Successfully loaded agent '{}' from unit: {} using class {}",
+                                agentInstance.name(),
+                                agentUnitName,
+                                className);
+                          } else {
+                            logger.warn(
+                                "ROOT_AGENT field in class {} from unit {} was null",
+                                className,
+                                agentUnitName);
+                          }
+                        }
+                      } catch (ClassNotFoundException | IllegalAccessException e) {
+                        logger.error(
+                            "Error loading or accessing agent from class file {} for unit {}",
+                            classFile,
+                            agentUnitName,
+                            e);
+                      } catch (Exception e) {
+                        logger.error(
+                            "Unexpected error processing class file {} for unit {}",
+                            classFile,
+                            agentUnitName,
+                            e);
                       }
-                    } catch (ClassNotFoundException | IllegalAccessException e) {
-                      logger.error(
-                          "Error loading or accessing agent from class file {} for app {}",
-                          classFile,
-                          agentFileName,
-                          e);
-                    } catch (Exception e) {
-                      logger.error(
-                          "Unexpected error processing class file {} for app {}",
-                          classFile,
-                          agentFileName,
-                          e);
-                    }
-                  });
-        } catch (Exception e) {
-          logger.error(
-              "Error during class loading setup for app {}: {}", agentFileName, e.getMessage(), e);
+                    });
+          } catch (Exception e) {
+            logger.error(
+                "Error during class loading setup for unit {}: {}",
+                agentUnitName,
+                e.getMessage(),
+                e);
+          }
+        } else {
+          logger.error("Compilation failed for agent unit: {}", agentUnitName);
         }
-      } else {
-        logger.error("Compilation failed for agent app: {}", agentFileName);
       }
     }
     return loadedAgents;
