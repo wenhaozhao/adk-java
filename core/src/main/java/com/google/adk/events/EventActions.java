@@ -40,7 +40,7 @@ public class EventActions {
   /** Default constructor for Jackson. */
   public EventActions() {}
 
-  @JsonProperty("skip_summarization")
+  @JsonProperty("skipSummarization")
   public Optional<Boolean> skipSummarization() {
     return skipSummarization;
   }
@@ -57,7 +57,7 @@ public class EventActions {
     this.skipSummarization = Optional.of(skipSummarization);
   }
 
-  @JsonProperty("state_delta")
+  @JsonProperty("stateDelta")
   public Map<String, Object> stateDelta() {
     return stateDelta;
   }
@@ -66,7 +66,7 @@ public class EventActions {
     this.stateDelta = stateDelta;
   }
 
-  @JsonProperty("artifact_delta")
+  @JsonProperty("artifactDelta")
   public Map<String, Part> artifactDelta() {
     return artifactDelta;
   }
@@ -75,7 +75,7 @@ public class EventActions {
     this.artifactDelta = artifactDelta;
   }
 
-  @JsonProperty("transfer_to_agent")
+  @JsonProperty("transferToAgent")
   public Optional<String> transferToAgent() {
     return transferToAgent;
   }
@@ -101,7 +101,7 @@ public class EventActions {
     this.escalate = Optional.of(escalate);
   }
 
-  @JsonProperty("requested_auth_configs")
+  @JsonProperty("requestedAuthConfigs")
   public Map<String, Map<String, Object>> requestedAuthConfigs() {
     return requestedAuthConfigs;
   }
@@ -167,28 +167,28 @@ public class EventActions {
     }
 
     @CanIgnoreReturnValue
-    @JsonProperty("skip_summarization")
+    @JsonProperty("skipSummarization")
     public Builder skipSummarization(boolean skipSummarization) {
       this.skipSummarization = Optional.of(skipSummarization);
       return this;
     }
 
     @CanIgnoreReturnValue
-    @JsonProperty("state_delta")
+    @JsonProperty("stateDelta")
     public Builder stateDelta(Map<String, Object> value) {
       this.stateDelta = value;
       return this;
     }
 
     @CanIgnoreReturnValue
-    @JsonProperty("artifact_delta")
+    @JsonProperty("artifactDelta")
     public Builder artifactDelta(Map<String, Part> value) {
       this.artifactDelta = value;
       return this;
     }
 
     @CanIgnoreReturnValue
-    @JsonProperty("transfer_to_agent")
+    @JsonProperty("transferToAgent")
     public Builder transferToAgent(String agentId) {
       this.transferToAgent = Optional.ofNullable(agentId);
       return this;
@@ -202,7 +202,7 @@ public class EventActions {
     }
 
     @CanIgnoreReturnValue
-    @JsonProperty("requested_auth_configs")
+    @JsonProperty("requestedAuthConfigs")
     public Builder requestedAuthConfigs(Map<String, Map<String, Object>> value) {
       this.requestedAuthConfigs = value;
       return this;

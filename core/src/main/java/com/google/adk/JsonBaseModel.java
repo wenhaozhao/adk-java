@@ -33,9 +33,9 @@ public abstract class JsonBaseModel {
   static {
     objectMapper
         .setSerializationInclusion(JsonInclude.Include.NON_ABSENT)
-        .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
+        .setPropertyNamingStrategy(PropertyNamingStrategies.LOWER_CAMEL_CASE)
         .registerModule(new Jdk8Module())
-        .registerModule(new JavaTimeModule()) //TODO: echo sec module replace, locale
+        .registerModule(new JavaTimeModule()) // TODO: echo sec module replace, locale
         .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
   }
 

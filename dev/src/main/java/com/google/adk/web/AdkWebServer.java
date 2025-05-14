@@ -116,16 +116,16 @@ public class AdkWebServer implements WebMvcConfigurer {
    * needed to execute an agent run.
    */
   public static class AgentRunRequest {
-    @JsonProperty("app_name")
+    @JsonProperty("appName")
     public String appName;
 
-    @JsonProperty("user_id")
+    @JsonProperty("userId")
     public String userId;
 
-    @JsonProperty("session_id")
+    @JsonProperty("sessionId")
     public String sessionId;
 
-    @JsonProperty("new_message")
+    @JsonProperty("newMessage")
     public Content newMessage;
 
     @JsonProperty("streaming")
@@ -159,13 +159,13 @@ public class AdkWebServer implements WebMvcConfigurer {
    * to associate a session with an evaluation set.
    */
   public static class AddSessionToEvalSetRequest {
-    @JsonProperty("eval_id")
+    @JsonProperty("evalId")
     public String evalId;
 
-    @JsonProperty("session_id")
+    @JsonProperty("sessionId")
     public String sessionId;
 
-    @JsonProperty("user_id")
+    @JsonProperty("userId")
     public String userId;
 
     public AddSessionToEvalSetRequest() {}
@@ -188,10 +188,10 @@ public class AdkWebServer implements WebMvcConfigurer {
    * running evaluations.
    */
   public static class RunEvalRequest {
-    @JsonProperty("eval_ids")
+    @JsonProperty("evalIds")
     public List<String> evalIds;
 
-    @JsonProperty("eval_metrics")
+    @JsonProperty("evalMetrics")
     public List<String> evalMetrics;
 
     public RunEvalRequest() {}
@@ -210,22 +210,22 @@ public class AdkWebServer implements WebMvcConfigurer {
    * results of an evaluation run.
    */
   public static class RunEvalResult extends JsonBaseModel {
-    @JsonProperty("app_name")
+    @JsonProperty("appName")
     public String appName;
 
-    @JsonProperty("eval_set_id")
+    @JsonProperty("evalSetId")
     public String evalSetId;
 
-    @JsonProperty("eval_id")
+    @JsonProperty("evalId")
     public String evalId;
 
-    @JsonProperty("final_eval_status")
+    @JsonProperty("finalEvalStatus")
     public String finalEvalStatus;
 
-    @JsonProperty("eval_metric_results")
+    @JsonProperty("evalMetricResults")
     public List<List<Object>> evalMetricResults;
 
-    @JsonProperty("session_id")
+    @JsonProperty("sessionId")
     public String sessionId;
 
     /**
@@ -262,7 +262,7 @@ public class AdkWebServer implements WebMvcConfigurer {
    * representation (e.g., DOT source).
    */
   public static class GraphResponse {
-    @JsonProperty("dot_src")
+    @JsonProperty("dotSrc")
     public String dotSrc;
 
     /**
@@ -339,7 +339,7 @@ public class AdkWebServer implements WebMvcConfigurer {
     private final Map<String, BaseAgent> agentRegistry;
     private final Map<String, Runner> runnerCache = new ConcurrentHashMap<>();
 
-    // TODO: Implement support for agent_engine_id and VertexAiSessionService if needed
+    // TODO: Implement support for agentEngineId and VertexAiSessionService if needed
     private final String agentEngineId = "";
 
     private final ExecutorService sseExecutor = Executors.newCachedThreadPool();

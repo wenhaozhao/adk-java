@@ -74,7 +74,7 @@ public class Event extends JsonBaseModel {
   }
 
   /** Id of the invocation that this event belongs to. */
-  @JsonProperty("invocation_id")
+  @JsonProperty("invocationId")
   public String invocationId() {
     return invocationId;
   }
@@ -115,7 +115,7 @@ public class Event extends JsonBaseModel {
    * Set of ids of the long running function calls. Agent client will know from this field about
    * which function call is long running.
    */
-  @JsonProperty("long_running_tool_ids")
+  @JsonProperty("longRunningToolIds")
   public Optional<Set<String>> longRunningToolIds() {
     return longRunningToolIds;
   }
@@ -137,7 +137,7 @@ public class Event extends JsonBaseModel {
     this.partial = partial;
   }
 
-  @JsonProperty("turn_complete")
+  @JsonProperty("turnComplete")
   public Optional<Boolean> turnComplete() {
     return turnComplete;
   }
@@ -146,7 +146,7 @@ public class Event extends JsonBaseModel {
     this.turnComplete = turnComplete;
   }
 
-  @JsonProperty("error_code")
+  @JsonProperty("errorCode")
   public Optional<FinishReason> errorCode() {
     return errorCode;
   }
@@ -155,7 +155,7 @@ public class Event extends JsonBaseModel {
     this.errorCode = errorCode;
   }
 
-  @JsonProperty("error_message")
+  @JsonProperty("errorMessage")
   public Optional<String> errorMessage() {
     return errorMessage;
   }
@@ -192,7 +192,7 @@ public class Event extends JsonBaseModel {
   }
 
   /** The grounding metadata of the event. */
-  @JsonProperty("grounding_metadata")
+  @JsonProperty("groundingMetadata")
   public Optional<GroundingMetadata> groundingMetadata() {
     return groundingMetadata;
   }
@@ -292,7 +292,7 @@ public class Event extends JsonBaseModel {
     }
 
     @CanIgnoreReturnValue
-    @JsonProperty("invocation_id")
+    @JsonProperty("invocationId")
     public Builder invocationId(String value) {
       this.invocationId = value;
       return this;
@@ -330,7 +330,7 @@ public class Event extends JsonBaseModel {
     }
 
     @CanIgnoreReturnValue
-    @JsonProperty("long_running_tool_ids")
+    @JsonProperty("longRunningToolIds")
     public Builder longRunningToolIds(@Nullable Set<String> value) {
       this.longRunningToolIds = Optional.ofNullable(value);
       return this;
@@ -356,7 +356,7 @@ public class Event extends JsonBaseModel {
     }
 
     @CanIgnoreReturnValue
-    @JsonProperty("turn_complete")
+    @JsonProperty("turnComplete")
     public Builder turnComplete(@Nullable Boolean value) {
       this.turnComplete = Optional.ofNullable(value);
       return this;
@@ -369,7 +369,7 @@ public class Event extends JsonBaseModel {
     }
 
     @CanIgnoreReturnValue
-    @JsonProperty("error_code")
+    @JsonProperty("errorCode")
     public Builder errorCode(@Nullable FinishReason value) {
       this.errorCode = Optional.ofNullable(value);
       return this;
@@ -382,7 +382,7 @@ public class Event extends JsonBaseModel {
     }
 
     @CanIgnoreReturnValue
-    @JsonProperty("error_message")
+    @JsonProperty("errorMessage")
     public Builder errorMessage(@Nullable String value) {
       this.errorMessage = Optional.ofNullable(value);
       return this;
@@ -444,7 +444,7 @@ public class Event extends JsonBaseModel {
     }
 
     @CanIgnoreReturnValue
-    @JsonProperty("grounding_metadata")
+    @JsonProperty("groundingMetadata")
     public Builder groundingMetadata(@Nullable GroundingMetadata value) {
       this.groundingMetadata = Optional.ofNullable(value);
       return this;

@@ -79,9 +79,9 @@ public final class LlmResponseTest {
     assertThat(jsonNode.get("content").get("parts").get(0).get("text").asText())
         .isEqualTo("Hello, world!");
     assertThat(jsonNode.get("partial").asBoolean()).isTrue();
-    assertThat(jsonNode.get("turn_complete").asBoolean()).isFalse();
-    assertThat(jsonNode.get("error_code").asText()).isEqualTo("ERR_123");
-    assertThat(jsonNode.get("error_message").asText()).isEqualTo("An error occurred.");
+    assertThat(jsonNode.get("turnComplete").asBoolean()).isFalse();
+    assertThat(jsonNode.get("errorCode").asText()).isEqualTo("ERR_123");
+    assertThat(jsonNode.get("errorMessage").asText()).isEqualTo("An error occurred.");
     assertThat(jsonNode.get("interrupted").asBoolean()).isTrue();
 
     LlmResponse deserializedResponse = LlmResponse.fromJsonString(json, LlmResponse.class);
@@ -115,12 +115,12 @@ public final class LlmResponseTest {
 
     JsonNode jsonNode = objectMapper.readTree(json);
     assertThat(jsonNode.has("content")).isTrue();
-    assertThat(jsonNode.has("grounding_metadata")).isFalse();
+    assertThat(jsonNode.has("groundingMetadata")).isFalse();
     assertThat(jsonNode.has("partial")).isFalse();
-    assertThat(jsonNode.has("turn_complete")).isTrue();
-    assertThat(jsonNode.get("turn_complete").asBoolean()).isFalse();
-    assertThat(jsonNode.has("error_code")).isFalse();
-    assertThat(jsonNode.has("error_message")).isFalse();
+    assertThat(jsonNode.has("turnComplete")).isTrue();
+    assertThat(jsonNode.get("turnComplete").asBoolean()).isFalse();
+    assertThat(jsonNode.has("errorCode")).isFalse();
+    assertThat(jsonNode.has("errorMessage")).isFalse();
     assertThat(jsonNode.has("interrupted")).isFalse();
 
     LlmResponse deserializedResponse = LlmResponse.fromJsonString(json, LlmResponse.class);
@@ -141,11 +141,11 @@ public final class LlmResponseTest {
     String jsonWithNulls =
         "{"
             + "\"content\": {\"parts\": [{\"text\": \"Test content\"}]},"
-            + "\"grounding_metadata\": null,"
+            + "\"groundingMetadata\": null,"
             + "\"partial\": null,"
-            + "\"turn_complete\": true,"
-            + "\"error_code\": null,"
-            + "\"error_message\": null,"
+            + "\"turnComplete\": true,"
+            + "\"errorCode\": null,"
+            + "\"errorMessage\": null,"
             + "\"interrupted\": null"
             + "}";
 
@@ -179,11 +179,11 @@ public final class LlmResponseTest {
 
     assertThat(jsonNode.has("content")).isTrue();
     assertThat(jsonNode.has("partial")).isFalse();
-    assertThat(jsonNode.has("turn_complete")).isTrue();
-    assertThat(jsonNode.get("turn_complete").asBoolean()).isTrue();
-    assertThat(jsonNode.has("error_code")).isTrue();
-    assertThat(jsonNode.get("error_code").asText()).isEqualTo("FATAL_ERROR");
-    assertThat(jsonNode.has("error_message")).isFalse();
+    assertThat(jsonNode.has("turnComplete")).isTrue();
+    assertThat(jsonNode.get("turnComplete").asBoolean()).isTrue();
+    assertThat(jsonNode.has("errorCode")).isTrue();
+    assertThat(jsonNode.get("errorCode").asText()).isEqualTo("FATAL_ERROR");
+    assertThat(jsonNode.has("errorMessage")).isFalse();
     assertThat(jsonNode.has("interrupted")).isFalse();
 
     LlmResponse deserializedResponse = LlmResponse.fromJsonString(json, LlmResponse.class);

@@ -55,7 +55,7 @@ public abstract class LlmResponse extends JsonBaseModel {
    *
    * @return An {@link Optional} containing {@link GroundingMetadata} or empty.
    */
-  @JsonProperty("grounding_metadata")
+  @JsonProperty("groundingMetadata")
   public abstract Optional<GroundingMetadata> groundingMetadata();
 
   /**
@@ -71,15 +71,15 @@ public abstract class LlmResponse extends JsonBaseModel {
    *
    * <p>Only used for streaming mode.
    */
-  @JsonProperty("turn_complete")
+  @JsonProperty("turnComplete")
   public abstract Optional<Boolean> turnComplete();
 
   /** Error code if the response is an error. Code varies by model. */
-  @JsonProperty("error_code")
+  @JsonProperty("errorCode")
   public abstract Optional<FinishReason> errorCode();
 
   /** Error message if the response is an error. */
-  @JsonProperty("error_message")
+  @JsonProperty("errorMessage")
   public abstract Optional<String> errorMessage();
 
   /**
@@ -109,7 +109,7 @@ public abstract class LlmResponse extends JsonBaseModel {
 
     public abstract Builder interrupted(Optional<Boolean> interrupted);
 
-    @JsonProperty("grounding_metadata")
+    @JsonProperty("groundingMetadata")
     public abstract Builder groundingMetadata(@Nullable GroundingMetadata groundingMetadata);
 
     public abstract Builder groundingMetadata(Optional<GroundingMetadata> groundingMetadata);
@@ -119,17 +119,17 @@ public abstract class LlmResponse extends JsonBaseModel {
 
     public abstract Builder partial(Optional<Boolean> partial);
 
-    @JsonProperty("turn_complete")
+    @JsonProperty("turnComplete")
     public abstract Builder turnComplete(@Nullable Boolean turnComplete);
 
     public abstract Builder turnComplete(Optional<Boolean> turnComplete);
 
-    @JsonProperty("error_code")
+    @JsonProperty("errorCode")
     public abstract Builder errorCode(@Nullable FinishReason errorCode);
 
     public abstract Builder errorCode(Optional<FinishReason> errorCode);
 
-    @JsonProperty("error_message")
+    @JsonProperty("errorMessage")
     public abstract Builder errorMessage(@Nullable String errorMessage);
 
     public abstract Builder errorMessage(Optional<String> errorMessage);

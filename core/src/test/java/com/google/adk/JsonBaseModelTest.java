@@ -31,13 +31,12 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-// TODO: once the Angular UI is expecting camelCase, switch serialization to that.
 /** Tests for JSON serialization/deserialization of classes inheriting from JsonBaseModel. */
 @RunWith(JUnit4.class)
 public class JsonBaseModelTest {
 
   @Test
-  public void eventSerialization_usesSnakeCase() {
+  public void eventSerialization_usesCamelCase() {
     Event event =
         Event.builder()
             .id(Event.generateEventId())
@@ -56,31 +55,31 @@ public class JsonBaseModelTest {
 
     String json = event.toJson();
 
-    // Basic checks for snake_case keys
-    assertThat(json).contains("\"invocation_id\":");
-    assertThat(json).contains("\"error_code\":");
-    assertThat(json).contains("\"error_message\":");
-    assertThat(json).contains("\"turn_complete\":");
-    assertThat(json).contains("\"long_running_tool_ids\":");
+    // Basic checks for camelCase keys
+    assertThat(json).contains("\"invocationId\":");
+    assertThat(json).contains("\"errorCode\":");
+    assertThat(json).contains("\"errorMessage\":");
+    assertThat(json).contains("\"turnComplete\":");
+    assertThat(json).contains("\"longRunningToolIds\":");
     assertThat(json).contains("\"partial\":");
     assertThat(json).contains("\"interrupted\":");
-    assertThat(json).contains("\"state_delta\":");
+    assertThat(json).contains("\"stateDelta\":");
   }
 
   @Test
-  public void eventDeserialization_handlesSnakeCase() {
+  public void eventDeserialization_handlesCamelCase() {
     String json =
         "{"
             + "\"id\":\"test-id\","
-            + "\"invocation_id\":\"test-invocation\","
+            + "\"invocationId\":\"test-invocation\","
             + "\"author\":\"agent\","
             + "\"content\":{\"parts\":[{\"text\":\"Response text\"}]},"
             + "\"partial\":false,"
-            + "\"turn_complete\":true,"
-            + "\"error_code\":null," // Test null handling
-            + "\"error_message\":null," // same as above
-            + "\"interrupted\":false,\"long_running_tool_ids\":[\"tool_id_3\"],"
-            + "\"actions\":{\"state_delta\":{\"key\":\"value\"},\"artifact_delta\":{},\"requested_auth_configs\":{}},"
+            + "\"turnComplete\":true,"
+            + "\"errorCode\":null," // Test null handling
+            + "\"errorMessage\":null," // same as above
+            + "\"interrupted\":false,\"longRunningToolIds\":[\"tool_id_3\"],"
+            + "\"actions\":{\"stateDelta\":{\"key\":\"value\"},\"artifactDelta\":{},\"requestedAuthConfigs\":{}},"
             + "\"timestamp\":1234567890}";
 
     Event event = Event.fromJson(json);

@@ -80,13 +80,13 @@ public final class Session extends JsonBaseModel {
       return this;
     }
 
-    @JsonProperty("app_name")
+    @JsonProperty("appName")
     public Builder appName(String appName) {
       this.appName = appName;
       return this;
     }
 
-    @JsonProperty("user_id")
+    @JsonProperty("userId")
     public Builder userId(String userId) {
       this.userId = userId;
       return this;
@@ -103,7 +103,7 @@ public final class Session extends JsonBaseModel {
       return this;
     }
 
-    @JsonProperty("last_update_time")
+    @JsonProperty("lastUpdateTime")
     public Builder lastUpdateTimeSeconds(double seconds) {
       long secs = (long) seconds;
       // Convert fractional part to nanoseconds
@@ -135,12 +135,12 @@ public final class Session extends JsonBaseModel {
     return events;
   }
 
-  @JsonProperty("app_name")
+  @JsonProperty("appName")
   public String appName() {
     return appName;
   }
 
-  @JsonProperty("user_id")
+  @JsonProperty("userId")
   public String userId() {
     return userId;
   }
@@ -153,7 +153,7 @@ public final class Session extends JsonBaseModel {
     return lastUpdateTime;
   }
 
-  @JsonProperty("last_update_time")
+  @JsonProperty("lastUpdateTime")
   public double getLastUpdateTimeAsDouble() {
     if (lastUpdateTime == null) {
       return 0.0;
