@@ -37,12 +37,13 @@ import com.google.adk.tools.ToolContext;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.genai.types.FunctionCall;
+import com.google.genai.types.FunctionResponse;
 import io.reactivex.rxjava3.core.Completable;
-import io.reactivex.rxjava3.core.CompletableObserver;
 import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.core.Maybe;
 import io.reactivex.rxjava3.core.Single;
 import io.reactivex.rxjava3.disposables.Disposable;
+import io.reactivex.rxjava3.observers.DisposableCompletableObserver;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -306,34 +307,32 @@ public abstract class BaseLlmFlow implements BaseFlow {
             ? Completable.complete()
             : connection.sendHistory(llmRequest.contents());
     Flowable<LiveRequest> liveRequests = invocationContext.liveRequestQueue().get().get();
-    historySent
-        .observeOn(
-            agent.executor().map(executor -> Schedulers.from(executor)).orElse(Schedulers.io()))
-        .andThen(
-            liveRequests.concatMapCompletable(
-                request -> {
-                  if (request.content().isPresent()) {
-                    return connection.sendContent(request.content().get());
-                  } else if (request.blob().isPresent()) {
-                    return connection.sendRealtime(request.blob().get());
+    Disposable sendTask =
+        historySent
+            .observeOn(
+                agent.executor().map(executor -> Schedulers.from(executor)).orElse(Schedulers.io()))
+            .andThen(
+                liveRequests.concatMapCompletable(
+                    request -> {
+                      if (request.content().isPresent()) {
+                        return connection.sendContent(request.content().get());
+                      } else if (request.blob().isPresent()) {
+                        return connection.sendRealtime(request.blob().get());
+                      }
+                      return Completable.fromAction(connection::close);
+                    }))
+            .subscribeWith(
+                new DisposableCompletableObserver() {
+                  @Override
+                  public void onComplete() {
+                    connection.close();
                   }
-                  return Completable.fromAction(connection::close);
-                }))
-        .subscribe(
-            new CompletableObserver() {
-              @Override
-              public void onSubscribe(Disposable d) {}
 
-              @Override
-              public void onComplete() {
-                connection.close();
-              }
-
-              @Override
-              public void onError(Throwable e) {
-                connection.close(e);
-              }
-            });
+                  @Override
+                  public void onError(Throwable e) {
+                    connection.close(e);
+                  }
+                });
 
     return connection
         .receive()
@@ -357,8 +356,16 @@ public abstract class BaseLlmFlow implements BaseFlow {
             })
         .doOnNext(
             event -> {
-              if (!event.functionResponses().isEmpty()) {
+              ImmutableList<FunctionResponse> functionResponses = event.functionResponses();
+              if (!functionResponses.isEmpty()) {
                 invocationContext.liveRequestQueue().get().content(event.content().get());
+              }
+              if (functionResponses.stream()
+                  .anyMatch(
+                      functionResponse ->
+                          functionResponse.name().orElse("").equals("transfer_to_agent"))) {
+                sendTask.dispose();
+                connection.close();
               }
             })
         .startWithIterable(preResult.events());
