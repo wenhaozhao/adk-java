@@ -52,7 +52,7 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
-import org.apache.http.util.EntityUtils;
+import okhttp3.ResponseBody;
 
 /** Connects to the managed Vertex AI Session Service. */
 /** TODO: Use the genai HttpApiClient and ApiResponse methods once they are public. */
@@ -96,7 +96,8 @@ public final class VertexAiSessionService implements BaseSessionService {
 
   public JsonNode getJsonResponse(ApiResponse apiResponse) {
     try {
-      return objectMapper.readTree(EntityUtils.toString(apiResponse.getEntity()));
+      ResponseBody responseBody = apiResponse.getResponseBody();
+      return objectMapper.readTree(responseBody.string());
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
@@ -127,11 +128,11 @@ public final class VertexAiSessionService implements BaseSessionService {
       throw new UncheckedIOException(e);
     }
 
-    logger.log(Level.INFO, "Create Session response " + apiResponse.getEntity());
+    logger.log(Level.INFO, "Create Session response " + apiResponse.getResponseBody());
     String sessionName = "";
     String operationId = "";
     String sessId = sessionId == null ? "" : sessionId;
-    if (apiResponse.getEntity() != null) {
+    if (apiResponse.getResponseBody() != null) {
       JsonNode jsonResponse = getJsonResponse(apiResponse);
       sessionName = (String) jsonResponse.get("name").asText();
       List<String> parts = Splitter.on('/').splitToList(sessionName);
@@ -192,7 +193,7 @@ public final class VertexAiSessionService implements BaseSessionService {
             "");
 
     // Handles empty response case
-    if (apiResponse.getEntity() == null) {
+    if (apiResponse.getResponseBody() == null) {
       return Single.just(ListSessionsResponse.builder().build());
     }
 
@@ -236,7 +237,7 @@ public final class VertexAiSessionService implements BaseSessionService {
 
     logger.log(Level.INFO, "List events response " + apiResponse);
 
-    if (apiResponse.getEntity() == null) {
+    if (apiResponse.getResponseBody() == null) {
       return Single.just(ListEventsResponse.builder().build());
     }
 
@@ -296,7 +297,7 @@ public final class VertexAiSessionService implements BaseSessionService {
             "reasoningEngines/" + reasoningEngineId + "/sessions/" + sessionId + "/events",
             "");
 
-    if (listEventsApiResponse.getEntity() == null) {
+    if (listEventsApiResponse.getResponseBody() == null) {
       return Maybe.just(session);
     }
 
@@ -377,9 +378,14 @@ public final class VertexAiSessionService implements BaseSessionService {
             "reasoningEngines/" + reasoningEngineId + "/sessions/" + session.id() + ":appendEvent",
             convertEventToJson(event));
     // TODO(b/414263934)): Improve error handling for appendEvent.
-    if (response.getEntity().toString().contains("com.google.genai.errors.ClientException")) {
+    try {
+      if (response.getResponseBody().string().contains("com.google.genai.errors.ClientException")) {
       System.err.println("Failed to append event: " + event);
     }
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+
     response.close();
     return Single.just(event);
   }

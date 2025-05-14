@@ -16,36 +16,28 @@
 
 package com.google.adk.sessions;
 
-import com.google.genai.errors.ApiException;
-import com.google.genai.errors.GenAiIOException;
-import java.io.IOException;
-import org.apache.http.HttpEntity;
-import org.apache.http.client.methods.CloseableHttpResponse;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 
 /** Wraps a real HTTP response to expose the methods needed by the GenAI SDK. */
 public final class HttpApiResponse extends ApiResponse {
 
-  private final CloseableHttpResponse response;
+  private final Response response;
 
   /** Constructs a HttpApiResponse instance with the response. */
-  public HttpApiResponse(CloseableHttpResponse response) {
+  public HttpApiResponse(Response response) {
     this.response = response;
   }
 
   /** Returns the HttpEntity from the response. */
   @Override
-  public HttpEntity getEntity() {
-    ApiException.throwFromResponse(response);
-    return response.getEntity();
+  public ResponseBody getResponseBody() {
+    return response.body();
   }
 
   /** Closes the Http response. */
   @Override
   public void close() {
-    try {
-      response.close();
-    } catch (IOException e) {
-      throw new GenAiIOException("Failed to close the HTTP response.", e);
-    }
+    response.close();
   }
 }

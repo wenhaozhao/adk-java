@@ -16,12 +16,12 @@
 
 package com.google.adk.sessions;
 
-import org.apache.http.HttpEntity;
+import okhttp3.ResponseBody;
 
 /** The API response contains a response to a call to the GenAI APIs. */
 public abstract class ApiResponse implements AutoCloseable {
   /** Gets the HttpEntity. */
-  public abstract HttpEntity getEntity();
+  public abstract ResponseBody getResponseBody();
 
   @Override
   public abstract void close();

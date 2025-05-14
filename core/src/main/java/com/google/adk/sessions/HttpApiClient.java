@@ -23,15 +23,15 @@ import com.google.genai.types.HttpOptions;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
-import org.apache.http.client.methods.HttpDelete;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.methods.HttpRequestBase;
-import org.apache.http.entity.ContentType;
-import org.apache.http.entity.StringEntity;
+import okhttp3.MediaType;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 
 /** Base client for the HTTP APIs. */
 public class HttpApiClient extends ApiClient {
+  public static final MediaType MEDIA_TYPE_APPLICATION_JSON =
+      MediaType.parse("application/json; charset=utf-8");
 
   /** Constructs an ApiClient for Google AI APIs. */
   HttpApiClient(Optional<String> apiKey, Optional<HttpOptions> httpOptions) {
@@ -61,33 +61,31 @@ public class HttpApiClient extends ApiClient {
         String.format(
             "%s/%s/%s", httpOptions.baseUrl().get(), httpOptions.apiVersion().get(), path);
 
+    Request.Builder requestBuilder = new Request.Builder().url(requestUrl);
+    setHeaders(requestBuilder);
+
     if (httpMethod.equalsIgnoreCase("POST")) {
-      HttpPost httpPost = new HttpPost(requestUrl);
-      setHeaders(httpPost);
-      httpPost.setEntity(new StringEntity(requestJson, ContentType.APPLICATION_JSON));
-      return executeRequest(httpPost);
+      requestBuilder.post(RequestBody.create(MEDIA_TYPE_APPLICATION_JSON, requestJson));
+
     } else if (httpMethod.equalsIgnoreCase("GET")) {
-      HttpGet httpGet = new HttpGet(requestUrl);
-      setHeaders(httpGet);
-      return executeRequest(httpGet);
+      requestBuilder.get();
     } else if (httpMethod.equalsIgnoreCase("DELETE")) {
-      HttpDelete httpDelete = new HttpDelete(requestUrl);
-      setHeaders(httpDelete);
-      return executeRequest(httpDelete);
+      requestBuilder.delete();
     } else {
       throw new IllegalArgumentException("Unsupported HTTP method: " + httpMethod);
     }
+    return executeRequest(requestBuilder.build());
   }
 
   /** Sets the required headers (including auth) on the request object. */
-  private void setHeaders(HttpRequestBase request) {
+  private void setHeaders(Request.Builder requestBuilder) {
     for (Map.Entry<String, String> header :
         httpOptions.headers().orElse(ImmutableMap.of()).entrySet()) {
-      request.setHeader(header.getKey(), header.getValue());
+      requestBuilder.header(header.getKey(), header.getValue());
     }
 
     if (apiKey.isPresent()) {
-      request.setHeader("x-goog-api-key", apiKey.get());
+      requestBuilder.header("x-goog-api-key", apiKey.get());
     } else {
       GoogleCredentials cred =
           credentials.orElseThrow(() -> new IllegalStateException("credentials is required"));
@@ -110,18 +108,19 @@ public class HttpApiClient extends ApiClient {
           throw e;
         }
       }
-      request.setHeader("Authorization", "Bearer " + accessToken);
+      requestBuilder.header("Authorization", "Bearer " + accessToken);
 
       if (cred.getQuotaProjectId() != null) {
-        request.setHeader("x-goog-user-project", cred.getQuotaProjectId());
+        requestBuilder.header("x-goog-user-project", cred.getQuotaProjectId());
       }
     }
   }
 
   /** Executes the given HTTP request. */
-  private ApiResponse executeRequest(HttpRequestBase request) {
+  private ApiResponse executeRequest(Request request) {
     try {
-      return new HttpApiResponse(httpClient.execute(request));
+      Response response = httpClient.newCall(request).execute();
+      return new HttpApiResponse(response);
     } catch (IOException e) {
       throw new GenAiIOException("Failed to execute HTTP request.", e);
     }

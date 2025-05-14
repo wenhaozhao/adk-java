@@ -18,8 +18,6 @@ import com.google.genai.types.Content;
 import com.google.genai.types.Part;
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Single;
-import java.io.ByteArrayInputStream;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -31,7 +29,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.apache.http.HttpEntity;
+import okhttp3.MediaType;
+import okhttp3.ResponseBody;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -166,8 +165,7 @@ public class VertexAiSessionServiceTest {
   @Mock private HttpApiClient mockApiClient;
 
   // private final ObjectMapper objectMapper = new ObjectMapper();
-  @Mock private ApiResponse mockGetApiResponse;
-  @Mock private HttpEntity mockHttpEntity;
+  @Mock private ApiResponse mockApiResponse;
   private VertexAiSessionService vertexAiSessionService;
   public Map<String, String> sessionMap =
       new HashMap<String, String>(
@@ -229,23 +227,22 @@ public class VertexAiSessionServiceTest {
                           """,
                           newSessionId);
 
-                  when(mockGetApiResponse.getEntity()).thenReturn(mockHttpEntity);
-                  when(mockHttpEntity.getContent())
+                  when(mockApiResponse.getResponseBody())
                       .thenReturn(
-                          new ByteArrayInputStream(
-                              operationResponse.getBytes(StandardCharsets.UTF_8)));
-                  return mockGetApiResponse;
+                          ResponseBody.create(
+                              MediaType.parse("application/json; charset=utf-8"),
+                              operationResponse));
+                  return mockApiResponse;
                 } else if (httpMethod.equals("GET") && SESSION_REGEX.matcher(path).matches()) {
                   String sessionId = path.substring(path.lastIndexOf('/') + 1);
                   if (!sessionId.contains("/")) { // Ensure it's a direct session ID
                     String sessionData = sessionMap.get(sessionId);
                     if (sessionData != null) {
-                      when(mockGetApiResponse.getEntity()).thenReturn(mockHttpEntity);
-                      when(mockHttpEntity.getContent())
+                      when(mockApiResponse.getResponseBody())
                           .thenReturn(
-                              new ByteArrayInputStream(
-                                  sessionData.getBytes(StandardCharsets.UTF_8)));
-                      return mockGetApiResponse;
+                              ResponseBody.create(
+                                  MediaType.parse("application/json; charset=utf-8"), sessionData));
+                      return mockApiResponse;
                     } else {
                       throw new RuntimeException("Session not found: " + sessionId);
                     }
@@ -271,12 +268,12 @@ public class VertexAiSessionServiceTest {
                             }
                             """,
                             String.join(",", userSessionsJson));
-                    when(mockGetApiResponse.getEntity()).thenReturn(mockHttpEntity);
-                    when(mockHttpEntity.getContent())
+                    when(mockApiResponse.getResponseBody())
                         .thenReturn(
-                            new ByteArrayInputStream(
-                                sessionsResponse.getBytes(StandardCharsets.UTF_8)));
-                    return mockGetApiResponse;
+                            ResponseBody.create(
+                                MediaType.parse("application/json; charset=utf-8"),
+                                sessionsResponse));
+                    return mockApiResponse;
                   }
                 } else if (httpMethod.equals("GET") && EVENTS_REGEX.matcher(path).matches()) {
                   Matcher matcher = EVENTS_REGEX.matcher(path);
@@ -292,12 +289,12 @@ public class VertexAiSessionServiceTest {
                               }
                               """,
                               eventData);
-                      when(mockGetApiResponse.getEntity()).thenReturn(mockHttpEntity);
-                      when(mockHttpEntity.getContent())
+                      when(mockApiResponse.getResponseBody())
                           .thenReturn(
-                              new ByteArrayInputStream(
-                                  eventsResponse.getBytes(StandardCharsets.UTF_8)));
-                      return mockGetApiResponse;
+                              ResponseBody.create(
+                                  MediaType.parse("application/json; charset=utf-8"),
+                                  eventsResponse));
+                      return mockApiResponse;
                     } else {
                       // Return an empty list if no events are found for the session
                       String emptyEventsResponse =
@@ -306,12 +303,12 @@ public class VertexAiSessionServiceTest {
                             "sessionEvents": []
                           }
                           """;
-                      when(mockGetApiResponse.getEntity()).thenReturn(mockHttpEntity);
-                      when(mockHttpEntity.getContent())
+                      when(mockApiResponse.getResponseBody())
                           .thenReturn(
-                              new ByteArrayInputStream(
-                                  emptyEventsResponse.getBytes(StandardCharsets.UTF_8)));
-                      return mockGetApiResponse;
+                              ResponseBody.create(
+                                  MediaType.parse("application/json; charset=utf-8"),
+                                  emptyEventsResponse));
+                      return mockApiResponse;
                     }
                   }
                 } else if (httpMethod.equals("GET") && LRO_REGEX.matcher(path).matches()) {
@@ -324,20 +321,21 @@ public class VertexAiSessionServiceTest {
                           }
                           """,
                           path.replace("/operations/111", "")); // Simulate LRO done
-                  when(mockGetApiResponse.getEntity()).thenReturn(mockHttpEntity);
-                  when(mockHttpEntity.getContent())
+                  when(mockApiResponse.getResponseBody())
                       .thenReturn(
-                          new ByteArrayInputStream(lroResponse.getBytes(StandardCharsets.UTF_8)));
-                  return mockGetApiResponse;
+                          ResponseBody.create(
+                              MediaType.parse("application/json; charset=utf-8"), lroResponse));
+                  return mockApiResponse;
                 } else if (httpMethod.equals("DELETE")) {
                   Matcher sessionMatcher = SESSION_REGEX.matcher(path);
                   if (sessionMatcher.matches()) {
                     String sessionIdToDelete = sessionMatcher.group(2);
                     sessionMap.remove(sessionIdToDelete);
-                    when(mockGetApiResponse.getEntity()).thenReturn(mockHttpEntity);
-                    when(mockHttpEntity.getContent())
-                        .thenReturn(new ByteArrayInputStream(new byte[0])); // Empty response
-                    return mockGetApiResponse;
+                    when(mockApiResponse.getResponseBody())
+                        .thenReturn(
+                            ResponseBody.create(
+                                MediaType.parse("application/json; charset=utf-8"), ""));
+                    return mockApiResponse;
                   }
                 }
                 return null; // Handle other cases or return null for unmocked calls

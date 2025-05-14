@@ -23,17 +23,15 @@ import com.google.common.collect.ImmutableMap;
 import com.google.genai.errors.GenAiIOException;
 import com.google.genai.types.HttpOptions;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.impl.client.HttpClients;
+import okhttp3.OkHttpClient;
 import org.jspecify.annotations.Nullable;
 
 /** Interface for an API client which issues HTTP requests to the GenAI APIs. */
-public abstract class ApiClient {
-  CloseableHttpClient httpClient;
+abstract class ApiClient {
+  OkHttpClient httpClient;
   // For Google AI APIs
   final Optional<String> apiKey;
   // For Vertex AI APIs
@@ -116,12 +114,12 @@ public abstract class ApiClient {
     this.httpClient = createHttpClient(httpOptions.timeout());
   }
 
-  private CloseableHttpClient createHttpClient(Optional<Integer> timeout) {
-    if (!timeout.isPresent()) {
-      return HttpClients.createDefault();
+  private OkHttpClient createHttpClient(Optional<Integer> timeout) {
+    OkHttpClient.Builder builder = new OkHttpClient().newBuilder();
+    if (timeout.isPresent()) {
+      builder.connectTimeout(Duration.ofMillis(timeout.get()));
     }
-    RequestConfig config = RequestConfig.custom().setConnectTimeout(timeout.get()).build();
-    return HttpClientBuilder.create().setDefaultRequestConfig(config).build();
+    return builder.build();
   }
 
   /** Sends a Http request given the http method, path, and request json string. */
@@ -156,7 +154,7 @@ public abstract class ApiClient {
   }
 
   /** Returns the HttpClient for API calls. */
-  CloseableHttpClient httpClient() {
+  OkHttpClient httpClient() {
     return httpClient;
   }
 
