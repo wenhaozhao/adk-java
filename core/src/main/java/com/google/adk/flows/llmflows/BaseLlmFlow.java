@@ -355,6 +355,12 @@ public abstract class BaseLlmFlow implements BaseFlow {
               }
               return events;
             })
+        .doOnNext(
+            event -> {
+              if (!event.functionResponses().isEmpty()) {
+                invocationContext.liveRequestQueue().get().content(event.content().get());
+              }
+            })
         .startWithIterable(preResult.events());
   }
 
