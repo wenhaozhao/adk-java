@@ -971,8 +971,7 @@ public class AdkWebServer implements WebMvcConfigurer {
                                 "SseEmitter: Sending event {} for session {}",
                                 event.id(),
                                 sessionId);
-                            emitter.send(
-                                SseEmitter.event().data(event, MediaType.APPLICATION_JSON));
+                            emitter.send(SseEmitter.event().data(event.toJson()));
                           } catch (IOException e) {
                             log.error(
                                 "SseEmitter: IOException sending event for session {}: {}",
