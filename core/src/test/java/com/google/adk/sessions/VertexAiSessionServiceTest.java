@@ -41,7 +41,7 @@ import org.mockito.stubbing.Answer;
 
 /** Unit tests for {@link VertexAiSessionService}. */
 @RunWith(JUnit4.class)
-public class TestVertexAiSessionService {
+public class VertexAiSessionServiceTest {
 
   private static final ObjectMapper mapper = JsonBaseModel.getMapper();
 
