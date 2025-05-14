@@ -19,6 +19,7 @@ package com.google.adk.tools.mcp;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.adk.JsonBaseModel;
 import io.modelcontextprotocol.client.McpSyncClient;
 import io.modelcontextprotocol.spec.McpSchema.ListToolsResult;
 import java.util.List;
@@ -33,7 +34,7 @@ import java.util.logging.Logger;
  *
  * <ul>
  *   <li>{@code connectionParams}: The connection parameters to the MCP server. Can be either {@code
- *       ServerParameters} or {@code SseServerParams}.
+ *       ServerParameters} or {@code SseServerParameters}.
  *   <li>{@code exit_stack}: (Python concept) The async exit stack to manage the connection to the
  *       MCP server. In Java, this is implicitly handled by {@code McpToolset} implementing {@code
  *       AutoCloseable}.
@@ -52,7 +53,7 @@ public class McpToolset implements AutoCloseable {
    *
    * @param connectionParams The connection parameters to the MCP server. Can be: {@code
    *     ServerParameters} for using a local mcp server (e.g., using `npx` or `python3`); or {@code
-   *     SseServerParams} for a local/remote SSE server.
+   *     SseServerParameters} for a local/remote SSE server.
    * @param objectMapper An ObjectMapper instance to be used for parsing schemas when creating
    *     {@code McpTool} instances.
    */
@@ -62,6 +63,23 @@ public class McpToolset implements AutoCloseable {
     }
     this.connectionParams = connectionParams;
     this.objectMapper = objectMapper;
+    this.mcpSessionManager = new McpSessionManager(this.connectionParams);
+  }
+
+  /**
+   * Initializes the McpToolset. Uses the {@code ObjectMapper} instance used across the ADK exposed
+   * by JsonBaseModel.
+   *
+   * @param connectionParams The connection parameters to the MCP server. Can be: {@code
+   *     ServerParameters} for using a local mcp server (e.g., using `npx` or `python3`); or {@code
+   *     SseServerParameters} for a local/remote SSE server.
+   */
+  public McpToolset(Object connectionParams) {
+    if (connectionParams == null) {
+      throw new IllegalArgumentException("Missing connection params in McpToolset.");
+    }
+    this.connectionParams = connectionParams;
+    this.objectMapper = JsonBaseModel.getMapper();
     this.mcpSessionManager = new McpSessionManager(this.connectionParams);
   }
 

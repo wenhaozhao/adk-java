@@ -191,8 +191,8 @@ public class LlmAgent extends BaseAgent {
     }
 
     @CanIgnoreReturnValue
-    public Builder subAgents(List<BaseAgent> subAgents) {
-      this.subAgents = subAgents;
+    public Builder subAgents(List<? extends BaseAgent> subAgents) {
+      this.subAgents = ImmutableList.copyOf(subAgents);
       return this;
     }
 
@@ -203,8 +203,8 @@ public class LlmAgent extends BaseAgent {
     }
 
     @CanIgnoreReturnValue
-    public Builder tools(List<BaseTool> tools) {
-      this.tools = tools;
+    public Builder tools(List<? extends BaseTool> tools) {
+      this.tools = ImmutableList.copyOf(tools);
       return this;
     }
 
