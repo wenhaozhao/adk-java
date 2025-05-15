@@ -75,6 +75,28 @@ public abstract class LlmRequest {
    */
   public abstract Map<String, BaseTool> tools();
 
+  /** returns the first system instruction text from the request if present. */
+  public Optional<String> getFirstSystemInstruction() {
+    return this.config()
+        .flatMap(GenerateContentConfig::systemInstruction)
+        .flatMap(content -> content.parts().flatMap(partList -> partList.stream().findFirst()))
+        .flatMap(Part::text);
+  }
+
+  /** Returns all system instruction texts from the request as an immutable list. */
+  public ImmutableList<String> getSystemInstructions() {
+    return config()
+        .flatMap(GenerateContentConfig::systemInstruction)
+        .flatMap(Content::parts)
+        .map(
+            partList ->
+                partList.stream()
+                    .map(Part::text)
+                    .flatMap(Optional::stream)
+                    .collect(toImmutableList()))
+        .orElse(ImmutableList.of());
+  }
+
   public static Builder builder() {
     return new AutoValue_LlmRequest.Builder()
         .tools(ImmutableMap.of())

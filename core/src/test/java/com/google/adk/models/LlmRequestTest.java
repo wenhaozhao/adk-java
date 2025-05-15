@@ -26,6 +26,7 @@ import com.google.genai.types.Content;
 import com.google.genai.types.GenerateContentConfig;
 import com.google.genai.types.Part;
 import com.google.genai.types.Schema;
+import java.util.Optional;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -204,5 +205,36 @@ public final class LlmRequestTest {
     assertThat(request.config().get().temperature()).isEqualTo(initialConfig.temperature());
     assertThat(request.config().get().responseSchema()).hasValue(schema);
     assertThat(request.config().get().responseMimeType()).hasValue("application/json");
+  }
+
+  @Test
+  public void getSystemInstruction_whenNoConfig_returnsEmpty() {
+    LlmRequest request = LlmRequest.builder().build();
+    Optional<String> systemText = request.getFirstSystemInstruction();
+    assertThat(systemText).isEmpty();
+  }
+
+  @Test
+  public void getSystemInstruction_whenPresent_returnsText() {
+    String instruction = "This is the system instruction.";
+    LlmRequest request =
+        LlmRequest.builder().appendInstructions(ImmutableList.of(instruction)).build();
+
+    Optional<String> systemText = request.getFirstSystemInstruction();
+    assertThat(systemText).hasValue(instruction);
+  }
+
+  @Test
+  public void getSystemInstructions_whenPresent_returnsList() {
+    String instruction1 = "Do A.";
+    String instruction2 = "Then Do B.";
+
+    LlmRequest request =
+        LlmRequest.builder()
+            .appendInstructions(ImmutableList.of(instruction1, instruction2))
+            .build();
+    assertThat(request.getSystemInstructions())
+        .containsExactly(instruction1, instruction2)
+        .inOrder();
   }
 }
