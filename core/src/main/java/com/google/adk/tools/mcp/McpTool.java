@@ -34,6 +34,7 @@ import io.modelcontextprotocol.spec.McpSchema.JsonSchema;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
 import io.reactivex.rxjava3.core.Single;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -73,6 +74,9 @@ public final class McpTool extends BaseTool {
     }
     if (mcpSession == null) {
       throw new IllegalArgumentException("mcpSession cannot be null");
+    }
+    if (objectMapper == null) {
+      throw new IllegalArgumentException("objectMapper cannot be null");
     }
     this.mcpTool = mcpTool;
     this.mcpSession = mcpSession;
@@ -129,35 +133,35 @@ public final class McpTool extends BaseTool {
                 return ImmutableMap.of();
               }
 
-              Content firstContent = contents.get(0);
-
-              if (firstContent instanceof TextContent) {
-                TextContent textContent = (TextContent) firstContent;
-                String textOutput = textContent.text();
-
-                if (textOutput == null) {
-                  return ImmutableMap.of();
+              List<String> textOutputs = new ArrayList<>();
+              for (Content content : contents) {
+                if (content instanceof TextContent) {
+                  TextContent textContent = (TextContent) content;
+                  if (textContent.text() != null) {
+                    textOutputs.add(textContent.text());
+                  }
                 }
+              }
 
-                try {
-                  Map<String, Object> resultMap =
-                      objectMapper.readValue(
-                          textOutput, new TypeReference<Map<String, Object>>() {});
-                  return ImmutableMap.copyOf(resultMap);
-                } catch (JsonProcessingException e) {
-                  return ImmutableMap.of("text_output", textOutput);
-                }
-
-              } else {
+              if (textOutputs.isEmpty()) {
                 return ImmutableMap.of(
                     "error",
-                    "Tool '"
-                        + this.name()
-                        + "' returned an unexpected content type: "
-                        + firstContent.getClass().getName(),
+                    "Tool '" + this.name() + "' returned content that is not TextContent.",
                     "content_details",
-                    firstContent.toString());
+                    contents.toString());
               }
+
+              List<Map<String, Object>> resultMaps = new ArrayList<>();
+              for (String textOutput : textOutputs) {
+                try {
+                  resultMaps.add(
+                      objectMapper.readValue(
+                          textOutput, new TypeReference<Map<String, Object>>() {}));
+                } catch (JsonProcessingException e) {
+                  resultMaps.add(ImmutableMap.of("text", textOutput));
+                }
+              }
+              return ImmutableMap.of("text_output", resultMaps);
             })
         .retryWhen(
             errors ->
