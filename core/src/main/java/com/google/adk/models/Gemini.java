@@ -21,7 +21,9 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import com.google.common.collect.ImmutableList;
 import com.google.genai.Client;
 import com.google.genai.ResponseStream;
+import com.google.genai.types.Candidate;
 import com.google.genai.types.Content;
+import com.google.genai.types.FinishReason;
 import com.google.genai.types.GenerateContentConfig;
 import com.google.genai.types.GenerateContentResponse;
 import com.google.genai.types.LiveConnectConfig;
@@ -30,10 +32,12 @@ import io.reactivex.rxjava3.core.Flowable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Represents the Gemini Generative AI model.
@@ -43,7 +47,7 @@ import java.util.stream.Stream;
  */
 public class Gemini extends BaseLlm {
 
-  private static final Logger logger = Logger.getLogger(Gemini.class.getName());
+  private static final Logger logger = LoggerFactory.getLogger(Gemini.class);
 
   private final Client apiClient;
 
@@ -81,22 +85,98 @@ public class Gemini extends BaseLlm {
     GenerateContentConfig config = llmRequest.config().orElse(null);
     String effectiveModelName = llmRequest.model().orElse(model());
 
-    logger.finer(() -> String.format("Request Contents: %s", finalContents));
-    logger.finer(() -> String.format("Request Config: %s", config));
+    logger.trace("Request Contents: {}", finalContents);
+    logger.trace("Request Config: {}", config);
 
     if (stream) {
-      logger.fine(
-          () ->
-              String.format(
-                  "Sending streaming generateContent request to model %s", effectiveModelName));
+      logger.debug("Sending streaming generateContent request to model {}", effectiveModelName);
       CompletableFuture<ResponseStream<GenerateContentResponse>> streamFuture =
           apiClient.async.models.generateContentStream(effectiveModelName, finalContents, config);
-      return Flowable.fromFuture(streamFuture)
-          .flatMapIterable(iterable -> iterable)
-          .map(LlmResponse::create);
+
+      return Flowable.defer(
+          () -> {
+            final StringBuilder accumulatedText = new StringBuilder();
+            // Array to bypass final local variable reassignment in lambda.
+            final GenerateContentResponse[] lastRawResponseHolder = {null};
+
+            return Flowable.fromFuture(streamFuture)
+                .flatMapIterable(iterable -> iterable)
+                .concatMap(
+                    rawResponse -> {
+                      lastRawResponseHolder[0] = rawResponse;
+                      logger.trace("Raw streaming response: {}", rawResponse);
+
+                      List<LlmResponse> responsesToEmit = new ArrayList<>();
+                      LlmResponse currentProcessedLlmResponse = LlmResponse.create(rawResponse);
+                      String currentTextChunk = getTextFromLlmResponse(currentProcessedLlmResponse);
+
+                      if (!currentTextChunk.isEmpty()) {
+                        accumulatedText.append(currentTextChunk);
+                        LlmResponse partialResponse =
+                            currentProcessedLlmResponse.toBuilder().partial(true).build();
+                        responsesToEmit.add(partialResponse);
+                      } else {
+                        if (accumulatedText.length() > 0
+                            && shouldEmitAccumulatedText(currentProcessedLlmResponse)) {
+                          LlmResponse aggregatedTextResponse =
+                              LlmResponse.builder()
+                                  .content(
+                                      Content.builder()
+                                          .parts(
+                                              ImmutableList.of(
+                                                  Part.builder()
+                                                      .text(accumulatedText.toString())
+                                                      .build()))
+                                          .build())
+                                  .build();
+                          responsesToEmit.add(aggregatedTextResponse);
+                          accumulatedText.setLength(0);
+                        }
+                        responsesToEmit.add(currentProcessedLlmResponse);
+                      }
+                      logger.debug("Responses to emit: {}", responsesToEmit);
+                      return Flowable.fromIterable(responsesToEmit);
+                    })
+                .concatWith(
+                    Flowable.defer(
+                        () -> {
+                          if (accumulatedText.length() > 0 && lastRawResponseHolder[0] != null) {
+                            GenerateContentResponse finalRawResp = lastRawResponseHolder[0];
+                            boolean isStop =
+                                finalRawResp
+                                    .candidates()
+                                    .flatMap(
+                                        candidates ->
+                                            candidates.isEmpty()
+                                                ? Optional.empty()
+                                                : Optional.of(candidates.get(0)))
+                                    .flatMap(Candidate::finishReason)
+                                    .map(
+                                        finishReason ->
+                                            finishReason.equals(
+                                                new FinishReason(FinishReason.Known.STOP)))
+                                    .orElse(false);
+
+                            if (isStop) {
+                              LlmResponse finalAggregatedTextResponse =
+                                  LlmResponse.builder()
+                                      .content(
+                                          Content.builder()
+                                              .parts(
+                                                  ImmutableList.of(
+                                                      Part.builder()
+                                                          .text(accumulatedText.toString())
+                                                          .build()))
+                                              .build())
+                                      .build();
+                              return Flowable.just(finalAggregatedTextResponse);
+                            }
+                          }
+                          return Flowable.empty();
+                        }));
+          });
     } else {
-      logger.fine(
-          () -> String.format("Sending generateContent request to model %s", effectiveModelName));
+      logger.debug("Sending generateContent request to model {}", effectiveModelName);
       return Flowable.fromFuture(
           apiClient
               .async
@@ -106,14 +186,60 @@ public class Gemini extends BaseLlm {
     }
   }
 
+  /**
+   * Extracts text content from the first part of an LlmResponse, if available.
+   *
+   * @param llmResponse The LlmResponse to extract text from.
+   * @return The text content, or an empty string if not found.
+   */
+  private String getTextFromLlmResponse(LlmResponse llmResponse) {
+    return llmResponse
+        .content()
+        .flatMap(Content::parts)
+        .filter(parts -> !parts.isEmpty())
+        .map(parts -> parts.get(0))
+        .flatMap(Part::text)
+        .orElse("");
+  }
+
+  /**
+   * Determines if accumulated text should be emitted based on the current LlmResponse. We flush if
+   * current response is not a text continuation (e.g., no content, no parts, or the first part is
+   * not inline_data, meaning it's something else or just empty, thereby warranting a flush of
+   * preceding text).
+   *
+   * @param currentLlmResponse The current LlmResponse being processed.
+   * @return True if accumulated text should be emitted, false otherwise.
+   */
+  private boolean shouldEmitAccumulatedText(LlmResponse currentLlmResponse) {
+    Optional<Content> contentOpt = currentLlmResponse.content();
+    if (contentOpt.isEmpty()) {
+      return true;
+    }
+
+    Optional<List<Part>> partsOpt = contentOpt.get().parts();
+    if (partsOpt.isEmpty() || partsOpt.get().isEmpty()) {
+      return true;
+    }
+
+    // If content and parts are present, and parts list is not empty, we want to yield accumulated
+    // text only if `text` is present AND (`not llm_response.content` OR `not
+    // llm_response.content.parts` OR `not llm_response.content.parts[0].inline_data`)
+    // This means we flush if the first part does NOT have inline_data.
+    // If it *has* inline_data, the condition below is false,
+    // and we would not flush based on this specific sub-condition.
+    Part firstPart = partsOpt.get().get(0);
+    return firstPart.inlineData().isEmpty();
+  }
+
   @Override
   public BaseLlmConnection connect(LlmRequest llmRequest) {
-    logger.info("Establishing Gemini connection...");
+    logger.info("Establishing Gemini connection.");
     LiveConnectConfig liveConnectConfig = llmRequest.liveConnectConfig();
     String effectiveModelName = llmRequest.model().orElse(model());
 
-    logger.fine(() -> String.format("Connecting to model %s", effectiveModelName));
-    logger.finer(() -> String.format("Connection Config: %s", liveConnectConfig));
+    logger.debug("Connecting to model {}", effectiveModelName);
+    logger.trace("Connection Config: {}", liveConnectConfig);
 
     return new GeminiLlmConnection(apiClient, effectiveModelName, liveConnectConfig);
   }
@@ -123,7 +249,7 @@ public class Gemini extends BaseLlm {
     List<Content> updatedContents = new ArrayList<>();
     for (Content content : originalContents) {
       ImmutableList<Part> nonThoughtParts =
-          content.parts().get().stream()
+          content.parts().orElse(ImmutableList.of()).stream()
               // Keep if thought is not present OR if thought is present but false
               .filter(part -> part.thought().map(isThought -> !isThought).orElse(true))
               .collect(toImmutableList());
