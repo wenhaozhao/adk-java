@@ -644,6 +644,19 @@ public class AdkWebServer implements WebMvcConfigurer {
     }
 
     /**
+     * Retrieves trace spans for a given session ID. (STUB - Not Implemented)
+     *
+     * @param sessionId The session ID.
+     * @return A ResponseEntity indicating the endpoint is not implemented.
+     */
+    @GetMapping("/debug/trace/session/{sessionId}")
+    public ResponseEntity<Object> getSessionTrace(@PathVariable String sessionId) {
+      log.warn("Endpoint /debug/trace/session/{} (GET) is not implemented", sessionId);
+      return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
+          .body(Collections.singletonMap("message", "Session trace retrieval not implemented"));
+    }
+
+    /**
      * Retrieves a specific session by its ID.
      *
      * @param appName The application name.
@@ -1336,6 +1349,33 @@ public class AdkWebServer implements WebMvcConfigurer {
           evalSetId,
           req.getEvalIds(),
           req.getEvalMetrics());
+      return Collections.emptyList();
+    }
+
+    /**
+     * Gets a specific evaluation result. (STUB - Not Implemented)
+     *
+     * @param appName The application name.
+     * @param evalResultId The evaluation result ID.
+     * @return A ResponseEntity indicating the endpoint is not implemented.
+     */
+    @GetMapping("/apps/{appName}/eval_results/{evalResultId}")
+    public ResponseEntity<Object> getEvalResult(
+        @PathVariable String appName, @PathVariable String evalResultId) {
+      log.warn("Endpoint /apps/{}/eval_results/{} (GET) is not implemented", appName, evalResultId);
+      return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
+          .body(Collections.singletonMap("message", "Get evaluation result not implemented"));
+    }
+
+    /**
+     * Lists all evaluation results for an app. (STUB - Not Implemented)
+     *
+     * @param appName The application name.
+     * @return An empty list, as this endpoint is not implemented.
+     */
+    @GetMapping("/apps/{appName}/eval_results")
+    public List<String> listEvalResults(@PathVariable String appName) {
+      log.warn("Endpoint /apps/{}/eval_results (GET) is not implemented", appName);
       return Collections.emptyList();
     }
   }
