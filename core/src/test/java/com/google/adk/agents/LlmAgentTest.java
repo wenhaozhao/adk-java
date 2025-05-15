@@ -24,11 +24,18 @@ import static com.google.adk.testing.TestUtils.createTestLlm;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.truth.Truth.assertThat;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static org.junit.Assert.assertThrows;
 
 import com.google.adk.events.Event;
+import com.google.adk.models.LlmResponse;
 import com.google.adk.testing.TestLlm;
+import com.google.adk.tools.BaseTool;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.genai.types.Content;
+import com.google.genai.types.FunctionDeclaration;
 import com.google.genai.types.Part;
+import com.google.genai.types.Schema;
 import io.reactivex.rxjava3.core.Maybe;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import java.util.List;
@@ -301,5 +308,74 @@ public final class LlmAgentTest {
     assertThat(events.get(0).finalResponse()).isTrue();
 
     assertThat(events.get(0).actions().stateDelta()).isEmpty();
+  }
+
+  @Test
+  public void build_withOutputSchemaAndTools_throwsIllegalArgumentException() {
+    BaseTool tool =
+        new BaseTool("test_tool", "test_description") {
+          @Override
+          public Optional<FunctionDeclaration> declaration() {
+            return Optional.empty();
+          }
+        };
+
+    Schema outputSchema =
+        Schema.builder()
+            .type("OBJECT")
+            .properties(ImmutableMap.of("status", Schema.builder().type("STRING").build()))
+            .required(ImmutableList.of("status"))
+            .build();
+
+    // Expecting an IllegalArgumentException when building the agent
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                LlmAgent.builder() // Use the agent builder directly
+                    .name("agent with invalid tool config")
+                    .outputSchema(outputSchema) // Set the output schema
+                    .tools(ImmutableList.of(tool)) // Set tools (this should cause the error)
+                    .build()); // Attempt to build the agent
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Invalid config for agent agent with invalid tool config: if outputSchema is set, tools"
+                + " must be empty");
+  }
+
+  @Test
+  public void build_withOutputSchemaAndSubAgents_throwsIllegalArgumentException() {
+    ImmutableList<BaseAgent> subAgents =
+        ImmutableList.of(
+            createTestAgentBuilder(createTestLlm(LlmResponse.builder().build()))
+                .name("test_sub_agent")
+                .description("test_sub_agent_description")
+                .build());
+
+    Schema outputSchema =
+        Schema.builder()
+            .type("OBJECT")
+            .properties(ImmutableMap.of("status", Schema.builder().type("STRING").build()))
+            .required(ImmutableList.of("status"))
+            .build();
+
+    // Expecting an IllegalArgumentException when building the agent
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                LlmAgent.builder() // Use the agent builder directly
+                    .name("agent with invalid tool config")
+                    .outputSchema(outputSchema) // Set the output schema
+                    .subAgents(subAgents) // Set subAgents (this should cause the error)
+                    .build()); // Attempt to build the agent
+
+    assertThat(exception)
+        .hasMessageThat()
+        .contains(
+            "Invalid config for agent agent with invalid tool config: if outputSchema is set,"
+                + " subAgents must be empty to disable agent transfer.");
   }
 }
