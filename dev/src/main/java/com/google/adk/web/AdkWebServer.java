@@ -1,8 +1,12 @@
 package com.google.adk.web;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.adk.JsonBaseModel;
 import com.google.adk.agents.BaseAgent;
+import com.google.adk.agents.LiveRequest;
+import com.google.adk.agents.LiveRequestQueue;
 import com.google.adk.agents.RunConfig;
 import com.google.adk.agents.RunConfig.StreamingMode;
 import com.google.adk.artifacts.BaseArtifactService;
@@ -20,6 +24,7 @@ import com.google.common.collect.Lists;
 import com.google.genai.types.Content;
 import com.google.genai.types.FunctionCall;
 import com.google.genai.types.FunctionResponse;
+import com.google.genai.types.Modality;
 import com.google.genai.types.Part;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.AttributeKey;
@@ -37,6 +42,7 @@ import io.reactivex.rxjava3.core.Single;
 import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -62,6 +68,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Component;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -74,6 +82,14 @@ import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry
 import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.socket.config.annotation.EnableWebSocket;
+import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
+import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
+import org.springframework.web.socket.handler.TextWebSocketHandler;
+import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Single-file Spring Boot application for the Agent Server. Combines configuration, DTOs, and
@@ -122,6 +138,11 @@ public class AdkWebServer implements WebMvcConfigurer {
       log.error("Failed to load dynamic agents", e);
       return Collections.emptyMap();
     }
+  }
+
+  @Bean
+  public ObjectMapper objectMapper() {
+    return JsonBaseModel.getMapper();
   }
 
   // --- OpenTelemetry Configuration START ---
@@ -1319,12 +1340,313 @@ public class AdkWebServer implements WebMvcConfigurer {
     }
   }
 
+  /** Configuration class for WebSocket handling. */
+  @Configuration
+  @EnableWebSocket
+  public static class WebSocketConfig implements WebSocketConfigurer {
+
+    private final LiveWebSocketHandler liveWebSocketHandler;
+
+    @Autowired
+    public WebSocketConfig(LiveWebSocketHandler liveWebSocketHandler) {
+      this.liveWebSocketHandler = liveWebSocketHandler;
+    }
+
+    @Override
+    public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
+      registry.addHandler(liveWebSocketHandler, "/run_live").setAllowedOrigins("*");
+    }
+  }
+
+  /**
+   * WebSocket Handler for the /run_live endpoint.
+   *
+   * <p>Manages bidirectional communication for live agent interactions. Assumes the
+   * com.google.adk.runner.Runner class has a method: public Flowable<Event> runLive(Session
+   * session, Flowable<LiveRequest> liveRequests, List<String> modalities)
+   */
+  @Component
+  public static class LiveWebSocketHandler extends TextWebSocketHandler {
+    private static final Logger log = LoggerFactory.getLogger(LiveWebSocketHandler.class);
+    private static final String LIVE_REQUEST_QUEUE_ATTR = "liveRequestQueue";
+    private static final String LIVE_SUBSCRIPTION_ATTR = "liveSubscription";
+    private static final int WEBSOCKET_MAX_BYTES_FOR_REASON = 123;
+
+    private final ObjectMapper objectMapper;
+    private final BaseSessionService sessionService;
+    private final BaseArtifactService artifactService; // For Runner instantiation
+    private final Map<String, BaseAgent> agentRegistry; // For Runner instantiation
+    private final Map<String, Runner> runnerCache = new ConcurrentHashMap<>();
+    private final String agentEngineId = ""; // TODO: Mirror AgentController's agentEngineId logic
+
+    @Autowired
+    public LiveWebSocketHandler(
+        ObjectMapper objectMapper,
+        BaseSessionService sessionService,
+        BaseArtifactService artifactService,
+        @Qualifier("loadedAgentRegistry") Map<String, BaseAgent> agentRegistry) {
+      this.objectMapper = objectMapper;
+      this.sessionService = sessionService;
+      this.agentRegistry = agentRegistry;
+      this.artifactService = artifactService; // Store for getRunner
+    }
+
+    // Duplicates AgentController.getRunner, consider refactoring to a shared service/util
+    private Runner getRunner(String appName) {
+      return runnerCache.computeIfAbsent(
+          appName,
+          key -> {
+            BaseAgent agent = agentRegistry.get(key);
+            if (agent == null) {
+              log.error(
+                  "Agent/App named '{}' not found in registry for WebSocket. Available apps: {}",
+                  key,
+                  agentRegistry.keySet());
+              throw new ResponseStatusException(
+                  HttpStatus.NOT_FOUND, "Agent/App not found for WebSocket: " + key);
+            }
+            String effectiveAppName =
+                (agentEngineId != null && !agentEngineId.isEmpty()) ? agentEngineId : appName;
+            log.info(
+                "Creating Runner for WebSocket appName: {}, using agent definition: {}",
+                appName,
+                agent.name());
+            return new Runner(agent, effectiveAppName, this.artifactService, this.sessionService);
+          });
+    }
+
+    @Override
+    public void afterConnectionEstablished(WebSocketSession wsSession) throws Exception {
+      URI uri = wsSession.getUri();
+      if (uri == null) {
+        log.warn("WebSocket session URI is null, cannot establish connection.");
+        wsSession.close(CloseStatus.SERVER_ERROR.withReason("Invalid URI"));
+        return;
+      }
+      String path = uri.getPath();
+      log.info("WebSocket connection established: {} from {}", wsSession.getId(), uri);
+
+      MultiValueMap<String, String> queryParams =
+          UriComponentsBuilder.fromUri(uri).build().getQueryParams();
+      String appName = queryParams.getFirst("app_name");
+      String userId = queryParams.getFirst("user_id");
+      String sessionId = queryParams.getFirst("session_id");
+      log.info(
+          "Extracted params for WebSocket session {}: appName={}, userId={}, sessionId={},",
+          wsSession.getId(),
+          appName,
+          userId,
+          sessionId);
+
+      RunConfig runConfig =
+          RunConfig.builder()
+              .setResponseModalities(ImmutableList.of(new Modality(Modality.Known.AUDIO)))
+              .setStreamingMode(StreamingMode.BIDI)
+              .build();
+
+      Session session;
+      try {
+        String effectiveAppName =
+            (agentEngineId != null && !agentEngineId.isEmpty()) ? agentEngineId : appName;
+        session =
+            sessionService
+                .getSession(effectiveAppName, userId, sessionId, Optional.empty())
+                .blockingGet();
+        if (session == null) {
+          log.warn(
+              "Session not found for WebSocket: app={}, user={}, id={}. Closing connection.",
+              effectiveAppName,
+              userId,
+              sessionId);
+          wsSession.close(new CloseStatus(1002, "Session not found")); // 1002: Protocol Error
+          return;
+        }
+      } catch (Exception e) {
+        log.error(
+            "Error retrieving session for WebSocket: app={}, user={}, id={}",
+            appName,
+            userId,
+            sessionId,
+            e);
+        wsSession.close(CloseStatus.SERVER_ERROR.withReason("Failed to retrieve session"));
+        return;
+      }
+
+      LiveRequestQueue liveRequestQueue = new LiveRequestQueue();
+      wsSession.getAttributes().put(LIVE_REQUEST_QUEUE_ATTR, liveRequestQueue);
+
+      Runner runner;
+      try {
+        runner = getRunner(appName);
+      } catch (ResponseStatusException e) {
+        log.error(
+            "Failed to get runner for app {} during WebSocket connection: {}",
+            appName,
+            e.getMessage());
+        wsSession.close(
+            CloseStatus.SERVER_ERROR.withReason("Runner unavailable: " + e.getReason()));
+        return;
+      }
+
+      Flowable<Event> eventStream = runner.runLive(session, liveRequestQueue, runConfig);
+
+      Disposable disposable =
+          eventStream
+              .subscribeOn(Schedulers.io()) // Offload runner work
+              .observeOn(Schedulers.io()) // Send messages on I/O threads
+              .subscribe(
+                  event -> {
+                    try {
+                      String jsonEvent = objectMapper.writeValueAsString(event);
+                      log.debug(
+                          "Sending event via WebSocket session {}: {}",
+                          wsSession.getId(),
+                          jsonEvent);
+                      wsSession.sendMessage(new TextMessage(jsonEvent));
+                    } catch (JsonProcessingException e) {
+                      log.error(
+                          "Error serializing event to JSON for WebSocket session {}",
+                          wsSession.getId(),
+                          e);
+                      // Decide if to close session or just log
+                    } catch (IOException e) {
+                      log.error(
+                          "IOException sending message via WebSocket session {}",
+                          wsSession.getId(),
+                          e);
+                      // This might mean the session is already closed or problematic
+                      // Consider closing/disposing here
+                      try {
+                        wsSession.close(
+                            CloseStatus.SERVER_ERROR.withReason("Error sending message"));
+                      } catch (IOException ignored) {
+                      }
+                    }
+                  },
+                  error -> {
+                    log.error(
+                        "Error in run_live stream for WebSocket session {}: {}",
+                        wsSession.getId(),
+                        error.getMessage(),
+                        error);
+                    String reason =
+                        error.getMessage() != null ? error.getMessage() : "Unknown error";
+                    try {
+                      wsSession.close(
+                          new CloseStatus(
+                              1011, // Internal Server Error for WebSocket
+                              reason.substring(
+                                  0, Math.min(reason.length(), WEBSOCKET_MAX_BYTES_FOR_REASON))));
+                    } catch (IOException ignored) {
+                    }
+                  },
+                  () -> {
+                    log.info(
+                        "run_live stream completed for WebSocket session {}", wsSession.getId());
+                    try {
+                      wsSession.close(CloseStatus.NORMAL);
+                    } catch (IOException ignored) {
+                    }
+                  });
+      wsSession.getAttributes().put(LIVE_SUBSCRIPTION_ATTR, disposable);
+      log.info("Live run started for WebSocket session {}", wsSession.getId());
+    }
+
+    @Override
+    protected void handleTextMessage(WebSocketSession wsSession, TextMessage message)
+        throws Exception {
+      LiveRequestQueue liveRequestQueue =
+          (LiveRequestQueue) wsSession.getAttributes().get(LIVE_REQUEST_QUEUE_ATTR);
+
+      if (liveRequestQueue == null) {
+        log.warn(
+            "Received message on WebSocket session {} but LiveRequestQueue is not available (null)."
+                + " Message: {}",
+            wsSession.getId(),
+            message.getPayload());
+        return;
+      }
+
+      try {
+        String payload = message.getPayload();
+        log.debug("Received text message on WebSocket session {}: {}", wsSession.getId(), payload);
+        LiveRequest liveRequest = objectMapper.readValue(payload, LiveRequest.class);
+        liveRequestQueue.send(liveRequest);
+      } catch (JsonProcessingException e) {
+        log.error(
+            "Error deserializing LiveRequest from WebSocket message for session {}: {}",
+            wsSession.getId(),
+            message.getPayload(),
+            e);
+        wsSession.sendMessage(
+            new TextMessage(
+                "{\"error\":\"Invalid JSON format for LiveRequest\", \"details\":\""
+                    + e.getMessage()
+                    + "\"}"));
+      } catch (Exception e) {
+        log.error(
+            "Unexpected error processing text message for WebSocket session {}: {}",
+            wsSession.getId(),
+            message.getPayload(),
+            e);
+        String reason = e.getMessage() != null ? e.getMessage() : "Error processing message";
+        wsSession.close(
+            new CloseStatus(
+                1011,
+                reason.substring(0, Math.min(reason.length(), WEBSOCKET_MAX_BYTES_FOR_REASON))));
+      }
+    }
+
+    @Override
+    public void handleTransportError(WebSocketSession wsSession, Throwable exception)
+        throws Exception {
+      log.error(
+          "WebSocket transport error for session {}: {}",
+          wsSession.getId(),
+          exception.getMessage(),
+          exception);
+      // Cleanup resources similar to afterConnectionClosed
+      cleanupSession(wsSession);
+      if (wsSession.isOpen()) {
+        String reason = exception.getMessage() != null ? exception.getMessage() : "Transport error";
+        wsSession.close(
+            CloseStatus.PROTOCOL_ERROR.withReason(
+                reason.substring(0, Math.min(reason.length(), WEBSOCKET_MAX_BYTES_FOR_REASON))));
+      }
+    }
+
+    @Override
+    public void afterConnectionClosed(WebSocketSession wsSession, CloseStatus status)
+        throws Exception {
+      log.info(
+          "WebSocket connection closed: {} with status {}", wsSession.getId(), status.toString());
+      cleanupSession(wsSession);
+    }
+
+    private void cleanupSession(WebSocketSession wsSession) {
+      LiveRequestQueue liveRequestQueue =
+          (LiveRequestQueue) wsSession.getAttributes().remove(LIVE_REQUEST_QUEUE_ATTR);
+      if (liveRequestQueue != null) {
+        liveRequestQueue.close(); // Signal end of input to the runner
+        log.debug("Called close() on LiveRequestQueue for session {}", wsSession.getId());
+      }
+
+      Disposable disposable = (Disposable) wsSession.getAttributes().remove(LIVE_SUBSCRIPTION_ATTR);
+      if (disposable != null && !disposable.isDisposed()) {
+        disposable.dispose();
+      }
+      log.debug("Cleaned up resources for WebSocket session {}", wsSession.getId());
+    }
+  }
+
   /**
    * Main entry point for the Spring Boot application.
    *
    * @param args Command line arguments.
    */
   public static void main(String[] args) {
+    System.setProperty(
+        "org.apache.tomcat.websocket.DEFAULT_BUFFER_SIZE", String.valueOf(10 * 1024 * 1024));
     SpringApplication.run(AdkWebServer.class, args);
     log.info("AdkWebServer application started successfully.");
   }

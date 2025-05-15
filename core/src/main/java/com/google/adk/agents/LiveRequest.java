@@ -16,15 +16,20 @@
 
 package com.google.adk.agents;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.google.adk.JsonBaseModel;
 import com.google.auto.value.AutoValue;
 import com.google.common.base.Preconditions;
 import com.google.genai.types.Blob;
 import com.google.genai.types.Content;
 import java.util.Optional;
+import javax.annotation.Nullable;
 
 /** Represents a request to be sent to a live connection to the LLM model. */
 @AutoValue
-public abstract class LiveRequest {
+@JsonDeserialize(builder = LiveRequest.Builder.class)
+public abstract class LiveRequest extends JsonBaseModel {
 
   /**
    * Returns the content of the request.
@@ -33,6 +38,7 @@ public abstract class LiveRequest {
    *
    * @return An optional {@link Content} object containing the content of the request.
    */
+  @JsonProperty("content")
   public abstract Optional<Content> content();
 
   /**
@@ -42,6 +48,7 @@ public abstract class LiveRequest {
    *
    * @return An optional {@link Blob} object containing the blob of the request.
    */
+  @JsonProperty("blob")
   public abstract Optional<Blob> blob();
 
   /**
@@ -51,27 +58,40 @@ public abstract class LiveRequest {
    *
    * @return A boolean indicating whether the connection should be closed.
    */
-  public abstract boolean close();
+  @JsonProperty("close")
+  public abstract Optional<Boolean> close();
+
+  /** Extracts boolean value from the close field or returns false if unset. */
+  public boolean shouldClose() {
+    return close().orElse(false);
+  }
 
   /** Builder for constructing {@link LiveRequest} instances. */
   @AutoValue.Builder
   public abstract static class Builder {
-    public abstract Builder content(Content content);
+    @JsonProperty("content")
+    public abstract Builder content(@Nullable Content content);
 
     public abstract Builder content(Optional<Content> content);
 
-    public abstract Builder blob(Blob blob);
+    @JsonProperty("blob")
+    public abstract Builder blob(@Nullable Blob blob);
 
     public abstract Builder blob(Optional<Blob> blob);
 
-    public abstract Builder close(boolean close);
+    @JsonProperty("close")
+    public abstract Builder close(@Nullable Boolean close);
+
+    public abstract Builder close(Optional<Boolean> close);
 
     abstract LiveRequest autoBuild();
 
     public final LiveRequest build() {
       LiveRequest request = autoBuild();
       Preconditions.checkState(
-          request.content().isPresent() || request.blob().isPresent() || request.close(),
+          request.content().isPresent()
+              || request.blob().isPresent()
+              || request.close().isPresent(),
           "One of content, blob, or close must be set");
       return request;
     }
@@ -82,4 +102,9 @@ public abstract class LiveRequest {
   }
 
   public abstract Builder toBuilder();
+
+  /** Deserializes a Json string to a {@link LiveRequest} object. */
+  public static LiveRequest fromJsonString(String json) {
+    return JsonBaseModel.fromJsonString(json, LiveRequest.class);
+  }
 }

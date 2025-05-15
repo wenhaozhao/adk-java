@@ -45,7 +45,7 @@ public final class LiveRequestQueue {
 
   public void send(LiveRequest request) {
     processor.onNext(request);
-    if (request.close()) {
+    if (request.shouldClose()) {
       processor.onComplete();
     }
   }
