@@ -37,7 +37,7 @@ import java.util.logging.Logger;
 // TODO(b/413489523): Implement this class.
 public class McpSessionManager {
 
-  private final Object connectionParams; // ServerParameters or SseServerParams
+  private final Object connectionParams; // ServerParameters or SseServerParameters
   private static final Logger logger = Logger.getLogger(McpSessionManager.class.getName());
 
   public McpSessionManager(Object connectionParams) {
@@ -52,13 +52,13 @@ public class McpSessionManager {
     McpClientTransport transport;
     if (connectionParams instanceof ServerParameters) {
       transport = new StdioClientTransport((ServerParameters) connectionParams);
-    } else if (connectionParams instanceof SseServerParams) {
-      SseServerParams sseServerParams = (SseServerParams) connectionParams;
+    } else if (connectionParams instanceof SseServerParameters) {
+      SseServerParameters sseServerParams = (SseServerParameters) connectionParams;
       transport =
           HttpClientSseClientTransport.builder(sseServerParams.url()).sseEndpoint("sse").build();
     } else {
       throw new IllegalArgumentException(
-          "Connection parameters must be either ServerParameters or SseServerParams, but got "
+          "Connection parameters must be either ServerParameters or SseServerParameters, but got "
               + connectionParams.getClass().getName());
     }
     McpSyncClient client =

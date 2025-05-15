@@ -24,7 +24,7 @@ import javax.annotation.Nullable;
 
 /** Parameters for establishing a MCP Server-Sent Events (SSE) connection. */
 @AutoValue
-public abstract class SseServerParams {
+public abstract class SseServerParameters {
 
   /** The URL of the SSE server. */
   public abstract String url();
@@ -39,14 +39,14 @@ public abstract class SseServerParams {
   /** The timeout for reading data from the SSE stream. */
   public abstract Duration sseReadTimeout();
 
-  /** Creates a new builder for {@link SseServerParams}. */
+  /** Creates a new builder for {@link SseServerParameters}. */
   public static Builder builder() {
-    return new AutoValue_SseServerParams.Builder()
+    return new AutoValue_SseServerParameters.Builder()
         .timeout(Duration.ofSeconds(5))
         .sseReadTimeout(Duration.ofMinutes(5));
   }
 
-  /** Builder for {@link SseServerParams}. */
+  /** Builder for {@link SseServerParameters}. */
   @AutoValue.Builder
   public abstract static class Builder {
     /** Sets the URL of the SSE server. */
@@ -61,7 +61,7 @@ public abstract class SseServerParams {
     /** Sets the timeout for reading data from the SSE stream. */
     public abstract Builder sseReadTimeout(Duration sseReadTimeout);
 
-    /** Builds a new {@link SseServerParams} instance. */
-    public abstract SseServerParams build();
+    /** Builds a new {@link SseServerParameters} instance. */
+    public abstract SseServerParameters build();
   }
 }
