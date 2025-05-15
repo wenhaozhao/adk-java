@@ -267,7 +267,7 @@ public final class LlmAgentTest {
     assertThat(events.get(0).content()).hasValue(modelContent);
     assertThat(events.get(0).finalResponse()).isTrue();
 
-    assertThat(invocationContext.session().state()).containsEntry("myOutput", "Saved output");
+    assertThat(events.get(0).actions().stateDelta()).containsEntry("myOutput", "Saved output");
   }
 
   @Test
@@ -283,7 +283,7 @@ public final class LlmAgentTest {
     assertThat(events.get(0).content()).hasValue(modelContent);
     assertThat(events.get(0).finalResponse()).isTrue();
 
-    assertThat(invocationContext.session().state())
+    assertThat(events.get(0).actions().stateDelta())
         .containsEntry("myMultiPartOutput", "Part 1. Part 2.");
   }
 
@@ -300,6 +300,6 @@ public final class LlmAgentTest {
     assertThat(events.get(0).content()).hasValue(modelContent);
     assertThat(events.get(0).finalResponse()).isTrue();
 
-    assertThat(invocationContext.session().state()).isEmpty();
+    assertThat(events.get(0).actions().stateDelta()).isEmpty();
   }
 }

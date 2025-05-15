@@ -16,6 +16,8 @@
 
 package com.google.adk.agents;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.adk.SchemaUtils;
 import com.google.adk.agents.Callbacks.AfterAgentCallback;
 import com.google.adk.agents.Callbacks.AfterAgentCallbackSync;
 import com.google.adk.agents.Callbacks.AfterModelCallback;
@@ -47,6 +49,7 @@ import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.core.Maybe;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
@@ -102,10 +105,8 @@ public class LlmAgent extends BaseAgent {
     this.includeContents =
         builder.includeContents != null ? builder.includeContents : IncludeContents.DEFAULT;
     this.planning = builder.planning != null ? builder.planning : false;
-    this.disallowTransferToParent =
-        builder.disallowTransferToParent != null ? builder.disallowTransferToParent : false;
-    this.disallowTransferToPeers =
-        builder.disallowTransferToPeers != null ? builder.disallowTransferToPeers : false;
+    this.disallowTransferToParent = builder.disallowTransferToParent;
+    this.disallowTransferToPeers = builder.disallowTransferToPeers;
     this.beforeModelCallback = Optional.ofNullable(builder.beforeModelCallback);
     this.afterModelCallback = Optional.ofNullable(builder.afterModelCallback);
     this.beforeToolCallback = Optional.ofNullable(builder.beforeToolCallback);
@@ -384,6 +385,38 @@ public class LlmAgent extends BaseAgent {
     }
 
     public LlmAgent build() {
+      this.disallowTransferToParent =
+          this.disallowTransferToParent != null && this.disallowTransferToParent;
+      this.disallowTransferToPeers =
+          this.disallowTransferToPeers != null && this.disallowTransferToPeers;
+
+      if (this.outputSchema != null) {
+        if (!this.disallowTransferToParent || !this.disallowTransferToPeers) {
+          System.err.println(
+              "Warning: Invalid config for agent "
+                  + this.name
+                  + ": outputSchema cannot co-exist with agent transfer"
+                  + " configurations. Setting disallowTransferToParent=true and"
+                  + " disallowTransferToPeers=true.");
+          this.disallowTransferToParent = true;
+          this.disallowTransferToPeers = true;
+        }
+
+        if (this.subAgents != null && !this.subAgents.isEmpty()) {
+          throw new IllegalArgumentException(
+              "Invalid config for agent "
+                  + this.name
+                  + ": if outputSchema is set, subAgents must be empty to disable agent"
+                  + " transfer.");
+        }
+        if (this.tools != null && !this.tools.isEmpty()) {
+          throw new IllegalArgumentException(
+              "Invalid config for agent "
+                  + this.name
+                  + ": if outputSchema is set, tools must be empty.");
+        }
+      }
+
       return new LlmAgent(this);
     }
   }
@@ -396,32 +429,53 @@ public class LlmAgent extends BaseAgent {
     }
   }
 
-  private void maybeSaveOutputToState(Event event, InvocationContext context) {
+  private void maybeSaveOutputToState(Event event) {
     if (outputKey().isPresent() && event.finalResponse() && event.content().isPresent()) {
       // Concatenate text from all parts.
-      String result =
+      Object output;
+      String rawResult =
           event.content().flatMap(Content::parts).orElse(Collections.emptyList()).stream()
               .map(part -> part.text().orElse(""))
               .collect(Collectors.joining());
 
-      // Update the session state directly. Won't be reflected in the event's EventActions object
-      // itself, because events are immutable once created.
-      context.session().state().put(outputKey().get(), result);
+      Optional<Schema> outputSchema = outputSchema();
+      if (outputSchema.isPresent()) {
+        try {
+          Map<String, Object> validatedMap =
+              SchemaUtils.validateOutputSchema(rawResult, outputSchema.get());
+          output = validatedMap;
+        } catch (JsonProcessingException e) {
+          System.err.println(
+              "Error: LlmAgent output for outputKey '"
+                  + outputKey().get()
+                  + "' was not valid JSON, despite an outputSchema being present."
+                  + " Saving raw output to state. Error: "
+                  + e.getMessage());
+          output = rawResult;
+        } catch (IllegalArgumentException e) {
+          System.err.println(
+              "Error: LlmAgent output for outputKey '"
+                  + outputKey().get()
+                  + "' did not match the outputSchema."
+                  + " Saving raw output to state. Error: "
+                  + e.getMessage());
+          output = rawResult;
+        }
+      } else {
+        output = rawResult;
+      }
+      event.actions().stateDelta().put(outputKey().get(), output);
     }
   }
 
   @Override
   protected Flowable<Event> runAsyncImpl(InvocationContext invocationContext) {
-    return llmFlow
-        .run(invocationContext)
-        .doOnNext(event -> maybeSaveOutputToState(event, invocationContext));
+    return llmFlow.run(invocationContext).doOnNext(this::maybeSaveOutputToState);
   }
 
   @Override
   protected Flowable<Event> runLiveImpl(InvocationContext invocationContext) {
-    return llmFlow
-        .runLive(invocationContext)
-        .doOnNext(event -> maybeSaveOutputToState(event, invocationContext));
+    return llmFlow.runLive(invocationContext).doOnNext(this::maybeSaveOutputToState);
   }
 
   public Optional<String> instruction() {
