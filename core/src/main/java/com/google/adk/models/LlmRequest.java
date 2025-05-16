@@ -19,6 +19,11 @@ package com.google.adk.models;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.google.adk.JsonBaseModel;
 import com.google.adk.tools.BaseTool;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
@@ -36,7 +41,8 @@ import java.util.stream.Stream;
 
 /** Represents a request to be sent to the LLM. */
 @AutoValue
-public abstract class LlmRequest {
+@JsonDeserialize(builder = LlmRequest.Builder.class)
+public abstract class LlmRequest extends JsonBaseModel {
 
   /**
    * Returns the name of the LLM model to be used. If not set, the default model of the LLM class
@@ -44,6 +50,7 @@ public abstract class LlmRequest {
    *
    * @return An optional string representing the model name.
    */
+  @JsonProperty("model")
   public abstract Optional<String> model();
 
   /**
@@ -51,6 +58,7 @@ public abstract class LlmRequest {
    *
    * @return A list of {@link Content} objects.
    */
+  @JsonProperty("contents")
   public abstract List<Content> contents();
 
   /**
@@ -58,6 +66,7 @@ public abstract class LlmRequest {
    *
    * @return An optional {@link GenerateContentConfig} object containing the generation settings.
    */
+  @JsonProperty("config")
   public abstract Optional<GenerateContentConfig> config();
 
   /**
@@ -66,6 +75,7 @@ public abstract class LlmRequest {
    *
    * @return An optional {@link LiveConnectConfig} object containing the live connection settings.
    */
+  @JsonProperty("liveConnectConfig")
   public abstract LiveConnectConfig liveConnectConfig();
 
   /**
@@ -73,6 +83,7 @@ public abstract class LlmRequest {
    *
    * @return A map where keys are tool names and values are {@link BaseTool} instances.
    */
+  @JsonIgnore
   public abstract Map<String, BaseTool> tools();
 
   /** returns the first system instruction text from the request if present. */
@@ -109,18 +120,28 @@ public abstract class LlmRequest {
   /** Builder for constructing {@link LlmRequest} instances. */
   @AutoValue.Builder
   public abstract static class Builder {
+
+    @JsonCreator
+    private static Builder create() {
+      return builder();
+    }
+
     @CanIgnoreReturnValue
+    @JsonProperty("model")
     public abstract Builder model(String model);
 
     @CanIgnoreReturnValue
+    @JsonProperty("contents")
     public abstract Builder contents(List<Content> contents);
 
     @CanIgnoreReturnValue
+    @JsonProperty("config")
     public abstract Builder config(GenerateContentConfig config);
 
     public abstract Optional<GenerateContentConfig> config();
 
     @CanIgnoreReturnValue
+    @JsonProperty("liveConnectConfig")
     public abstract Builder liveConnectConfig(LiveConnectConfig liveConnectConfig);
 
     abstract LiveConnectConfig liveConnectConfig();
