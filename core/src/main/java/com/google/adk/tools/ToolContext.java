@@ -53,18 +53,18 @@ public class ToolContext extends CallbackContext {
     this.functionCallId = Optional.ofNullable(functionCallId);
   }
 
-  public void requestCredential() {
-    // TODO: b/414678311 - Implement credential request logic
+  private void requestCredential() {
+    // TODO: b/414678311 - Implement credential request logic. Make this public.
     throw new UnsupportedOperationException("Credential request not implemented yet.");
   }
 
-  public void getAuthResponse() {
-    // TODO: b/414678311 - Implement auth response retrieval logic
+  private void getAuthResponse() {
+    // TODO: b/414678311 - Implement auth response retrieval logic. Make this public.
     throw new UnsupportedOperationException("Auth response retrieval not implemented yet.");
   }
 
-  public void searchMemory() {
-    // TODO: b/414680316 - Implement search memory logic
+  private void searchMemory() {
+    // TODO: b/414680316 - Implement search memory logic. Make this public.
     throw new UnsupportedOperationException("Search memory not implemented yet.");
   }
 
