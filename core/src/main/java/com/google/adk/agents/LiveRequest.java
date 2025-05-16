@@ -16,8 +16,10 @@
 
 package com.google.adk.agents;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import com.google.adk.JsonBaseModel;
 import com.google.auto.value.AutoValue;
 import com.google.common.base.Preconditions;
@@ -30,6 +32,8 @@ import javax.annotation.Nullable;
 @AutoValue
 @JsonDeserialize(builder = LiveRequest.Builder.class)
 public abstract class LiveRequest extends JsonBaseModel {
+
+  LiveRequest() {}
 
   /**
    * Returns the content of the request.
@@ -68,6 +72,7 @@ public abstract class LiveRequest extends JsonBaseModel {
 
   /** Builder for constructing {@link LiveRequest} instances. */
   @AutoValue.Builder
+  @JsonPOJOBuilder(buildMethodName = "build", withPrefix = "")
   public abstract static class Builder {
     @JsonProperty("content")
     public abstract Builder content(@Nullable Content content);
@@ -106,5 +111,10 @@ public abstract class LiveRequest extends JsonBaseModel {
   /** Deserializes a Json string to a {@link LiveRequest} object. */
   public static LiveRequest fromJsonString(String json) {
     return JsonBaseModel.fromJsonString(json, LiveRequest.class);
+  }
+
+  @JsonCreator
+  static LiveRequest.Builder jacksonBuilder() {
+    return LiveRequest.builder();
   }
 }

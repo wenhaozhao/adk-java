@@ -2,6 +2,7 @@ package com.google.adk.web;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.adk.JsonBaseModel;
 import com.google.adk.agents.BaseAgent;
@@ -21,6 +22,7 @@ import com.google.adk.sessions.Session;
 import com.google.adk.web.config.AgentLoadingProperties;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import com.google.genai.types.Blob;
 import com.google.genai.types.Content;
 import com.google.genai.types.FunctionCall;
 import com.google.genai.types.FunctionResponse;
@@ -1402,8 +1404,8 @@ public class AdkWebServer implements WebMvcConfigurer {
    * WebSocket Handler for the /run_live endpoint.
    *
    * <p>Manages bidirectional communication for live agent interactions. Assumes the
-   * com.google.adk.runner.Runner class has a method: public Flowable<Event> runLive(Session
-   * session, Flowable<LiveRequest> liveRequests, List<String> modalities)
+   * com.google.adk.runner.Runner class has a method: {@code public Flowable<Event> runLive(Session
+   * session, Flowable<LiveRequest> liveRequests, List<String> modalities)}
    */
   @Component
   public static class LiveWebSocketHandler extends TextWebSocketHandler {
@@ -1610,7 +1612,36 @@ public class AdkWebServer implements WebMvcConfigurer {
       try {
         String payload = message.getPayload();
         log.debug("Received text message on WebSocket session {}: {}", wsSession.getId(), payload);
-        LiveRequest liveRequest = objectMapper.readValue(payload, LiveRequest.class);
+
+        JsonNode rootNode = objectMapper.readTree(payload);
+        LiveRequest.Builder liveRequestBuilder = LiveRequest.builder();
+
+        if (rootNode.has("content")) {
+          Content content = objectMapper.treeToValue(rootNode.get("content"), Content.class);
+          liveRequestBuilder.content(content);
+        }
+
+        if (rootNode.has("blob")) {
+          JsonNode blobNode = rootNode.get("blob");
+          Blob.Builder blobBuilder = Blob.builder();
+          if (blobNode.has("displayName")) {
+            blobBuilder.displayName(blobNode.get("displayName").asText());
+          }
+          if (blobNode.has("data")) {
+            blobBuilder.data(blobNode.get("data").binaryValue());
+          }
+          // Handle both mime_type and mimeType. Blob states mimeType but we get mime_type from the
+          // frontend.
+          String mimeType =
+              blobNode.has("mimeType")
+                  ? blobNode.get("mimeType").asText()
+                  : (blobNode.has("mime_type") ? blobNode.get("mime_type").asText() : null);
+          if (mimeType != null) {
+            blobBuilder.mimeType(mimeType);
+          }
+          liveRequestBuilder.blob(blobBuilder.build());
+        }
+        LiveRequest liveRequest = liveRequestBuilder.build();
         liveRequestQueue.send(liveRequest);
       } catch (JsonProcessingException e) {
         log.error(
