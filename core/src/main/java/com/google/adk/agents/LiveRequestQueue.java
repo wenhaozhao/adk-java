@@ -20,14 +20,16 @@ import com.google.genai.types.Blob;
 import com.google.genai.types.Content;
 import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.processors.FlowableProcessor;
-import io.reactivex.rxjava3.processors.UnicastProcessor;
+import io.reactivex.rxjava3.processors.MulticastProcessor;
 
 /** A queue of live requests to be sent to the model. */
 public final class LiveRequestQueue {
   private final FlowableProcessor<LiveRequest> processor;
 
   public LiveRequestQueue() {
-    this.processor = UnicastProcessor.<LiveRequest>create().toSerialized();
+    MulticastProcessor<LiveRequest> processor = MulticastProcessor.<LiveRequest>create();
+    processor.start();
+    this.processor = processor.toSerialized();
   }
 
   public void close() {
