@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 @Component
 @ConfigurationProperties(prefix = "adk.agents")
 public class AgentLoadingProperties {
-  private String sourceDir;
+  private String sourceDir = "src/main/java";
   private String compileClasspath;
 
   public String getSourceDir() {
