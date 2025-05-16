@@ -17,10 +17,11 @@
 package com.google.adk.runner;
 
 import com.google.adk.CollectionUtils;
-import com.google.adk.agents.LlmAgent;
+import com.google.adk.Telemetry;
 import com.google.adk.agents.BaseAgent;
 import com.google.adk.agents.InvocationContext;
 import com.google.adk.agents.LiveRequestQueue;
+import com.google.adk.agents.LlmAgent;
 import com.google.adk.agents.RunConfig;
 import com.google.adk.artifacts.BaseArtifactService;
 import com.google.adk.events.Event;
@@ -31,6 +32,9 @@ import com.google.genai.types.AudioTranscriptionConfig;
 import com.google.genai.types.Content;
 import com.google.genai.types.Modality;
 import com.google.genai.types.Part;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.context.Scope;
 import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.core.Single;
 import java.util.ArrayList;
@@ -125,34 +129,51 @@ public class Runner {
    */
   public Flowable<Event> runAsync(
       String userId, String sessionId, Content newMessage, RunConfig runConfig) {
-    return this.sessionService
-        .getSession(appName, userId, sessionId, Optional.empty())
-        .switchIfEmpty(
-            Single.error(
-                new IllegalArgumentException(
-                    String.format("Session not found: %s for user %s", sessionId, userId))))
-        .flatMapPublisher(
-            session -> {
-              BaseAgent rootAgent = this.agent;
-              InvocationContext invocationContext =
-                  InvocationContext.create(
-                      this.sessionService,
-                      this.artifactService,
-                      InvocationContext.newInvocationContextId(),
-                      rootAgent,
+    Span span = Telemetry.getTracer().spanBuilder("invocation").startSpan();
+    try (Scope scope = span.makeCurrent()) {
+      return this.sessionService
+          .getSession(appName, userId, sessionId, Optional.empty())
+          .switchIfEmpty(
+              Single.error(
+                  new IllegalArgumentException(
+                      String.format("Session not found: %s for user %s", sessionId, userId))))
+          .flatMapPublisher(
+              session -> {
+                BaseAgent rootAgent = this.agent;
+                InvocationContext invocationContext =
+                    InvocationContext.create(
+                        this.sessionService,
+                        this.artifactService,
+                        InvocationContext.newInvocationContextId(),
+                        rootAgent,
+                        session,
+                        newMessage,
+                        runConfig);
+
+                if (newMessage != null) {
+                  appendNewMessageToSession(
                       session,
                       newMessage,
-                      runConfig);
+                      invocationContext,
+                      runConfig.saveInputBlobsAsArtifacts());
+                }
 
-              if (newMessage != null) {
-                appendNewMessageToSession(
-                    session, newMessage, invocationContext, runConfig.saveInputBlobsAsArtifacts());
-              }
-
-              invocationContext.agent(this.findAgentToRun(session, rootAgent));
-              Flowable<Event> events = invocationContext.agent().runAsync(invocationContext);
-              return events.doOnNext(event -> this.sessionService.appendEvent(session, event));
-            });
+                invocationContext.agent(this.findAgentToRun(session, rootAgent));
+                Flowable<Event> events = invocationContext.agent().runAsync(invocationContext);
+                return events.doOnNext(event -> this.sessionService.appendEvent(session, event));
+              })
+          .doOnError(
+              throwable -> {
+                span.setStatus(StatusCode.ERROR, "Error in runAsync Flowable execution");
+                span.recordException(throwable);
+              })
+          .doFinally(span::end);
+    } catch (Throwable t) {
+      span.setStatus(StatusCode.ERROR, "Error during runAsync synchronous setup");
+      span.recordException(t);
+      span.end();
+      return Flowable.error(t);
+    }
   }
 
   /**
@@ -207,15 +228,29 @@ public class Runner {
 
   public Flowable<Event> runLive(
       Session session, LiveRequestQueue liveRequestQueue, RunConfig runConfig) {
-    InvocationContext invocationContext =
-        newInvocationContextForLive(session, Optional.of(liveRequestQueue), runConfig);
-    return invocationContext
-        .agent()
-        .runLive(invocationContext)
-        .doOnNext(
-            event -> {
-              this.sessionService.appendEvent(session, event);
-            });
+    Span span = Telemetry.getTracer().spanBuilder("invocation").startSpan();
+    try (Scope scope = span.makeCurrent()) {
+      InvocationContext invocationContext =
+          newInvocationContextForLive(session, Optional.of(liveRequestQueue), runConfig);
+      return invocationContext
+          .agent()
+          .runLive(invocationContext)
+          .doOnNext(
+              event -> {
+                this.sessionService.appendEvent(session, event);
+              })
+          .doOnError(
+              throwable -> {
+                span.setStatus(StatusCode.ERROR, "Error in runLive Flowable execution");
+                span.recordException(throwable);
+              })
+          .doFinally(span::end);
+    } catch (Throwable t) {
+      span.setStatus(StatusCode.ERROR, "Error during runLive synchronous setup");
+      span.recordException(t);
+      span.end();
+      return Flowable.error(t);
+    }
   }
 
   public Flowable<Event> runWithSessionId(

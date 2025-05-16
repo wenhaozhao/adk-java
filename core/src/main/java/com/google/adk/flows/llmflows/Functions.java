@@ -16,8 +16,9 @@
 
 package com.google.adk.flows.llmflows;
 
-import com.google.adk.agents.LlmAgent;
+import com.google.adk.Telemetry;
 import com.google.adk.agents.InvocationContext;
+import com.google.adk.agents.LlmAgent;
 import com.google.adk.events.Event;
 import com.google.adk.events.EventActions;
 import com.google.adk.tools.BaseTool;
@@ -27,6 +28,9 @@ import com.google.genai.types.Content;
 import com.google.genai.types.FunctionCall;
 import com.google.genai.types.FunctionResponse;
 import com.google.genai.types.Part;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.context.Scope;
 import io.reactivex.rxjava3.core.Maybe;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -162,8 +166,24 @@ public final class Functions {
         .toList()
         .flatMapMaybe(
             events -> {
+              if (events.isEmpty()) {
+                return Maybe.empty();
+              }
               Event mergedEvent = Functions.mergeParallelFunctionResponseEvents(events);
-              return mergedEvent == null ? Maybe.empty() : Maybe.just(mergedEvent);
+              if (mergedEvent == null) {
+                return Maybe.empty();
+              }
+
+              if (events.size() > 1) {
+                Tracer tracer = Telemetry.getTracer();
+                Span mergedSpan = tracer.spanBuilder("tool_response").startSpan();
+                try (Scope scope = mergedSpan.makeCurrent()) {
+                  Telemetry.traceToolResponse(invocationContext, mergedEvent.id(), mergedEvent);
+                } finally {
+                  mergedSpan.end();
+                }
+              }
+              return Maybe.just(mergedEvent);
             });
   }
 
@@ -206,7 +226,7 @@ public final class Functions {
 
     return Event.builder()
         .id(Event.generateEventId())
-        .invocationId(Event.generateEventId())
+        .invocationId(baseEvent.invocationId())
         .author(baseEvent.author())
         .branch(baseEvent.branch())
         .content(Optional.of(Content.builder().role("user").parts(mergedParts).build()))
@@ -250,11 +270,22 @@ public final class Functions {
 
   private static Maybe<Map<String, Object>> callTool(
       BaseTool tool, Map<String, Object> args, ToolContext toolContext) {
-    try {
-      return tool.runAsync(args, toolContext).toMaybe();
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to call tool: " + tool.name(), e);
-    }
+    Tracer tracer = Telemetry.getTracer();
+    return Maybe.defer(
+        () -> {
+          Span span = tracer.spanBuilder("tool_call [" + tool.name() + "]").startSpan();
+          try (Scope scope = span.makeCurrent()) {
+            Telemetry.traceToolCall(args);
+            return tool.runAsync(args, toolContext)
+                .toMaybe()
+                .doOnError(span::recordException)
+                .doFinally(span::end);
+          } catch (RuntimeException e) {
+            span.recordException(e);
+            span.end();
+            return Maybe.error(new RuntimeException("Failed to call tool: " + tool.name(), e));
+          }
+        });
   }
 
   private static Event buildResponseEvent(
@@ -262,34 +293,43 @@ public final class Functions {
       Map<String, Object> response,
       ToolContext toolContext,
       InvocationContext invocationContext) {
-    // use a empty placeholder response if tool response is null.
-    if (response == null) {
-      response = new HashMap<>();
+    Tracer tracer = Telemetry.getTracer();
+    Span span = tracer.spanBuilder("tool_response [" + tool.name() + "]").startSpan();
+    try (Scope scope = span.makeCurrent()) {
+      // use a empty placeholder response if tool response is null.
+      if (response == null) {
+        response = new HashMap<>();
+      }
+
+      Part partFunctionResponse =
+          Part.builder()
+              .functionResponse(
+                  FunctionResponse.builder()
+                      .id(toolContext.functionCallId().orElse(""))
+                      .name(tool.name())
+                      .response(response)
+                      .build())
+              .build();
+
+      Event event =
+          Event.builder()
+              .id(Event.generateEventId())
+              .invocationId(invocationContext.invocationId())
+              .author(invocationContext.agent().name())
+              .branch(invocationContext.branch())
+              .content(
+                  Optional.of(
+                      Content.builder()
+                          .role("user")
+                          .parts(Collections.singletonList(partFunctionResponse))
+                          .build()))
+              .actions(toolContext.eventActions())
+              .build();
+      Telemetry.traceToolResponse(invocationContext, event.id(), event);
+      return event;
+    } finally {
+      span.end();
     }
-
-    Part partFunctionResponse =
-        Part.builder()
-            .functionResponse(
-                FunctionResponse.builder()
-                    .id(toolContext.functionCallId().orElse(""))
-                    .name(tool.name())
-                    .response(response)
-                    .build())
-            .build();
-
-    return Event.builder()
-        .id(Event.generateEventId())
-        .invocationId(invocationContext.invocationId())
-        .author(invocationContext.agent().name())
-        .branch(invocationContext.branch())
-        .content(
-            Optional.of(
-                Content.builder()
-                    .role("user")
-                    .parts(Collections.singletonList(partFunctionResponse))
-                    .build()))
-        .actions(toolContext.eventActions())
-        .build();
   }
 
   private Functions() {}

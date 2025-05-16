@@ -16,10 +16,14 @@
 
 package com.google.adk.agents;
 
+import com.google.adk.Telemetry;
 import com.google.adk.agents.Callbacks.AfterAgentCallback;
 import com.google.adk.agents.Callbacks.BeforeAgentCallback;
 import com.google.adk.events.Event;
 import com.google.genai.types.Content;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.context.Scope;
 import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.core.Maybe;
 import io.reactivex.rxjava3.core.Single;
@@ -169,39 +173,50 @@ public abstract class BaseAgent {
   }
 
   public Flowable<Event> runAsync(InvocationContext parentContext) {
-    InvocationContext invocationContext = createInvocationContext(parentContext);
+    Tracer tracer = Telemetry.getTracer();
+    return Flowable.defer(
+        () -> {
+          Span span = tracer.spanBuilder("agent_run [" + name() + "]").startSpan();
+          try (Scope scope = span.makeCurrent()) {
+            InvocationContext invocationContext = createInvocationContext(parentContext);
 
-    return beforeAgentCallback
-        .map(callback -> callCallback(callback::call, invocationContext))
-        .orElse(Single.just(Optional.empty()))
-        .flatMapPublisher(
-            beforeEvent -> {
-              if (beforeEvent.isPresent()) {
-                if (beforeEvent.get().content().isPresent()) {
-                  return Flowable.just(beforeEvent.get());
-                }
-                // TODO (b/413093657): Currently endInvocation cannot be set by tools/callbacks,
-                // so this will be a no-op.
-                // We should allow it to be settable in the invocation context.
-                if (invocationContext.endInvocation()) {
-                  return Flowable.just(beforeEvent.get());
-                }
-              }
+            Flowable<Event> executionFlowable =
+                beforeAgentCallback
+                    .map(callback -> callCallback(callback::call, invocationContext))
+                    .orElse(Single.just(Optional.empty()))
+                    .flatMapPublisher(
+                        beforeEvent -> {
+                          if (beforeEvent.isPresent()) {
+                            if (beforeEvent.get().content().isPresent()) {
+                              return Flowable.just(beforeEvent.get());
+                            }
+                            // TODO (b/413093657): Currently endInvocation cannot be set by
+                            // tools/callbacks,
+                            // so this will be a no-op.
+                            // We should allow it to be settable in the invocation context.
+                            if (invocationContext.endInvocation()) {
+                              return Flowable.just(beforeEvent.get());
+                            }
+                          }
 
-              Flowable<Event> beforeEvents = Flowable.fromOptional(beforeEvent);
-              Flowable<Event> mainEvents = Flowable.defer(() -> runAsyncImpl(invocationContext));
-              Flowable<Event> afterEvents =
-                  afterAgentCallback
-                      .map(
-                          callback ->
-                              Flowable.defer(
-                                  () ->
-                                      callCallback(callback::call, invocationContext)
-                                          .flatMapPublisher(Flowable::fromOptional)))
-                      .orElse(Flowable.empty());
+                          Flowable<Event> beforeEvents = Flowable.fromOptional(beforeEvent);
+                          Flowable<Event> mainEvents =
+                              Flowable.defer(() -> runAsyncImpl(invocationContext));
+                          Flowable<Event> afterEvents =
+                              afterAgentCallback
+                                  .map(
+                                      callback ->
+                                          Flowable.defer(
+                                              () ->
+                                                  callCallback(callback::call, invocationContext)
+                                                      .flatMapPublisher(Flowable::fromOptional)))
+                                  .orElse(Flowable.empty());
 
-              return Flowable.concat(beforeEvents, mainEvents, afterEvents);
-            });
+                          return Flowable.concat(beforeEvents, mainEvents, afterEvents);
+                        });
+            return executionFlowable.doFinally(span::end);
+          }
+        });
   }
 
   private Single<Optional<Event>> callCallback(
@@ -238,9 +253,16 @@ public abstract class BaseAgent {
   }
 
   public Flowable<Event> runLive(InvocationContext parentContext) {
-    InvocationContext invocationContext = createInvocationContext(parentContext);
-
-    return runLiveImpl(invocationContext);
+    Tracer tracer = Telemetry.getTracer();
+    return Flowable.defer(
+        () -> {
+          Span span = tracer.spanBuilder("agent_run [" + name() + "]").startSpan();
+          try (Scope scope = span.makeCurrent()) {
+            InvocationContext invocationContext = createInvocationContext(parentContext);
+            Flowable<Event> executionFlowable = runLiveImpl(invocationContext);
+            return executionFlowable.doFinally(span::end);
+          }
+        });
   }
 
   protected abstract Flowable<Event> runAsyncImpl(InvocationContext invocationContext);
