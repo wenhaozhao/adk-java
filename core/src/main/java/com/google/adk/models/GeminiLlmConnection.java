@@ -153,7 +153,7 @@ public final class GeminiLlmConnection implements BaseLlmConnection {
       return Optional.empty();
     } else if (message.toolCallCancellation().isPresent()) {
       logger.log(
-          Level.INFO, "Received tool call cancellation: {0}", message.toolCallCancellation().get());
+          Level.FINE, "Received tool call cancellation: {0}", message.toolCallCancellation().get());
       // TODO: implement proper CFC and thus tool call cancellation handling.
       return Optional.empty();
     } else if (message.setupComplete().isPresent()) {
@@ -271,7 +271,7 @@ public final class GeminiLlmConnection implements BaseLlmConnection {
   /** Internal method to handle closing logic and signal completion/error. */
   private void closeInternal(Throwable throwable) {
     if (closed.compareAndSet(false, true)) {
-      logger.log(Level.INFO, "Closing GeminiConnection.", throwable);
+      logger.log(Level.FINE, "Closing GeminiConnection.", throwable);
 
       if (throwable == null) {
         responseProcessor.onComplete();

@@ -128,7 +128,7 @@ public final class VertexAiSessionService implements BaseSessionService {
       throw new UncheckedIOException(e);
     }
 
-    logger.log(Level.INFO, "Create Session response " + apiResponse.getResponseBody());
+    logger.log(Level.FINE, "Create Session response " + apiResponse.getResponseBody());
     String sessionName = "";
     String operationId = "";
     String sessId = sessionId == null ? "" : sessionId;
@@ -235,7 +235,7 @@ public final class VertexAiSessionService implements BaseSessionService {
             "reasoningEngines/" + reasoningEngineId + "/sessions/" + sessionId + "/events",
             "");
 
-    logger.log(Level.INFO, "List events response " + apiResponse);
+    logger.log(Level.FINE, "List events response " + apiResponse);
 
     if (apiResponse.getResponseBody() == null) {
       return Single.just(ListEventsResponse.builder().build());

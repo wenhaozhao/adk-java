@@ -234,7 +234,7 @@ public class Gemini extends BaseLlm {
 
   @Override
   public BaseLlmConnection connect(LlmRequest llmRequest) {
-    logger.info("Establishing Gemini connection.");
+    logger.debug("Establishing Gemini connection.");
     LiveConnectConfig liveConnectConfig = llmRequest.liveConnectConfig();
     String effectiveModelName = llmRequest.model().orElse(model());
 

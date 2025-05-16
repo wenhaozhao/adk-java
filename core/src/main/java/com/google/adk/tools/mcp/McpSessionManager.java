@@ -67,7 +67,7 @@ public class McpSessionManager {
             .capabilities(ClientCapabilities.builder().build())
             .build();
     InitializeResult initResult = client.initialize();
-    logger.log(Level.INFO, "Initialize Client Result: " + initResult);
+    logger.log(Level.FINE, "Initialize Client Result: " + initResult);
 
     return client;
   }

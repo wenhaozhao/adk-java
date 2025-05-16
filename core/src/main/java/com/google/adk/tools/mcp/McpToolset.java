@@ -271,7 +271,7 @@ public class McpToolset implements AutoCloseable {
     if (this.mcpSession != null) {
       try {
         this.mcpSession.close();
-        logger.log(Level.INFO, "MCP session closed successfully.");
+        logger.log(Level.FINE, "MCP session closed successfully.");
       } catch (RuntimeException e) {
         logger.log(Level.SEVERE, "Failed to close MCP session", e);
         // We don't throw an exception here, as closing is a cleanup operation and

@@ -162,7 +162,7 @@ public class AdkWebServer implements WebMvcConfigurer {
 
     @Bean(destroyMethod = "shutdown")
     public SdkTracerProvider sdkTracerProvider(ApiServerSpanExporter apiServerSpanExporter) {
-      otelLog.info("Configuring SdkTracerProvider with ApiServerSpanExporter.");
+      otelLog.debug("Configuring SdkTracerProvider with ApiServerSpanExporter.");
       Resource resource =
           Resource.getDefault()
               .merge(
@@ -177,7 +177,7 @@ public class AdkWebServer implements WebMvcConfigurer {
 
     @Bean
     public OpenTelemetry openTelemetrySdk(SdkTracerProvider sdkTracerProvider) {
-      otelLog.info("Configuring OpenTelemetrySdk and registering globally.");
+      otelLog.debug("Configuring OpenTelemetrySdk and registering globally.");
       OpenTelemetrySdk otelSdk =
           OpenTelemetrySdk.builder().setTracerProvider(sdkTracerProvider).buildAndRegisterGlobal();
 
@@ -276,7 +276,7 @@ public class AdkWebServer implements WebMvcConfigurer {
 
     @Override
     public CompletableResultCode shutdown() {
-      exporterLog.info("Shutting down ApiServerSpanExporter.");
+      exporterLog.debug("Shutting down ApiServerSpanExporter.");
       // no need to clear storage on shutdown, as everything is currently stored in memory.
       return CompletableResultCode.ofSuccess();
     }
@@ -467,7 +467,7 @@ public class AdkWebServer implements WebMvcConfigurer {
       if (!location.endsWith("/")) {
         location += "/";
       }
-      log.info("Mapping URL path /** to static resources at location: {}", location);
+      log.debug("Mapping URL path /** to static resources at location: {}", location);
       registry
           .addResourceHandler("/**")
           .addResourceLocations(location)
@@ -475,7 +475,7 @@ public class AdkWebServer implements WebMvcConfigurer {
           .resourceChain(true);
 
     } else {
-      log.warn(
+      log.debug(
           "System property 'adk.web.ui.dir' or config 'adk.web.ui.dir' is not set. Mapping URL path"
               + " /** to classpath:/browser/");
       registry
@@ -1210,7 +1210,7 @@ public class AdkWebServer implements WebMvcConfigurer {
                     .subscribe(
                         event -> {
                           try {
-                            log.info(
+                            log.debug(
                                 "SseEmitter: Sending event {} for session {}",
                                 event.id(),
                                 sessionId);
@@ -1246,7 +1246,7 @@ public class AdkWebServer implements WebMvcConfigurer {
                           }
                         },
                         () -> {
-                          log.info(
+                          log.debug(
                               "SseEmitter: Stream completed normally for session: {}", sessionId);
                           try {
                             emitter.complete();
@@ -1260,7 +1260,7 @@ public class AdkWebServer implements WebMvcConfigurer {
                         });
             emitter.onCompletion(
                 () -> {
-                  log.info(
+                  log.debug(
                       "SseEmitter: onCompletion callback for session: {}. Disposing subscription.",
                       sessionId);
                   if (!disposable.isDisposed()) {
@@ -1269,7 +1269,7 @@ public class AdkWebServer implements WebMvcConfigurer {
                 });
             emitter.onTimeout(
                 () -> {
-                  log.info(
+                  log.debug(
                       "SseEmitter: onTimeout callback for session: {}. Disposing subscription and"
                           + " completing.",
                       sessionId);
@@ -1280,7 +1280,7 @@ public class AdkWebServer implements WebMvcConfigurer {
                 });
           });
 
-      log.info("SseEmitter: Returning emitter for session: {}", sessionId);
+      log.debug("SseEmitter: Returning emitter for session: {}", sessionId);
       return emitter;
     }
 
@@ -1361,7 +1361,7 @@ public class AdkWebServer implements WebMvcConfigurer {
           AgentGraphGenerator.getAgentGraphDotSource(currentAppAgent, highlightPairs);
 
       if (dotSourceOpt.isPresent()) {
-        log.info("Successfully generated graph DOT source for event {}", eventId);
+        log.debug("Successfully generated graph DOT source for event {}", eventId);
         return ResponseEntity.ok(new GraphResponse(dotSourceOpt.get()));
       } else {
         log.warn(
@@ -1525,7 +1525,7 @@ public class AdkWebServer implements WebMvcConfigurer {
             }
             String effectiveAppName =
                 (agentEngineId != null && !agentEngineId.isEmpty()) ? agentEngineId : appName;
-            log.info(
+            log.debug(
                 "Creating Runner for WebSocket appName: {}, using agent definition: {}",
                 appName,
                 agent.name());
@@ -1549,7 +1549,7 @@ public class AdkWebServer implements WebMvcConfigurer {
       String appName = queryParams.getFirst("app_name");
       String userId = queryParams.getFirst("user_id");
       String sessionId = queryParams.getFirst("session_id");
-      log.info(
+      log.debug(
           "Extracted params for WebSocket session {}: appName={}, userId={}, sessionId={},",
           wsSession.getId(),
           appName,
@@ -1659,7 +1659,7 @@ public class AdkWebServer implements WebMvcConfigurer {
                     }
                   },
                   () -> {
-                    log.info(
+                    log.debug(
                         "run_live stream completed for WebSocket session {}", wsSession.getId());
                     try {
                       wsSession.close(CloseStatus.NORMAL);
@@ -1667,7 +1667,7 @@ public class AdkWebServer implements WebMvcConfigurer {
                     }
                   });
       wsSession.getAttributes().put(LIVE_SUBSCRIPTION_ATTR, disposable);
-      log.info("Live run started for WebSocket session {}", wsSession.getId());
+      log.debug("Live run started for WebSocket session {}", wsSession.getId());
     }
 
     @Override

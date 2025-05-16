@@ -90,12 +90,12 @@ public class AgentCompilerLoader {
       if ("file".equals(agentClassUrl.getProtocol())) {
         Path path = Paths.get(agentClassUrl.toURI());
         if (path.toString().endsWith(".jar") && Files.exists(path)) {
-          logger.info(
+          logger.debug(
               "ADK Core JAR (or where BaseAgent resides) found directly on classpath: {}",
               path.toAbsolutePath());
           return path.toAbsolutePath().toString();
         } else if (Files.isDirectory(path)) {
-          logger.info(
+          logger.debug(
               "BaseAgent.class found in directory (e.g., target/classes): {}. This path will be"
                   + " part of classloader introspection.",
               path.toAbsolutePath());
@@ -128,7 +128,7 @@ public class AgentCompilerLoader {
               Files.copy(is, tempFile, StandardCopyOption.REPLACE_EXISTING);
             }
             tempFile.toFile().deleteOnExit();
-            logger.info(
+            logger.debug(
                 "Extracted ADK Core JAR '{}' from nested location to: {}",
                 nestedJarName,
                 tempFile.toAbsolutePath());
@@ -137,7 +137,7 @@ public class AgentCompilerLoader {
         } else if (mainJarPath.contains("google-adk-") && mainJarPath.endsWith(".jar")) {
           File adkJar = new File(mainJarPath);
           if (adkJar.exists()) {
-            logger.info("ADK Core JAR identified as the outer JAR: {}", adkJar.getAbsolutePath());
+            logger.debug("ADK Core JAR identified as the outer JAR: {}", adkJar.getAbsolutePath());
             return adkJar.getAbsolutePath();
           }
         }
@@ -190,7 +190,7 @@ public class AgentCompilerLoader {
 
     this.compiledAgentsOutputDir = Files.createTempDirectory("adk-compiled-agents-");
     this.compiledAgentsOutputDir.toFile().deleteOnExit();
-    logger.info("Compiling agents from {} to {}", agentsSourceRoot, compiledAgentsOutputDir);
+    logger.debug("Compiling agents from {} to {}", agentsSourceRoot, compiledAgentsOutputDir);
 
     Map<String, BaseAgent> loadedAgents = new HashMap<>();
 
@@ -203,7 +203,7 @@ public class AgentCompilerLoader {
 
         if (Files.isDirectory(entry)) {
           agentUnitName = entry.getFileName().toString();
-          logger.info("Processing agent sources from directory: {}", agentUnitName);
+          logger.debug("Processing agent sources from directory: {}", agentUnitName);
           try (Stream<Path> javaFilesStream =
               Files.walk(entry)
                   .filter(p -> p.toString().endsWith(".java") && Files.isRegularFile(p))) {
@@ -215,7 +215,7 @@ public class AgentCompilerLoader {
         } else if (Files.isRegularFile(entry) && entry.getFileName().toString().endsWith(".java")) {
           String fileName = entry.getFileName().toString();
           agentUnitName = fileName.substring(0, fileName.length() - ".java".length());
-          logger.info("Processing agent source file: {}", entry.getFileName());
+          logger.debug("Processing agent source file: {}", entry.getFileName());
           javaFilesToCompile.add(entry.toAbsolutePath().toString());
         } else {
           logger.trace("Skipping non-agent entry in agent source root: {}", entry.getFileName());
@@ -223,7 +223,7 @@ public class AgentCompilerLoader {
         }
 
         if (javaFilesToCompile.isEmpty()) {
-          logger.info("No .java files found for agent unit: {}", agentUnitName);
+          logger.debug("No .java files found for agent unit: {}", agentUnitName);
           continue;
         }
 
@@ -277,7 +277,7 @@ public class AgentCompilerLoader {
                                   className);
                             }
                             loadedAgents.put(agentInstance.name(), agentInstance);
-                            logger.info(
+                            logger.debug(
                                 "Successfully loaded agent '{}' from unit: {} using class {}",
                                 agentInstance.name(),
                                 agentUnitName,
@@ -357,7 +357,7 @@ public class AgentCompilerLoader {
 
     Set<String> classpathEntries = new LinkedHashSet<>();
 
-    logger.info("Attempting to derive ECJ classpath from classloader hierarchy...");
+    logger.debug("Attempting to derive ECJ classpath from classloader hierarchy...");
     ClassLoader currentClassLoader = AgentCompilerLoader.class.getClassLoader();
     int classLoaderCount = 0;
     while (currentClassLoader != null) {
@@ -409,7 +409,7 @@ public class AgentCompilerLoader {
               + "Falling back to System.getProperty(\"java.class.path\").");
       String systemClasspath = System.getProperty("java.class.path");
       if (systemClasspath != null && !systemClasspath.isEmpty()) {
-        logger.info("Using system classpath for ECJ (fallback): {}", systemClasspath);
+        logger.debug("Using system classpath for ECJ (fallback): {}", systemClasspath);
         classpathEntries.addAll(Arrays.asList(systemClasspath.split(File.pathSeparator)));
       } else {
         logger.error("System classpath (java.class.path) is also null or empty.");
@@ -418,12 +418,12 @@ public class AgentCompilerLoader {
 
     if (this.adkCoreJarPathForCompilation != null && !this.adkCoreJarPathForCompilation.isEmpty()) {
       if (!classpathEntries.contains(this.adkCoreJarPathForCompilation)) {
-        logger.info(
+        logger.debug(
             "Adding ADK Core JAR path explicitly to ECJ classpath: {}",
             this.adkCoreJarPathForCompilation);
         classpathEntries.add(this.adkCoreJarPathForCompilation);
       } else {
-        logger.info(
+        logger.debug(
             "ADK Core JAR path ({}) already found in derived ECJ classpath.",
             this.adkCoreJarPathForCompilation);
       }
@@ -446,7 +446,7 @@ public class AgentCompilerLoader {
           classpathEntries.stream().collect(Collectors.joining(File.pathSeparator));
       ecjArgs.add("-cp");
       ecjArgs.add(effectiveClasspath);
-      logger.info("Constructed ECJ classpath with {} entries", classpathEntries.size());
+      logger.debug("Constructed ECJ classpath with {} entries", classpathEntries.size());
       logger.debug("Final effective ECJ classpath: {}", effectiveClasspath);
     } else {
       logger.error("ECJ Classpath is empty after all attempts. Compilation will fail.");
