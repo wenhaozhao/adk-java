@@ -94,6 +94,9 @@ public class Telemetry {
     // Setting empty llm request and response (as the AdkDevServer UI expects these)
     span.setAttribute("gcp.vertex.agent.llm_request", "{}");
     span.setAttribute("gcp.vertex.agent.llm_response", "{}");
+    if (invocationContext.session() != null && invocationContext.session().id() != null) {
+      span.setAttribute("gcp.vertex.agent.session_id", invocationContext.session().id());
+    }
   }
 
   /**
@@ -107,7 +110,7 @@ public class Telemetry {
   private static Map<String, Object> buildLlmRequestForTrace(LlmRequest llmRequest) {
     Map<String, Object> result = new HashMap<>();
     result.put("model", llmRequest.model().orElse(null));
-    result.put("config", llmRequest.config().orElse(null));
+    llmRequest.config().ifPresent(config -> result.put("config", config));
 
     List<Content> contentsList = new ArrayList<>();
     for (Content content : llmRequest.contents()) {
@@ -116,9 +119,10 @@ public class Telemetry {
               .filter(part -> part.inlineData().isEmpty())
               .collect(toImmutableList());
 
-      Content filteredContent =
-          Content.builder().role(content.role().get()).parts(filteredParts).build();
-      contentsList.add(filteredContent);
+      Content.Builder contentBuilder = Content.builder();
+      content.role().ifPresent(contentBuilder::role);
+      contentBuilder.parts(filteredParts);
+      contentsList.add(contentBuilder.build());
     }
     result.put("contents", contentsList);
     return result;
@@ -147,6 +151,14 @@ public class Telemetry {
     llmRequest.model().ifPresent(modelName -> span.setAttribute("gen_ai.request.model", modelName));
     span.setAttribute("gcp.vertex.agent.invocation_id", invocationContext.invocationId());
     span.setAttribute("gcp.vertex.agent.event_id", eventId);
+
+    if (invocationContext.session() != null && invocationContext.session().id() != null) {
+      span.setAttribute("gcp.vertex.agent.session_id", invocationContext.session().id());
+    } else {
+      log.trace(
+          "traceCallLlm: InvocationContext session or session ID is null, cannot set"
+              + " gcp.vertex.agent.session_id");
+    }
 
     try {
       span.setAttribute(
@@ -178,13 +190,19 @@ public class Telemetry {
       span.setAttribute("gcp.vertex.agent.event_id", eventId);
     }
 
+    if (invocationContext.session() != null && invocationContext.session().id() != null) {
+      span.setAttribute("gcp.vertex.agent.session_id", invocationContext.session().id());
+    }
+
     try {
       List<Map<String, Object>> dataList = new ArrayList<>();
       if (data != null) {
         for (Content content : data) {
-          dataList.add(
-              JsonBaseModel.getMapper()
-                  .convertValue(content, new TypeReference<Map<String, Object>>() {}));
+          if (content != null) {
+            dataList.add(
+                JsonBaseModel.getMapper()
+                    .convertValue(content, new TypeReference<Map<String, Object>>() {}));
+          }
         }
       }
       span.setAttribute("gcp.vertex.agent.data", JsonBaseModel.toJsonString(dataList));
