@@ -1142,6 +1142,16 @@ public class AdkWebServer implements WebMvcConfigurer {
      */
     @PostMapping("/run")
     public List<Event> agentRun(@RequestBody AgentRunRequest request) {
+      if (request.appName == null || request.appName.trim().isEmpty()) {
+        log.warn("appName cannot be null or empty in POST /run request.");
+        throw new ResponseStatusException(
+            HttpStatus.BAD_REQUEST, "appName cannot be null or empty");
+      }
+      if (request.sessionId == null || request.sessionId.trim().isEmpty()) {
+        log.warn("sessionId cannot be null or empty in POST /run request.");
+        throw new ResponseStatusException(
+            HttpStatus.BAD_REQUEST, "sessionId cannot be null or empty");
+      }
       log.info("Request received for POST /run for session: {}", request.sessionId);
 
       Runner runner = getRunner(request.appName);
@@ -1168,11 +1178,32 @@ public class AdkWebServer implements WebMvcConfigurer {
      */
     @PostMapping(value = "/run_sse", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter agentRunSse(@RequestBody AgentRunRequest request) {
+      SseEmitter emitter = new SseEmitter();
+
+      if (request.appName == null || request.appName.trim().isEmpty()) {
+        log.warn(
+            "appName cannot be null or empty in SseEmitter request for appName: {}, session: {}",
+            request.appName,
+            request.sessionId);
+        emitter.completeWithError(
+            new ResponseStatusException(HttpStatus.BAD_REQUEST, "appName cannot be null or empty"));
+        return emitter;
+      }
+      if (request.sessionId == null || request.sessionId.trim().isEmpty()) {
+        log.warn(
+            "sessionId cannot be null or empty in SseEmitter request for appName: {}, session: {}",
+            request.appName,
+            request.sessionId);
+        emitter.completeWithError(
+            new ResponseStatusException(
+                HttpStatus.BAD_REQUEST, "sessionId cannot be null or empty"));
+        return emitter;
+      }
+
       log.info(
           "SseEmitter Request received for POST /run_sse_emitter for session: {}",
           request.sessionId);
 
-      SseEmitter emitter = new SseEmitter();
       final String sessionId = request.sessionId;
       sseExecutor.execute(
           () -> {
@@ -1549,6 +1580,30 @@ public class AdkWebServer implements WebMvcConfigurer {
       String appName = queryParams.getFirst("app_name");
       String userId = queryParams.getFirst("user_id");
       String sessionId = queryParams.getFirst("session_id");
+
+      if (appName == null || appName.trim().isEmpty()) {
+        log.warn(
+            "WebSocket connection for session {} rejected: app_name query parameter is required and"
+                + " cannot be empty. URI: {}",
+            wsSession.getId(),
+            uri);
+        wsSession.close(
+            CloseStatus.POLICY_VIOLATION.withReason(
+                "app_name query parameter is required and cannot be empty"));
+        return;
+      }
+      if (sessionId == null || sessionId.trim().isEmpty()) {
+        log.warn(
+            "WebSocket connection for session {} rejected: session_id query parameter is required"
+                + " and cannot be empty. URI: {}",
+            wsSession.getId(),
+            uri);
+        wsSession.close(
+            CloseStatus.POLICY_VIOLATION.withReason(
+                "session_id query parameter is required and cannot be empty"));
+        return;
+      }
+
       log.debug(
           "Extracted params for WebSocket session {}: appName={}, userId={}, sessionId={},",
           wsSession.getId(),
