@@ -77,6 +77,7 @@ public class Claude extends BaseLlm {
 
   @Override
   public Flowable<LlmResponse> generateContent(LlmRequest llmRequest, boolean stream) {
+    // TODO: Switch to streaming API.
     List<MessageParam> messages =
         llmRequest.contents().stream()
             .map(this::contentToAnthropicMessageParam)

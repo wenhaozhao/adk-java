@@ -17,12 +17,8 @@
 package com.google.adk.models;
 
 import com.google.genai.Client;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import com.google.common.base.VerifyException;
 
 public class LlmRegistry {
 
@@ -37,7 +33,6 @@ public class LlmRegistry {
 
   // API clients
   private static Client geminiApiClient = Client.builder().build();
-  private static Object anthropicApiClient;
 
   // Map of model name patterns regex to factories
   private static final Map<String, LlmFactory> llmFactories = new ConcurrentHashMap<>();
@@ -46,52 +41,8 @@ public class LlmRegistry {
     return geminiApiClient;
   }
 
-  private static Object getAnthropicApiClient() {
-    if (anthropicApiClient == null) {
-      try {
-        // com.anthropic isn't available in google3/. So loading it dynamically so build still
-        // works.
-        Class<?> okHttpClass = Class.forName("com.anthropic.client.okhttp.AnthropicOkHttpClient");
-        Method builderMethod = okHttpClass.getMethod("builder");
-        Object builder = builderMethod.invoke(null);
-
-        Class<?> vertexBackendClass = Class.forName("com.anthropic.vertex.backends.VertexBackend");
-        Method fromEnvMethod = vertexBackendClass.getMethod("fromEnv");
-        Object vertexBackend = fromEnvMethod.invoke(null);
-
-        Class<?> anthropicBackendInterface = Class.forName("com.anthropic.backends.Backend");
-
-        Method backendMethod = builder.getClass().getMethod("backend", anthropicBackendInterface);
-        builder = backendMethod.invoke(builder, vertexBackend);
-
-        Method buildMethod = builder.getClass().getMethod("build");
-        anthropicApiClient = buildMethod.invoke(builder);
-      } catch (ClassNotFoundException
-          | NoSuchMethodException
-          | IllegalAccessException
-          | InvocationTargetException e) {
-        throw new VerifyException("Failed to initialize Anthropic client dynamically", e);
-      }
-    }
-    return anthropicApiClient;
-  }
-
   static {
     registerLlm("gemini-.*", modelName -> new Gemini(modelName, getGeminiApiClient()));
-    registerLlm(
-        "claude-.*",
-        modelName -> {
-          try {
-            Class<?> claudeClass = Class.forName("com.google.adk.models.Claude");
-            Class<?> anthropicClientInterface =
-                Class.forName("com.anthropic.client.AnthropicClient");
-            Constructor<?> claudeConstructor =
-                claudeClass.getConstructor(String.class, anthropicClientInterface);
-            return (BaseLlm) claudeConstructor.newInstance(modelName, getAnthropicApiClient());
-          } catch (Exception e) {
-            throw new VerifyException("Failed to initialize Claude LLM dynamically", e);
-          }
-        });
   }
 
   public static void registerLlm(String modelNamePattern, LlmFactory factory) {
