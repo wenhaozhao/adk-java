@@ -44,7 +44,7 @@ public abstract class RunConfig {
 
   public abstract boolean saveInputBlobsAsArtifacts();
 
-  public abstract StreamingMode streamingMode(); // TODO: implement streaming mode
+  public abstract StreamingMode streamingMode();
 
   public abstract @Nullable AudioTranscriptionConfig outputAudioTranscription();
 
@@ -76,7 +76,7 @@ public abstract class RunConfig {
     public abstract Builder setSpeechConfig(SpeechConfig speechConfig);
 
     @CanIgnoreReturnValue
-    public abstract Builder setResponseModalities(ImmutableList<Modality> responseModalities);
+    public abstract Builder setResponseModalities(Iterable<Modality> responseModalities);
 
     @CanIgnoreReturnValue
     public abstract Builder setSaveInputBlobsAsArtifacts(boolean saveInputBlobsAsArtifacts);
@@ -101,8 +101,6 @@ public abstract class RunConfig {
                 + " number of llm calls that will be made for a run. This may not be ideal, as this"
                 + " could result in a never ending communication between the model and the agent in"
                 + " certain cases.");
-      } else if (runConfig.maxLlmCalls() == Integer.MAX_VALUE) {
-        throw new IllegalArgumentException("maxLlmCalls should be less than " + Integer.MAX_VALUE);
       }
       return runConfig;
     }

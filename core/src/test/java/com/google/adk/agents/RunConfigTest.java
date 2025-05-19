@@ -1,7 +1,6 @@
 package com.google.adk.agents;
 
 import static com.google.common.truth.Truth.assertThat;
-import static org.junit.Assert.assertThrows;
 
 import com.google.common.collect.ImmutableList;
 import com.google.genai.types.AudioTranscriptionConfig;
@@ -20,7 +19,7 @@ public final class RunConfigTest {
     AudioTranscriptionConfig audioTranscriptionConfig = AudioTranscriptionConfig.builder().build();
 
     RunConfig runConfig =
-        RunConfig.builder() // Use the static builder method
+        RunConfig.builder()
             .setSpeechConfig(speechConfig)
             .setResponseModalities(ImmutableList.of(new Modality(Modality.Known.TEXT)))
             .setSaveInputBlobsAsArtifacts(true)
@@ -39,32 +38,20 @@ public final class RunConfigTest {
 
   @Test
   public void testBuilderDefaults() {
-    RunConfig runConfig = RunConfig.builder().build(); // Build with default values
+    RunConfig runConfig = RunConfig.builder().build();
 
     assertThat(runConfig.speechConfig()).isNull();
     assertThat(runConfig.responseModalities()).isEmpty();
     assertThat(runConfig.saveInputBlobsAsArtifacts()).isFalse();
     assertThat(runConfig.streamingMode()).isEqualTo(RunConfig.StreamingMode.NONE);
     assertThat(runConfig.outputAudioTranscription()).isNull();
-    assertThat(runConfig.maxLlmCalls()).isEqualTo(500); // Default maxLlmCalls
+    assertThat(runConfig.maxLlmCalls()).isEqualTo(500);
   }
 
   @Test
   public void testMaxLlmCalls_negativeValueAllowedInSetterButLoggedAndBuilt() {
-    // AutoValue builder setters don't typically have validation.
-    // Validation happens in the build() method.
-    // A negative value is allowed in the setter, but the build logs a warning.
     RunConfig runConfig = RunConfig.builder().setMaxLlmCalls(-1).build();
     assertThat(runConfig.maxLlmCalls()).isEqualTo(-1);
-    // Note: We don't typically assert on logging output in unit tests
-  }
-
-  @Test
-  public void testMaxLlmCalls_maxValueThrowsExceptionOnBuild() {
-    // The validation for Integer.MAX_VALUE is in the build() method.
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> RunConfig.builder().setMaxLlmCalls(Integer.MAX_VALUE).build());
   }
 
   @Test
@@ -73,7 +60,7 @@ public final class RunConfigTest {
     AudioTranscriptionConfig audioTranscriptionConfig = AudioTranscriptionConfig.builder().build();
 
     RunConfig runConfig =
-        RunConfig.builder() // Use the static builder method
+        RunConfig.builder()
             .setSpeechConfig(speechConfig)
             .setResponseModalities(ImmutableList.of(new Modality(Modality.Known.AUDIO)))
             .setSaveInputBlobsAsArtifacts(true)
