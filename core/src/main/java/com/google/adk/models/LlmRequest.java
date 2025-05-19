@@ -165,13 +165,39 @@ public abstract class LlmRequest extends JsonBaseModel {
           instructions.stream()
               .map(instruction -> Part.builder().text(instruction).build())
               .collect(toImmutableList()));
-      return config(
+      config(
           config.toBuilder()
               .systemInstruction(
                   Content.builder()
                       .parts(parts.build())
                       .role(
                           config
+                              .systemInstruction()
+                              .map(c -> c.role().orElse("user"))
+                              .orElse("user"))
+                      .build())
+              .build());
+
+      LiveConnectConfig liveConfig = liveConnectConfig();
+      ImmutableList.Builder<Part> livePartsBuilder = ImmutableList.builder();
+
+      if (liveConfig.systemInstruction().isPresent()) {
+        livePartsBuilder.addAll(
+            liveConfig.systemInstruction().get().parts().orElse(ImmutableList.of()));
+      }
+
+      livePartsBuilder.addAll(
+          instructions.stream()
+              .map(instruction -> Part.builder().text(instruction).build())
+              .collect(toImmutableList()));
+
+      return liveConnectConfig(
+          liveConfig.toBuilder()
+              .systemInstruction(
+                  Content.builder()
+                      .parts(livePartsBuilder.build())
+                      .role(
+                          liveConfig
                               .systemInstruction()
                               .map(c -> c.role().orElse("user"))
                               .orElse("user"))

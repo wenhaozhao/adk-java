@@ -20,6 +20,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
 import com.google.adk.tools.BaseTool;
+import com.google.genai.types.LiveConnectConfig;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.genai.types.Content;
@@ -52,6 +53,7 @@ public final class LlmRequestTest {
     assertThat(request.config()).isEmpty();
     assertThat(request.liveConnectConfig()).isNotNull();
     assertThat(request.liveConnectConfig().temperature()).isEmpty();
+    assertThat(request.liveConnectConfig().systemInstruction()).isEmpty();
     assertThat(request.tools()).isEmpty();
   }
 
@@ -66,6 +68,12 @@ public final class LlmRequestTest {
     assertThat(systemInstruction.role()).hasValue("user");
     assertThat(systemInstruction.parts().get()).hasSize(1);
     assertThat(systemInstruction.parts().get().get(0).text()).hasValue(instruction);
+
+    assertThat(request.liveConnectConfig().systemInstruction()).isPresent();
+    Content liveSystemInstruction = request.liveConnectConfig().systemInstruction().get();
+    assertThat(liveSystemInstruction.role()).hasValue("user");
+    assertThat(liveSystemInstruction.parts().get()).hasSize(1);
+    assertThat(liveSystemInstruction.parts().get().get(0).text()).hasValue(instruction);
   }
 
   @Test
@@ -83,6 +91,12 @@ public final class LlmRequestTest {
     Content systemInstruction = request.config().get().systemInstruction().get();
     assertThat(systemInstruction.parts().get()).hasSize(1);
     assertThat(systemInstruction.parts().get().get(0).text()).hasValue(instruction);
+
+    assertThat(request.liveConnectConfig().systemInstruction()).isPresent();
+    Content liveSystemInstruction = request.liveConnectConfig().systemInstruction().get();
+    assertThat(liveSystemInstruction.role()).hasValue("user");
+    assertThat(liveSystemInstruction.parts().get()).hasSize(1);
+    assertThat(liveSystemInstruction.parts().get().get(0).text()).hasValue(instruction);
   }
 
   @Test
@@ -109,15 +123,66 @@ public final class LlmRequestTest {
     assertThat(systemInstruction.parts().get()).hasSize(2);
     assertThat(systemInstruction.parts().get().get(0).text()).hasValue(initialInstructionText);
     assertThat(systemInstruction.parts().get().get(1).text()).hasValue(newInstructionText);
+
+    assertThat(request.liveConnectConfig().systemInstruction()).isPresent();
+    Content liveSystemInstruction = request.liveConnectConfig().systemInstruction().get();
+    assertThat(liveSystemInstruction.role()).hasValue("user");
+    assertThat(liveSystemInstruction.parts().get()).hasSize(1);
+    assertThat(liveSystemInstruction.parts().get().get(0).text()).hasValue(newInstructionText);
   }
 
   @Test
-  public void appendInstructions_emptyList_doesNotModifyConfig() {
-    GenerateContentConfig initialConfig = GenerateContentConfig.builder().temperature(0.8f).build();
-    LlmRequest request =
-        LlmRequest.builder().config(initialConfig).appendInstructions(ImmutableList.of()).build();
+  public void
+      appendInstructions_liveConnectConfigWithExistingInstruction_appendsNewInstructionCorrectly() {
+    String initialLiveInstructionText = "Live: Be cautious.";
+    Content initialLiveSystemInstruction =
+        Content.builder()
+            .role("system") // Custom role
+            .parts(ImmutableList.of(Part.builder().text(initialLiveInstructionText).build()))
+            .build();
+    LiveConnectConfig initialLiveConfig =
+        LiveConnectConfig.builder().systemInstruction(initialLiveSystemInstruction).build();
 
-    assertThat(request.config()).hasValue(initialConfig);
+    String newInstructionText = "Live: Be fast.";
+    LlmRequest request =
+        LlmRequest.builder()
+            .liveConnectConfig(initialLiveConfig) // Set initial live config
+            .appendInstructions(ImmutableList.of(newInstructionText))
+            .build();
+
+    // Assertions for liveConnectConfig
+    assertThat(request.liveConnectConfig().systemInstruction()).isPresent();
+    Content liveSystemInstruction = request.liveConnectConfig().systemInstruction().get();
+    assertThat(liveSystemInstruction.role()).hasValue("system"); // Role preserved
+    assertThat(liveSystemInstruction.parts().get()).hasSize(2);
+    assertThat(liveSystemInstruction.parts().get().get(0).text())
+        .hasValue(initialLiveInstructionText);
+    assertThat(liveSystemInstruction.parts().get().get(1).text()).hasValue(newInstructionText);
+
+    // Assertions for main config (should get the new instruction with default role)
+    assertThat(request.config()).isPresent();
+    Content mainSystemInstruction = request.config().get().systemInstruction().get();
+    assertThat(mainSystemInstruction.role()).hasValue("user");
+    assertThat(mainSystemInstruction.parts().get()).hasSize(1);
+    assertThat(mainSystemInstruction.parts().get().get(0).text()).hasValue(newInstructionText);
+  }
+
+  @Test
+  public void appendInstructions_emptyList_doesNotModifyBuilderState() {
+    GenerateContentConfig initialConfig = GenerateContentConfig.builder().temperature(0.8f).build();
+    LiveConnectConfig initialLiveConfig =
+        LiveConnectConfig.builder()
+            .systemInstruction(
+                Content.builder().parts(ImmutableList.of(Part.fromText("Initial live"))).build())
+            .build();
+    LlmRequest initialRequestState =
+        LlmRequest.builder().config(initialConfig).liveConnectConfig(initialLiveConfig).build();
+    LlmRequest finalRequestState =
+        initialRequestState.toBuilder().appendInstructions(ImmutableList.of()).build();
+
+    assertThat(finalRequestState.config()).isEqualTo(initialRequestState.config());
+    assertThat(finalRequestState.liveConnectConfig())
+        .isEqualTo(initialRequestState.liveConnectConfig());
   }
 
   @Test
@@ -134,6 +199,13 @@ public final class LlmRequestTest {
     assertThat(systemInstruction.parts().get()).hasSize(2);
     assertThat(systemInstruction.parts().get().get(0).text()).hasValue(instruction1);
     assertThat(systemInstruction.parts().get().get(1).text()).hasValue(instruction2);
+
+    assertThat(request.liveConnectConfig().systemInstruction()).isPresent();
+    Content liveSystemInstruction = request.liveConnectConfig().systemInstruction().get();
+    assertThat(liveSystemInstruction.role()).hasValue("user");
+    assertThat(liveSystemInstruction.parts().get()).hasSize(2);
+    assertThat(liveSystemInstruction.parts().get().get(0).text()).hasValue(instruction1);
+    assertThat(liveSystemInstruction.parts().get().get(1).text()).hasValue(instruction2);
   }
 
   @Test
