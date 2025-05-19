@@ -36,9 +36,9 @@ jobs:
             ${{ runner.os }}-maven-${{ matrix.java-version }}-
             ${{ runner.os }}-maven-
 
-      - name: Compile core module with Java ${{ matrix.java-version }}
+      - name: Compile and install core module with Java ${{ matrix.java-version }}
         working-directory: ./core
-        run: mvn clean compile
+        run: mvn clean compile install
 
       - name: Compile dev module with Java ${{ matrix.java-version }}
         working-directory: ./dev
