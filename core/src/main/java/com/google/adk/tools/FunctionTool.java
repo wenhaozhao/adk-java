@@ -34,16 +34,45 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** FunctionTool implements a customized function calling tool. */
 public class FunctionTool extends BaseTool {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private static final Logger logger = LoggerFactory.getLogger(FunctionTool.class);
 
   private final Method func;
   private FunctionDeclaration funcDeclaration;
 
   public static FunctionTool create(Method func) {
+    if (!areParametersAnnotatedWithSchema(func) && !wasCompiledWithParameterNames(func)) {
+      logger.error(
+          "Functions used in tools must have their parameters annotated with @Schema or at least"
+              + " the code must be compiled with the -parameters flag as a fallback. Your function"
+              + " tool will likely not work as expected and exit at runtime.");
+    }
     return new FunctionTool(func, /* isLongRunning= */ false);
+  }
+
+  private static boolean areParametersAnnotatedWithSchema(Method func) {
+    for (Parameter parameter : func.getParameters()) {
+      if (!parameter.isAnnotationPresent(Annotations.Schema.class)
+          || parameter.getAnnotation(Annotations.Schema.class).name().isEmpty()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private static boolean wasCompiledWithParameterNames(Method func) {
+    for (Parameter parameter : func.getParameters()) {
+      String parameterName = parameter.getName();
+      if (!parameterName.matches("arg\\d+")) {
+        return false;
+      }
+    }
+    return true;
   }
 
   public static FunctionTool create(Class<?> cls, String methodName) {
