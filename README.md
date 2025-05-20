@@ -13,7 +13,8 @@
     <h3 align="center">
       Important Links:
       <a href="https://google.github.io/adk-docs/">Docs</a> &
-      <a href="https://github.com/google/adk-samples">Samples</a>.
+      <a href="https://github.com/google/adk-samples">Samples</a> &
+      <a href="https://github.com/google/adk-python">Python ADK</a>.
     </h3>
 </html>
 
