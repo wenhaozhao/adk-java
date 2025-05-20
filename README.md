@@ -67,11 +67,11 @@ documentation:
 ### Same Features & Familiar Interface As Python ADK:
 
 ```java
-import com.google.adk.agents.Agent;
+import com.google.adk.agents.LlmAgent;
 import com.google.adk.tools.GoogleSearchTool;
 
 GoogleSearchTool googleSearchTool = new GoogleSearchTool();
-Agent rootAgent = Agent.builder()
+LlmAgent rootAgent = LlmAgent.builder()
     .name("search_assistant")
     .description("An assistant that can search the web.")
     .model("gemini-2.0-flash") // Or your preferred models
@@ -81,10 +81,20 @@ Agent rootAgent = Agent.builder()
 ```
 
 ### Development UI
-Same as beloved Python's Development UI.
+
+Same as the beloved Python Development UI.
+A built-in development UI to help you test, evaluate, debug, and showcase your agent(s).
+<img src="https://raw.githubusercontent.com/google/adk-python/main/assets/adk-web-dev-ui-function-call.png"/>
 
 ### Evaluate Agents
+
 Coming soon...
+
+## 🤖 A2A and ADK integration
+
+For remote agent-to-agent communication, ADK integrates with the
+[A2A protocol](https://github.com/google/A2A/).
+Examples coming soon...
 
 ## 🤝 Contributing
 
