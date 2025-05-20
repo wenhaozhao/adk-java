@@ -46,7 +46,7 @@ public class FunctionTool extends BaseTool {
   private FunctionDeclaration funcDeclaration;
 
   public static FunctionTool create(Method func) {
-    if (!areParametersAnnotatedWithSchema(func) && !wasCompiledWithParameterNames(func)) {
+    if (!areParametersAnnotatedWithSchema(func) && wasCompiledWithDefaultParameterNames(func)) {
       logger.error(
           "Functions used in tools must have their parameters annotated with @Schema or at least"
               + " the code must be compiled with the -parameters flag as a fallback. Your function"
@@ -65,7 +65,8 @@ public class FunctionTool extends BaseTool {
     return true;
   }
 
-  private static boolean wasCompiledWithParameterNames(Method func) {
+  // Rough check to see if the code wasn't compiled with the -parameters flag.
+  private static boolean wasCompiledWithDefaultParameterNames(Method func) {
     for (Parameter parameter : func.getParameters()) {
       String parameterName = parameter.getName();
       if (!parameterName.matches("arg\\d+")) {
