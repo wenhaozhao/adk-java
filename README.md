@@ -67,73 +67,17 @@ documentation:
 ### Same Features & Familiar Interface As Python ADK:
 
 ```java
-import com.google.common.collect.ImmutableList;
 import com.google.adk.agents.Agent;
-import com.google.adk.tools.Annotations.Schema;
-import com.google.adk.tools.FunctionTool;
+import com.google.adk.tools.GoogleSearchTool;
 
-public final class TestAgent {
-
-  @Schema(
-      description =
-          "This function returns the current weather temperature for the specified location.")
-  public static int getWeather(
-      @Schema(name = "location", description = "The location for which the weather is requested")
-          String location) {
-    return 25;
-  }
-
-  static final Agent rootAgent;
-
-  static {
-    FunctionTool weatherFunctionTool = FunctionTool.create(TestAgent.class, "getWeather");
-
-    rootAgent =
-        Agent.builder()
-            .name("root-agent")
-            .description("A helpful AI assistant.")
-            .model("gemini-2.0-flash-001")
-            .instruction("Be polite and answer all users' questions.")
-            .tools(ImmutableList.of(weatherFunctionTool))
-            .beforeModelCallback(
-                (invocationContext, llmRequest) -> {
-                  System.out.printf(
-                      "==== Agent %s calling LLM with request: %s%n",
-                      invocationContext.agent().name(), llmRequest);
-                  return null;
-                })
-            .afterModelCallback(
-                (invocationContext, llmResponse) -> {
-                  System.out.printf(
-                      "==== Agent %s got response from LLM: %s%n",
-                      invocationContext.agent().name(), llmResponse);
-                  return null;
-                })
-            .beforeAgentCallback(
-                (invocationContext) -> {
-                  System.out.printf("==== Agent %s starting%n", invocationContext.agent().name());
-                  return null;
-                })
-            .beforeToolCallback(
-                (invocationContext, tool, args, toolContext) -> {
-                  System.out.printf(
-                      "==== Agent %s calling tool %s, args: %s%n",
-                      invocationContext.agent().name(), tool.name(), args);
-                  return null;
-                })
-            .afterToolCallback(
-                (invocationContext, tool, args, toolContext, response) -> {
-                  System.out.printf(
-                      "==== Agent %s finished calling tool %s, response: %s%n",
-                      invocationContext.agent().name(), tool.name(), response);
-                  return null;
-                })
-            .build();
-  }
-
-  private TestAgent() {}
-}
-
+GoogleSearchTool googleSearchTool = new GoogleSearchTool();
+Agent rootAgent = Agent.builder()
+    .name("search_assistant")
+    .description("An assistant that can search the web.")
+    .model("gemini-2.0-flash") // Or your preferred models
+    .instruction("You are a helpful assistant. Answer user questions using Google Search when needed.")
+    .tools(ImmutableList.of(googleSearchTool))
+    .build();
 ```
 
 ### Development UI
