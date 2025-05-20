@@ -8,7 +8,12 @@
       <img src="https://raw.githubusercontent.com/google/adk-python/main/assets/agent-development-kit.png" width="256"/>
     </h2>
     <h3 align="center">
-      A Java version of our open-source, code-first Python toolkit for building, evaluating, and deploying sophisticated AI agents with flexibility and control.
+      An open-source, code-first Java toolkit for building, evaluating, and deploying sophisticated AI agents with flexibility and control.
+    </h3>
+    <h3 align="center">
+      Important Links:
+      <a href="https://google.github.io/adk-docs/">Docs</a> &
+      <a href="https://github.com/google/adk-samples">Samples</a>.
     </h3>
 </html>
 
@@ -27,7 +32,7 @@ debugging, versioning, and deployment anywhere – from your laptop to the cloud
     for tight integration with the Google ecosystem.
 
 -   **Code-First Development**: Define agent logic, tools, and orchestration
-    directly in Python for ultimate flexibility, testability, and versioning.
+    directly in Java for ultimate flexibility, testability, and versioning.
 
 -   **Modular Multi-Agent Systems**: Design scalable applications by composing
     multiple specialized agents into flexible hierarchies.
@@ -39,13 +44,11 @@ If you're using Maven, add the following to your dependencies:
 <!-- {x-version-start:google-adk:released} -->
 
 ```xml
-<dependencies>
-  <dependency>
-    <groupId>com.google.adk</groupId>
-    <artifactId>google-adk</artifactId>
-    <version>0.1.0</version>
-  </dependency>
-</dependencies>
+<dependency>
+  <groupId>com.google.adk</groupId>
+  <artifactId>google-adk</artifactId>
+  <version>0.1.0</version>
+</dependency>
 ```
 
 <!-- {x-version-end} -->
@@ -54,28 +57,22 @@ If you're using Maven, add the following to your dependencies:
 
 We're working on the Java version of the ADK docs, but you can but in the
 meantime you can familiarize yourself with the concepts and workflows for
-building, evaluating, and deploying agents by following the python
+building, evaluating, and deploying agents by following the Java
 documentation:
 
 *   **[Documentation](https://google.github.io/adk-docs)**
 
 ## 🏁 Feature Highlight
 
-### Define a single agent:
+### Same Features & Familiar Interface As Python ADK:
 
 ```java
-
-package com.google.adk;
-
 import com.google.common.collect.ImmutableList;
-import com.google.common.flogger.GoogleLogger;
 import com.google.adk.agents.Agent;
 import com.google.adk.tools.Annotations.Schema;
 import com.google.adk.tools.FunctionTool;
 
-
 public final class TestAgent {
-  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   @Schema(
       description =
@@ -88,11 +85,9 @@ public final class TestAgent {
 
   static final Agent rootAgent;
 
-  // Static initializer block to handle exceptions
   static {
     FunctionTool weatherFunctionTool = FunctionTool.create(TestAgent.class, "getWeather");
 
-    // Create the Agent
     rootAgent =
         Agent.builder()
             .name("root-agent")
@@ -102,34 +97,34 @@ public final class TestAgent {
             .tools(ImmutableList.of(weatherFunctionTool))
             .beforeModelCallback(
                 (invocationContext, llmRequest) -> {
-                  logger.atInfo().log(
-                      "==== Agent %s calling LLM with request: %s",
+                  System.out.printf(
+                      "==== Agent %s calling LLM with request: %s%n",
                       invocationContext.agent().name(), llmRequest);
                   return null;
                 })
             .afterModelCallback(
                 (invocationContext, llmResponse) -> {
-                  logger.atInfo().log(
-                      "==== Agent %s got response from LLM: %s",
+                  System.out.printf(
+                      "==== Agent %s got response from LLM: %s%n",
                       invocationContext.agent().name(), llmResponse);
                   return null;
                 })
             .beforeAgentCallback(
                 (invocationContext) -> {
-                  logger.atInfo().log("==== Agent %s starting", invocationContext.agent().name());
+                  System.out.printf("==== Agent %s starting%n", invocationContext.agent().name());
                   return null;
                 })
             .beforeToolCallback(
                 (invocationContext, tool, args, toolContext) -> {
-                  logger.atInfo().log(
-                      "==== Agent %s calling tool %s, args: %s",
+                  System.out.printf(
+                      "==== Agent %s calling tool %s, args: %s%n",
                       invocationContext.agent().name(), tool.name(), args);
                   return null;
                 })
             .afterToolCallback(
                 (invocationContext, tool, args, toolContext, response) -> {
-                  logger.atInfo().log(
-                      "==== Agent %s finished calling tool %s, response: %s",
+                  System.out.printf(
+                      "==== Agent %s finished calling tool %s, response: %s%n",
                       invocationContext.agent().name(), tool.name(), response);
                   return null;
                 })
@@ -142,12 +137,10 @@ public final class TestAgent {
 ```
 
 ### Development UI
-
-TODO(b/410930446): Add development UI
+Same as beloved Python's Development UI.
 
 ### Evaluate Agents
-
-TODO(b/410912902): Port/reuse Python ADK eval stack
+Coming soon...
 
 ## 🤝 Contributing
 
