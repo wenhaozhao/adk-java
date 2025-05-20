@@ -87,6 +87,7 @@ public abstract class LlmRequest extends JsonBaseModel {
   public abstract Map<String, BaseTool> tools();
 
   /** returns the first system instruction text from the request if present. */
+  @JsonIgnore
   public Optional<String> getFirstSystemInstruction() {
     return this.config()
         .flatMap(GenerateContentConfig::systemInstruction)
@@ -95,6 +96,7 @@ public abstract class LlmRequest extends JsonBaseModel {
   }
 
   /** Returns all system instruction texts from the request as an immutable list. */
+  @JsonIgnore
   public ImmutableList<String> getSystemInstructions() {
     return config()
         .flatMap(GenerateContentConfig::systemInstruction)
