@@ -22,7 +22,7 @@
   <artifactId>google-adk</artifactId>
   <version>0.1.0</version><!-- {x-version-update:google-adk:current} -->
   <packaging>jar</packaging>
-  <name>Google Agent Development Kit</name>
+  <name>Agent Development Kit</name>
   <url>https://github.com/google/adk-java</url>
   <licenses>
     <license>
@@ -44,7 +44,7 @@
     </developer>
   </developers>
   <description>
-    Google Agent Development Kit: an open-source, code-first toolkit designed to simplify building,
+    Agent Development Kit: an open-source, code-first toolkit designed to simplify building,
     evaluating, and deploying advanced AI agents anywhere.
   </description>
   <properties>
@@ -350,7 +350,7 @@
             <doclint>all,-missing</doclint>
             <nohelp>true</nohelp>
             <outputDirectory>${project.build.directory}/javadoc</outputDirectory>
-            <doctitle>Google Agent Development Kit</doctitle>
+            <doctitle>Agent Development Kit</doctitle>
             <source>${maven.compiler.release}</source>
             <encoding>UTF-8</encoding>
           </configuration>

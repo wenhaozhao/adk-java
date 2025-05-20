@@ -21,10 +21,10 @@
     <artifactId>google-adk-dev</artifactId>
     <version>0.1.0</version>
     <packaging>jar</packaging>
-    <name>Google Agent Development Kit - Dev Tools</name>
+    <name>Agent Development Kit - Dev Tools</name>
     <url>https://github.com/google/adk-java</url>
     <description>
-      Development tools and server for the Google Agent Development Kit.
+      Development tools and server for Agent Development Kit.
     </description>
     <licenses>
         <license>
@@ -215,7 +215,7 @@
                         <doclint>all,-missing</doclint>
                         <nohelp>true</nohelp>
                         <outputDirectory>${project.build.directory}/javadoc</outputDirectory>
-                        <doctitle>Google Agent Development Kit - Dev Tools</doctitle>
+                        <doctitle>Agent Development Kit - Dev Tools</doctitle>
                         <source>${maven.compiler.release}</source>
                         <encoding>UTF-8</encoding>
                     </configuration>
