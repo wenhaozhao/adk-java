@@ -21,8 +21,11 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.adk.JsonBaseModel;
 import io.modelcontextprotocol.client.McpSyncClient;
+import io.modelcontextprotocol.client.transport.ServerParameters;
+import com.google.adk.tools.mcp.SseServerParameters;
 import io.modelcontextprotocol.spec.McpSchema.ListToolsResult;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,44 +46,53 @@ import org.slf4j.LoggerFactory;
  */
 public class McpToolset implements AutoCloseable {
   private static final Logger logger = LoggerFactory.getLogger(McpToolset.class);
-  private final Object connectionParams;
   private final McpSessionManager mcpSessionManager;
   private McpSyncClient mcpSession;
   private final ObjectMapper objectMapper;
 
   /**
-   * Initializes the McpToolset.
+   * Initializes the McpToolset with SSE server parameters.
    *
-   * @param connectionParams The connection parameters to the MCP server. Can be: {@code
-   *     ServerParameters} for using a local mcp server (e.g., using `npx` or `python3`); or {@code
-   *     SseServerParameters} for a local/remote SSE server.
-   * @param objectMapper An ObjectMapper instance to be used for parsing schemas when creating
-   *     {@code McpTool} instances.
+   * @param connectionParams The SSE connection parameters to the MCP server.
+   * @param objectMapper An ObjectMapper instance for parsing schemas.
    */
-  public McpToolset(Object connectionParams, ObjectMapper objectMapper) {
-    if (connectionParams == null) {
-      throw new IllegalArgumentException("Missing connection params in McpToolset.");
-    }
-    this.connectionParams = connectionParams;
+  public McpToolset(SseServerParameters connectionParams, ObjectMapper objectMapper) {
+    Objects.requireNonNull(connectionParams);
+    Objects.requireNonNull(objectMapper);
     this.objectMapper = objectMapper;
-    this.mcpSessionManager = new McpSessionManager(this.connectionParams);
+    this.mcpSessionManager = new McpSessionManager(connectionParams);
   }
 
   /**
-   * Initializes the McpToolset. Uses the {@code ObjectMapper} instance used across the ADK exposed
-   * by JsonBaseModel.
+   * Initializes the McpToolset with local server parameters.
    *
-   * @param connectionParams The connection parameters to the MCP server. Can be: {@code
-   *     ServerParameters} for using a local mcp server (e.g., using `npx` or `python3`); or {@code
-   *     SseServerParameters} for a local/remote SSE server.
+   * @param connectionParams The local server connection parameters to the MCP server.
+   * @param objectMapper An ObjectMapper instance for parsing schemas.
    */
-  public McpToolset(Object connectionParams) {
-    if (connectionParams == null) {
-      throw new IllegalArgumentException("Missing connection params in McpToolset.");
-    }
-    this.connectionParams = connectionParams;
-    this.objectMapper = JsonBaseModel.getMapper();
-    this.mcpSessionManager = new McpSessionManager(this.connectionParams);
+  public McpToolset(ServerParameters connectionParams, ObjectMapper objectMapper) {
+    Objects.requireNonNull(connectionParams);
+    this.objectMapper = objectMapper;
+    this.mcpSessionManager = new McpSessionManager(connectionParams);
+  }
+
+  /**
+   * Initializes the McpToolset with SSE server parameters, using the ObjectMapper used across the
+   * ADK.
+   *
+   * @param connectionParams The SSE connection parameters to the MCP server.
+   */
+  public McpToolset(SseServerParameters connectionParams) {
+    this(connectionParams, JsonBaseModel.getMapper());
+  }
+
+  /**
+   * Initializes the McpToolset with local server parameters, using the ObjectMapper used across the
+   * ADK.
+   *
+   * @param connectionParams The local server connection parameters to the MCP server.
+   */
+  public McpToolset(ServerParameters connectionParams) {
+    this(connectionParams, JsonBaseModel.getMapper());
   }
 
   /** Holds the result of loading tools, containing both the tools and the toolset instance. */
@@ -112,9 +124,23 @@ public class McpToolset implements AutoCloseable {
    *     McpToolsAndToolsetResult}. The {@code McpToolset} instance within the result should be
    *     closed using {@code .close()} when no longer needed to release resources.
    */
-  public static CompletableFuture<McpToolsAndToolsetResult> fromServer(
+  private static CompletableFuture<McpToolsAndToolsetResult> fromServerInternal(
       Object connectionParams, ObjectMapper objectMapper) {
-    McpToolset toolset = new McpToolset(connectionParams, objectMapper);
+
+    McpToolset toolset;
+    if (connectionParams instanceof SseServerParameters sseServerParameters) {
+      toolset = new McpToolset(sseServerParameters, objectMapper);
+    } else if (connectionParams instanceof ServerParameters serverParameters) {
+      toolset = new McpToolset(serverParameters, objectMapper);
+    } else {
+      throw new IllegalArgumentException(
+          "Connection parameters must be either"
+              + ServerParameters.class.getName()
+              + " or "
+              + SseServerParameters.class.getName()
+              + "but got "
+              + connectionParams.getClass().getName());
+    }
     return toolset
         .initializeSession() // Initialize the session (this can throw exceptions)
         .thenCompose(
@@ -147,6 +173,54 @@ public class McpToolset implements AutoCloseable {
                       e));
               return failedFuture;
             });
+  }
+
+  /**
+   * Retrieve all tools from the MCP connection using SSE server parameters.
+   *
+   * @param connectionParams The SSE connection parameters to the MCP server.
+   * @param objectMapper An ObjectMapper instance for parsing schemas.
+   * @return A {@code CompletableFuture} of {@code McpToolsAndToolsetResult}.
+   */
+  public static CompletableFuture<McpToolsAndToolsetResult> fromServer(
+      SseServerParameters connectionParams, ObjectMapper objectMapper) {
+    return fromServerInternal(connectionParams, objectMapper);
+  }
+
+  /**
+   * Retrieve all tools from the MCP connection using local server parameters.
+   *
+   * @param connectionParams The local server connection parameters to the MCP server.
+   * @param objectMapper An ObjectMapper instance for parsing schemas.
+   * @return A {@code CompletableFuture} of {@code McpToolsAndToolsetResult}.
+   */
+  public static CompletableFuture<McpToolsAndToolsetResult> fromServer(
+      ServerParameters connectionParams, ObjectMapper objectMapper) {
+    return fromServerInternal(connectionParams, objectMapper);
+  }
+
+  /**
+   * Retrieve all tools from the MCP connection using SSE server parameters and the ObjectMapper
+   * used across the ADK.
+   *
+   * @param connectionParams The SSE connection parameters to the MCP server.
+   * @return A {@code CompletableFuture} of {@code McpToolsAndToolsetResult}.
+   */
+  public static CompletableFuture<McpToolsAndToolsetResult> fromServer(
+      SseServerParameters connectionParams) {
+    return fromServerInternal(connectionParams, JsonBaseModel.getMapper());
+  }
+
+  /**
+   * Retrieve all tools from the MCP connection using local server parameters and the ObjectMapper
+   * used across the ADK.
+   *
+   * @param connectionParams The local server connection parameters to the MCP server.
+   * @return A {@code CompletableFuture} of {@code McpToolsAndToolsetResult}.
+   */
+  public static CompletableFuture<McpToolsAndToolsetResult> fromServer(
+      ServerParameters connectionParams) {
+    return fromServerInternal(connectionParams, JsonBaseModel.getMapper());
   }
 
   /**

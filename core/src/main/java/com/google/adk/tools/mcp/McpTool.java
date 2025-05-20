@@ -21,6 +21,7 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.adk.JsonBaseModel;
 import com.google.adk.tools.BaseTool;
 import com.google.adk.tools.ToolContext;
 import com.google.common.collect.ImmutableMap;
@@ -59,6 +60,13 @@ public final class McpTool extends BaseTool {
   McpSyncClient mcpSession;
   McpSessionManager mcpSessionManager;
   ObjectMapper objectMapper;
+
+  public McpTool(
+      Tool mcpTool,
+      McpSyncClient mcpSession,
+      McpSessionManager mcpSessionManager) {
+    this(mcpTool, mcpSession, mcpSessionManager, JsonBaseModel.getMapper());
+  }
 
   public McpTool(
       Tool mcpTool,
