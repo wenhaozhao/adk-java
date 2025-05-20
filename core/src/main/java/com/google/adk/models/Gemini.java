@@ -18,7 +18,9 @@ package com.google.adk.models;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
+import com.google.adk.Version;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.genai.Client;
 import com.google.genai.ResponseStream;
@@ -27,6 +29,7 @@ import com.google.genai.types.Content;
 import com.google.genai.types.FinishReason;
 import com.google.genai.types.GenerateContentConfig;
 import com.google.genai.types.GenerateContentResponse;
+import com.google.genai.types.HttpOptions;
 import com.google.genai.types.LiveConnectConfig;
 import com.google.genai.types.Part;
 import io.reactivex.rxjava3.core.Flowable;
@@ -49,6 +52,18 @@ import org.slf4j.LoggerFactory;
 public class Gemini extends BaseLlm {
 
   private static final Logger logger = LoggerFactory.getLogger(Gemini.class);
+  private static final ImmutableMap<String, String> TRACKING_HEADERS;
+
+  static {
+    String frameworkLabel = "google-adk/" + Version.JAVA_ADK_VERSION;
+    String languageLabel = "gl-java/" + System.getProperty("java.version");
+    String versionHeaderValue = String.format("%s %s", frameworkLabel, languageLabel);
+
+    TRACKING_HEADERS =
+        ImmutableMap.of(
+            "x-goog-api-client", versionHeaderValue,
+            "user-agent", versionHeaderValue);
+  }
 
   private final Client apiClient;
 
@@ -76,7 +91,11 @@ public class Gemini extends BaseLlm {
   public Gemini(String modelName, String apiKey) {
     super(modelName);
     Objects.requireNonNull(apiKey, "apiKey cannot be null");
-    this.apiClient = Client.builder().apiKey(apiKey).build();
+    this.apiClient =
+        Client.builder()
+            .apiKey(apiKey)
+            .httpOptions(HttpOptions.builder().headers(TRACKING_HEADERS).build())
+            .build();
   }
 
   /**
@@ -88,7 +107,8 @@ public class Gemini extends BaseLlm {
   public Gemini(String modelName, VertexCredentials vertexCredentials) {
     super(modelName);
     Objects.requireNonNull(vertexCredentials, "vertexCredentials cannot be null");
-    Client.Builder apiClientBuilder = Client.builder();
+    Client.Builder apiClientBuilder =
+        Client.builder().httpOptions(HttpOptions.builder().headers(TRACKING_HEADERS).build());
     vertexCredentials
         .project()
         .ifPresent(
