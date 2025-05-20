@@ -24,8 +24,8 @@ import io.modelcontextprotocol.client.McpSyncClient;
 import io.modelcontextprotocol.spec.McpSchema.ListToolsResult;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Connects to a MCP Server, and retrieves MCP Tools into ADK Tools.
@@ -42,7 +42,7 @@ import java.util.logging.Logger;
  * </ul>
  */
 public class McpToolset implements AutoCloseable {
-  private static final Logger logger = Logger.getLogger(McpToolset.class.getName());
+  private static final Logger logger = LoggerFactory.getLogger(McpToolset.class);
   private final Object connectionParams;
   private final McpSessionManager mcpSessionManager;
   private McpSyncClient mcpSession;
@@ -131,11 +131,11 @@ public class McpToolset implements AutoCloseable {
             e -> {
               CompletableFuture<McpToolsAndToolsetResult> failedFuture = new CompletableFuture<>();
               // Log the original exception before attempting to close for better context.
-              logger.log(Level.SEVERE, "Error during McpToolset operation, attempting cleanup.", e);
+              logger.error("Error during McpToolset operation, attempting cleanup.", e);
               try {
                 toolset.close(); // Attempt to close the toolset if an error occurred
               } catch (RuntimeException closeException) {
-                logger.log(Level.WARNING, "Failed to close McpToolset after error", closeException);
+                logger.warn("Failed to close McpToolset after error", closeException);
                 // Add the close exception as a suppressed exception to the original error
                 e.addSuppressed(closeException);
               }
@@ -163,11 +163,11 @@ public class McpToolset implements AutoCloseable {
             this.mcpSession = this.mcpSessionManager.createSession();
             return this.mcpSession;
           } catch (IllegalArgumentException e) {
-            logger.log(Level.SEVERE, "Invalid connection parameters for MCP session.", e);
+            logger.error("Invalid connection parameters for MCP session.", e);
             throw new McpInitializationException(
                 "Invalid connection parameters for MCP session.", e);
           } catch (RuntimeException e) { // Catch any other unexpected exceptions
-            logger.log(Level.SEVERE, "Unexpected error during MCP session initialization.", e);
+            logger.error("Unexpected error during MCP session initialization.", e);
             throw new McpInitializationException(
                 "Unexpected error during MCP session initialization.", e);
           }
@@ -192,7 +192,7 @@ public class McpToolset implements AutoCloseable {
               // If session is not initialized or was closed, reinitialize it.
               // The createSession in McpSessionManager will handle creating a new one.
               if (this.mcpSession == null) {
-                logger.log(Level.INFO, "MCP session is null, attempting to reinitialize.");
+                logger.info("MCP session is null, attempting to reinitialize.");
                 this.mcpSession = this.mcpSessionManager.createSession();
               }
 
@@ -206,48 +206,37 @@ public class McpToolset implements AutoCloseable {
             } catch (IllegalArgumentException e) {
               // This could happen if parameters for tool loading are somehow invalid.
               // This is likely a fatal error and should not be retried.
-              logger.log(Level.SEVERE, "Invalid argument encountered during tool loading.", e);
+              logger.error("Invalid argument encountered during tool loading.", e);
               throw new McpToolLoadingException(
                   "Invalid argument encountered during tool loading.", e);
             } catch (RuntimeException e) { // Catch any other unexpected runtime exceptions
-              logger.log(
-                  Level.SEVERE,
-                  "Unexpected error during tool loading, retry attempt " + (i + 1),
-                  e);
+              logger.error("Unexpected error during tool loading, retry attempt " + (i + 1), e);
               if (i < maxRetries - 1) {
                 // For other general exceptions, we might still want to retry if they are
                 // potentially transient, or if we don't have more specific handling. But it's
                 // better to be specific. For now, we'll treat them as potentially retryable but log
                 // them at a higher level.
                 try {
-                  logger.log(
-                      Level.INFO,
-                      "Reinitializing MCP session before next retry for unexpected error.");
+                  logger.info("Reinitializing MCP session before next retry for unexpected error.");
                   this.mcpSession = this.mcpSessionManager.createSession();
                   Thread.sleep(retryDelayMillis);
                 } catch (InterruptedException ie) {
                   Thread.currentThread().interrupt();
-                  logger.log(
-                      Level.SEVERE,
-                      "Interrupted during retry delay for loadTools (unexpected error).",
-                      ie);
+                  logger.error(
+                      "Interrupted during retry delay for loadTools (unexpected error).", ie);
                   throw new McpToolLoadingException(
                       "Interrupted during retry delay (unexpected error)", ie);
                 } catch (RuntimeException reinitE) {
-                  logger.log(
-                      Level.SEVERE,
-                      "Failed to reinitialize session during retry (unexpected error).",
-                      reinitE);
+                  logger.error(
+                      "Failed to reinitialize session during retry (unexpected error).", reinitE);
                   throw new McpInitializationException(
                       "Failed to reinitialize session during tool loading retry (unexpected"
                           + " error).",
                       reinitE);
                 }
               } else {
-                logger.log(
-                    Level.SEVERE,
-                    "Failed to load tools after multiple retries due to unexpected error.",
-                    e);
+                logger.error(
+                    "Failed to load tools after multiple retries due to unexpected error.", e);
                 throw new McpToolLoadingException(
                     "Failed to load tools after multiple retries due to unexpected error.", e);
               }
@@ -271,9 +260,9 @@ public class McpToolset implements AutoCloseable {
     if (this.mcpSession != null) {
       try {
         this.mcpSession.close();
-        logger.log(Level.FINE, "MCP session closed successfully.");
+        logger.debug("MCP session closed successfully.");
       } catch (RuntimeException e) {
-        logger.log(Level.SEVERE, "Failed to close MCP session", e);
+        logger.error("Failed to close MCP session", e);
         // We don't throw an exception here, as closing is a cleanup operation and
         // failing to close shouldn't prevent the program from continuing (or exiting).
         // However, we log the error for debugging purposes.

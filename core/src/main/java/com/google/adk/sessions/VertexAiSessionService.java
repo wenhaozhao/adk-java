@@ -47,12 +47,12 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import okhttp3.ResponseBody;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Connects to the managed Vertex AI Session Service. */
 /** TODO: Use the genai HttpApiClient and ApiResponse methods once they are public. */
@@ -64,7 +64,7 @@ public final class VertexAiSessionService implements BaseSessionService {
   private int maxRetryAttempts = 5;
   private Map<String, Object> sessionJsonMap;
   private final ObjectMapper objectMapper = JsonBaseModel.getMapper();
-  private static final Logger logger = Logger.getLogger(VertexAiSessionService.class.getName());
+  private static final Logger logger = LoggerFactory.getLogger(VertexAiSessionService.class);
 
   /**
    * Creates a new instance of the Vertex AI Session Service with a custom ApiClient for testing.
@@ -128,7 +128,7 @@ public final class VertexAiSessionService implements BaseSessionService {
       throw new UncheckedIOException(e);
     }
 
-    logger.log(Level.FINE, "Create Session response " + apiResponse.getResponseBody());
+    logger.debug("Create Session response {}", apiResponse.getResponseBody());
     String sessionName = "";
     String operationId = "";
     String sessId = sessionId == null ? "" : sessionId;
@@ -149,7 +149,7 @@ public final class VertexAiSessionService implements BaseSessionService {
         TimeUnit.SECONDS.sleep(1);
         maxRetryAttempts -= 1;
       } catch (InterruptedException e) {
-        logger.log(Level.WARNING, "Error during sleep", e);
+        logger.warn("Error during sleep", e);
       }
     }
 
@@ -171,7 +171,7 @@ public final class VertexAiSessionService implements BaseSessionService {
         }
       }
     } catch (JsonProcessingException e) {
-      logger.log(Level.WARNING, "Error while parsing session state: " + e.getMessage());
+      logger.warn("Error while parsing session state: {}", e.getMessage());
     }
     return Single.just(
         Session.builder(sessId)
@@ -235,7 +235,7 @@ public final class VertexAiSessionService implements BaseSessionService {
             "reasoningEngines/" + reasoningEngineId + "/sessions/" + sessionId + "/events",
             "");
 
-    logger.log(Level.FINE, "List events response " + apiResponse);
+    logger.debug("List events response {}", apiResponse);
 
     if (apiResponse.getResponseBody() == null) {
       return Single.just(ListEventsResponse.builder().build());
@@ -313,7 +313,7 @@ public final class VertexAiSessionService implements BaseSessionService {
         }
       }
     } catch (JsonProcessingException e) {
-      logger.log(Level.WARNING, "Error while parsing session events: " + e.getMessage());
+      logger.warn("Error while parsing session events: {}", e.getMessage());
     }
 
     List<Event> events = new ArrayList<>();

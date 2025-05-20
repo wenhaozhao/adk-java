@@ -25,8 +25,8 @@ import io.modelcontextprotocol.spec.McpClientTransport;
 import io.modelcontextprotocol.spec.McpSchema.ClientCapabilities;
 import io.modelcontextprotocol.spec.McpSchema.InitializeResult;
 import java.time.Duration;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Manages MCP client sessions.
@@ -38,7 +38,7 @@ import java.util.logging.Logger;
 public class McpSessionManager {
 
   private final Object connectionParams; // ServerParameters or SseServerParameters
-  private static final Logger logger = Logger.getLogger(McpSessionManager.class.getName());
+  private static final Logger logger = LoggerFactory.getLogger(McpSessionManager.class);
 
   public McpSessionManager(Object connectionParams) {
     this.connectionParams = connectionParams;
@@ -67,7 +67,7 @@ public class McpSessionManager {
             .capabilities(ClientCapabilities.builder().build())
             .build();
     InitializeResult initResult = client.initialize();
-    logger.log(Level.FINE, "Initialize Client Result: " + initResult);
+    logger.debug("Initialize Client Result: {}", initResult);
 
     return client;
   }

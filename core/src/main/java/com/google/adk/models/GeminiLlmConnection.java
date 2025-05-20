@@ -44,8 +44,8 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Manages a persistent, bidirectional connection to the Gemini model via WebSockets for real-time
@@ -57,7 +57,7 @@ import java.util.logging.Logger;
  */
 public final class GeminiLlmConnection implements BaseLlmConnection {
 
-  private static final Logger logger = Logger.getLogger(GeminiLlmConnection.class.getName());
+  private static final Logger logger = LoggerFactory.getLogger(GeminiLlmConnection.class);
 
   private final Client apiClient;
   private final String modelName;
@@ -118,7 +118,7 @@ public final class GeminiLlmConnection implements BaseLlmConnection {
       return;
     }
 
-    logger.fine(() -> String.format("Received server message: %s", message.toJson()));
+    logger.debug("Received server message: {}", message.toJson());
 
     Optional<LlmResponse> llmResponse = convertToServerResponse(message);
     llmResponse.ifPresent(responseProcessor::onNext);
@@ -149,18 +149,17 @@ public final class GeminiLlmConnection implements BaseLlmConnection {
               });
       builder.partial(false).turnComplete(false);
     } else if (message.usageMetadata().isPresent()) {
-      logger.log(Level.FINE, "Received usage metadata: {0}", message.usageMetadata().get());
+      logger.debug("Received usage metadata: {}", message.usageMetadata().get());
       return Optional.empty();
     } else if (message.toolCallCancellation().isPresent()) {
-      logger.log(
-          Level.FINE, "Received tool call cancellation: {0}", message.toolCallCancellation().get());
+      logger.debug("Received tool call cancellation: {}", message.toolCallCancellation().get());
       // TODO: implement proper CFC and thus tool call cancellation handling.
       return Optional.empty();
     } else if (message.setupComplete().isPresent()) {
-      logger.log(Level.FINE, "Received setup complete.");
+      logger.debug("Received setup complete.");
       return Optional.empty();
     } else {
-      logger.log(Level.WARNING, "Received unknown or empty server message: {0}", message.toJson());
+      logger.warn("Received unknown or empty server message: {}", message.toJson());
       builder
           .errorCode(new FinishReason("Unknown server message."))
           .errorMessage("Received unknown server message.");
@@ -172,7 +171,7 @@ public final class GeminiLlmConnection implements BaseLlmConnection {
   /** Handles errors that occur *during* the initial connection attempt. */
   private void handleConnectionError(Throwable throwable) {
     if (closed.compareAndSet(false, true)) {
-      logger.log(Level.SEVERE, "WebSocket connection failed", throwable);
+      logger.error("WebSocket connection failed", throwable);
       Throwable cause =
           (throwable instanceof CompletionException) ? throwable.getCause() : throwable;
       responseProcessor.onError(cause);
@@ -182,7 +181,7 @@ public final class GeminiLlmConnection implements BaseLlmConnection {
   /** Handles errors reported by the WebSocket client *after* connection (e.g., receive errors). */
   private void handleReceiveError(Throwable throwable) {
     if (closed.compareAndSet(false, true)) {
-      logger.log(Level.SEVERE, "Error during WebSocket receive operation", throwable);
+      logger.error("Error during WebSocket receive operation", throwable);
       responseProcessor.onError(throwable);
       sessionFuture.thenAccept(this::closeSessionIgnoringErrors).exceptionally(err -> null);
     }
@@ -271,7 +270,7 @@ public final class GeminiLlmConnection implements BaseLlmConnection {
   /** Internal method to handle closing logic and signal completion/error. */
   private void closeInternal(Throwable throwable) {
     if (closed.compareAndSet(false, true)) {
-      logger.log(Level.FINE, "Closing GeminiConnection.", throwable);
+      logger.debug("Closing GeminiConnection.", throwable);
 
       if (throwable == null) {
         responseProcessor.onComplete();
@@ -294,7 +293,7 @@ public final class GeminiLlmConnection implements BaseLlmConnection {
           .close()
           .exceptionally(
               closeError -> {
-                logger.log(Level.WARNING, "Error occurred while closing AsyncSession", closeError);
+                logger.warn("Error occurred while closing AsyncSession", closeError);
                 return null; // Suppress error during close
               });
     }

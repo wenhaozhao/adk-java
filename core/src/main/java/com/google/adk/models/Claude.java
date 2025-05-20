@@ -17,29 +17,27 @@
 package com.google.adk.models;
 
 import com.anthropic.client.AnthropicClient;
-import com.anthropic.models.messages.ToolChoiceAuto;
 import com.anthropic.models.messages.ContentBlock;
 import com.anthropic.models.messages.ContentBlockParam;
+import com.anthropic.models.messages.Message;
 import com.anthropic.models.messages.MessageCreateParams;
 import com.anthropic.models.messages.MessageParam;
 import com.anthropic.models.messages.MessageParam.Role;
 import com.anthropic.models.messages.TextBlockParam;
 import com.anthropic.models.messages.Tool;
 import com.anthropic.models.messages.ToolChoice;
-import com.anthropic.models.messages.ToolUnion;
+import com.anthropic.models.messages.ToolChoiceAuto;
 import com.anthropic.models.messages.ToolResultBlockParam;
+import com.anthropic.models.messages.ToolUnion;
 import com.anthropic.models.messages.ToolUseBlockParam;
-import com.anthropic.models.messages.Message;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.genai.types.Content;
 import com.google.genai.types.FunctionCall;
 import com.google.genai.types.FunctionDeclaration;
-import com.google.genai.types.FunctionResponse;
 import com.google.genai.types.GenerateContentConfig;
 import com.google.genai.types.Part;
 import io.reactivex.rxjava3.core.Flowable;
@@ -49,8 +47,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Represents the Claude Generative AI model by Anthropic.
@@ -60,7 +59,7 @@ import java.util.stream.Collectors;
  */
 public class Claude extends BaseLlm {
 
-  private static final Logger logger = Logger.getLogger(Claude.class.getName());
+  private static final Logger logger = LoggerFactory.getLogger(Claude.class);
   private static final int MAX_TOKEN = 1024;
   private final AnthropicClient anthropicClient;
 
@@ -129,7 +128,7 @@ public class Claude extends BaseLlm {
                     .maxTokens(MAX_TOKEN)
                     .build());
 
-    logger.fine(String.format("Claude response: %s", message));
+    logger.debug("Claude response: {}", message);
 
     return Flowable.just(convertAnthropicResponseToLlmResponse(message));
   }

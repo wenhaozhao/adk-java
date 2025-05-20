@@ -32,10 +32,10 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * An in-memory implementation of {@link BaseSessionService} assuming {@link Session} objects are
@@ -50,7 +50,7 @@ import org.jspecify.annotations.Nullable;
  */
 public final class InMemorySessionService implements BaseSessionService {
 
-  private static final Logger logger = Logger.getLogger(InMemorySessionService.class.getName());
+  private static final Logger logger = LoggerFactory.getLogger(InMemorySessionService.class);
 
   // Structure: appName -> userId -> sessionId -> Session
   private final ConcurrentMap<String, ConcurrentMap<String, ConcurrentMap<String, Session>>>
@@ -270,8 +270,7 @@ public final class InMemorySessionService implements BaseSessionService {
       BaseSessionService.super.appendEvent(storedSession, event);
       storedSession.lastUpdateTime(getInstantFromEvent(event));
     } else {
-      logger.log(
-          Level.WARNING,
+      logger.warn(
           String.format(
               "appendEvent called for session %s which is not found in InMemorySessionService",
               sessionId));

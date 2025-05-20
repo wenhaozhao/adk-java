@@ -22,13 +22,14 @@ import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.genai.types.AudioTranscriptionConfig;
 import com.google.genai.types.Modality;
 import com.google.genai.types.SpeechConfig;
-import java.util.logging.Logger;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Configuration to modify an agent's LLM's underlying behavior. */
 @AutoValue
 public abstract class RunConfig {
-  private static final Logger logger = Logger.getLogger(RunConfig.class.getName());
+  private static final Logger logger = LoggerFactory.getLogger(RunConfig.class);
 
   /** Streaming mode for the runner. Required for BaseAgent.runLive() to work. */
   public enum StreamingMode {
@@ -96,7 +97,7 @@ public abstract class RunConfig {
     public RunConfig build() {
       RunConfig runConfig = autoBuild();
       if (runConfig.maxLlmCalls() < 0) {
-        logger.warning(
+        logger.warn(
             "maxLlmCalls is negative. This will result in no enforcement on total"
                 + " number of llm calls that will be made for a run. This may not be ideal, as this"
                 + " could result in a never ending communication between the model and the agent in"
