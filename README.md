@@ -55,12 +55,11 @@ If you're using Maven, add the following to your dependencies:
 
 ## 📚 Documentation
 
-We're working on the Java version of the ADK docs, but you can but in the
-meantime you can familiarize yourself with the concepts and workflows for
-building, evaluating, and deploying agents by following the Java
-documentation:
+For building, evaluating, and deploying agents by follow the Java
+documentation & samples:
 
 *   **[Documentation](https://google.github.io/adk-docs)**
+*   **[Samples](https://github.com/google/adk-samples)**
 
 ## 🏁 Feature Highlight
 
