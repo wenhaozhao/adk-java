@@ -29,14 +29,21 @@ import com.google.adk.events.EventActions;
 import com.google.adk.models.BaseLlm;
 import com.google.adk.models.LlmResponse;
 import com.google.adk.sessions.InMemorySessionService;
+import com.google.adk.tools.BaseTool;
+import com.google.adk.tools.ToolContext;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.genai.types.Content;
 import com.google.genai.types.FunctionCall;
+import com.google.genai.types.FunctionDeclaration;
 import com.google.genai.types.FunctionResponse;
 import com.google.genai.types.Part;
 import io.reactivex.rxjava3.core.Flowable;
+import io.reactivex.rxjava3.core.Single;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.function.Supplier;
 
 /** Utility methods for testing. */
@@ -185,5 +192,36 @@ public final class TestUtils {
     return LlmResponse.builder().content(content).build();
   }
 
+  public static class EchoTool extends BaseTool {
+    public EchoTool() {
+      super("echo_tool", "description");
+    }
+
+    @Override
+    public Optional<FunctionDeclaration> declaration() {
+      return Optional.of(FunctionDeclaration.builder().name("echo_tool").build());
+    }
+
+    @Override
+    public Single<Map<String, Object>> runAsync(Map<String, Object> args, ToolContext toolContext) {
+      return Single.just(ImmutableMap.<String, Object>builder().put("result", args).buildOrThrow());
+    }
+  }
+
+  public static class FailingEchoTool extends BaseTool {
+    public FailingEchoTool() {
+      super("echo_tool", "description");
+    }
+
+    @Override
+    public Optional<FunctionDeclaration> declaration() {
+      return Optional.of(FunctionDeclaration.builder().name("echo_tool").build());
+    }
+
+    @Override
+    public Single<Map<String, Object>> runAsync(Map<String, Object> args, ToolContext toolContext) {
+      return Single.error(new RuntimeException("error"));
+    }
+  }
   private TestUtils() {}
 }

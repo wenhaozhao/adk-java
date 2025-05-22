@@ -1,5 +1,6 @@
 package com.google.adk.agents;
 
+import static com.google.adk.testing.TestUtils.createEvent;
 import static com.google.adk.testing.TestUtils.createInvocationContext;
 import static com.google.adk.testing.TestUtils.createLlmResponse;
 import static com.google.adk.testing.TestUtils.createTestAgentBuilder;
@@ -9,10 +10,15 @@ import static com.google.common.truth.Truth.assertThat;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import com.google.adk.events.Event;
+import com.google.adk.flows.llmflows.Functions;
 import com.google.adk.models.LlmResponse;
+import com.google.adk.testing.TestUtils;
 import com.google.adk.testing.TestLlm;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.genai.types.Content;
+import com.google.genai.types.FunctionCall;
+import com.google.genai.types.FunctionResponse;
 import com.google.genai.types.Part;
 import io.reactivex.rxjava3.core.Maybe;
 import io.reactivex.rxjava3.schedulers.Schedulers;
@@ -532,5 +538,404 @@ public final class CallbacksTest {
                         .build())
                 .build())
         .build();
+  }
+
+  // Tool callback tests moved from FunctionsTest
+  @Test
+  public void handleFunctionCalls_withBeforeToolCallback_returnsBeforeToolCallbackResult() {
+    ImmutableMap<String, Object> beforeToolCallbackResult =
+        ImmutableMap.<String, Object>of("before_tool_callback_result", "value");
+    InvocationContext invocationContext =
+        createInvocationContext(
+            createTestAgentBuilder(createTestLlm(LlmResponse.builder().build()))
+                .beforeToolCallback(
+                    (invocationContext1, tool, args, toolContext) ->
+                        Maybe.just(beforeToolCallbackResult))
+                .build());
+    Event event =
+        createEvent("event").toBuilder()
+            .content(
+                Content.fromParts(
+                    Part.fromText("..."),
+                    Part.builder()
+                        .functionCall(
+                            FunctionCall.builder()
+                                .id("function_call_id")
+                                .name("echo_tool")
+                                .args(ImmutableMap.of("key", "value"))
+                                .build())
+                        .build()))
+            .build();
+
+    Event functionResponseEvent =
+        Functions.handleFunctionCalls(
+                invocationContext, event, ImmutableMap.of("echo_tool", new TestUtils.FailingEchoTool()))
+            .blockingGet();
+
+    assertThat(functionResponseEvent).isNotNull();
+    assertThat(functionResponseEvent.content().get().parts().get())
+        .containsExactly(
+            Part.builder()
+                .functionResponse(
+                    FunctionResponse.builder()
+                        .id("function_call_id")
+                        .name("echo_tool")
+                        .response(beforeToolCallbackResult)
+                        .build())
+                .build());
+  }
+
+  @Test
+  public void handleFunctionCalls_withBeforeToolCallbackThatReturnsNull_returnsToolResult() {
+    InvocationContext invocationContext =
+        createInvocationContext(
+            createTestAgentBuilder(createTestLlm(LlmResponse.builder().build()))
+                .beforeToolCallback((invocationContext1, tool, args, toolContext) -> Maybe.empty())
+                .build());
+    Event event =
+        createEvent("event").toBuilder()
+            .content(
+                Content.fromParts(
+                    Part.fromText("..."),
+                    Part.builder()
+                        .functionCall(
+                            FunctionCall.builder()
+                                .id("function_call_id")
+                                .name("echo_tool")
+                                .args(ImmutableMap.of("key", "value"))
+                                .build())
+                        .build()))
+            .build();
+
+    Event functionResponseEvent =
+        Functions.handleFunctionCalls(
+                invocationContext, event, ImmutableMap.of("echo_tool", new TestUtils.EchoTool()))
+            .blockingGet();
+
+    assertThat(functionResponseEvent).isNotNull();
+    assertThat(functionResponseEvent.content().get().parts().get())
+        .containsExactly(
+            Part.builder()
+                .functionResponse(
+                    FunctionResponse.builder()
+                        .id("function_call_id")
+                        .name("echo_tool")
+                        .response(ImmutableMap.of("result", ImmutableMap.of("key", "value")))
+                        .build())
+                .build());
+  }
+
+  @Test
+  public void handleFunctionCalls_withBeforeToolCallbackSync_returnsBeforeToolCallbackResult() {
+    ImmutableMap<String, Object> beforeToolCallbackResult =
+        ImmutableMap.<String, Object>of("before_tool_callback_result", "value");
+    InvocationContext invocationContext =
+        createInvocationContext(
+            createTestAgentBuilder(createTestLlm(LlmResponse.builder().build()))
+                .beforeToolCallbackSync(
+                    (invocationContext1, tool, args, toolContext) ->
+                        Optional.of(beforeToolCallbackResult))
+                .build());
+    Event event =
+        createEvent("event").toBuilder()
+            .content(
+                Content.fromParts(
+                    Part.fromText("..."),
+                    Part.builder()
+                        .functionCall(
+                            FunctionCall.builder()
+                                .id("function_call_id")
+                                .name("echo_tool")
+                                .args(ImmutableMap.of("key", "value"))
+                                .build())
+                        .build()))
+            .build();
+
+    Event functionResponseEvent =
+        Functions.handleFunctionCalls(
+                invocationContext, event, ImmutableMap.of("echo_tool", new TestUtils.FailingEchoTool()))
+            .blockingGet();
+
+    assertThat(functionResponseEvent).isNotNull();
+    assertThat(functionResponseEvent.content().get().parts().get())
+        .containsExactly(
+            Part.builder()
+                .functionResponse(
+                    FunctionResponse.builder()
+                        .id("function_call_id")
+                        .name("echo_tool")
+                        .response(beforeToolCallbackResult)
+                        .build())
+                .build());
+  }
+
+  @Test
+  public void handleFunctionCalls_withBeforeToolCallbackSyncThatReturnsNull_returnsToolResult() {
+    InvocationContext invocationContext =
+        createInvocationContext(
+            createTestAgentBuilder(createTestLlm(LlmResponse.builder().build()))
+                .beforeToolCallbackSync(
+                    (invocationContext1, tool, args, toolContext) -> Optional.empty())
+                .build());
+    Event event =
+        createEvent("event").toBuilder()
+            .content(
+                Content.fromParts(
+                    Part.fromText("..."),
+                    Part.builder()
+                        .functionCall(
+                            FunctionCall.builder()
+                                .id("function_call_id")
+                                .name("echo_tool")
+                                .args(ImmutableMap.of("key", "value"))
+                                .build())
+                        .build()))
+            .build();
+
+    Event functionResponseEvent =
+        Functions.handleFunctionCalls(
+                invocationContext, event, ImmutableMap.of("echo_tool", new TestUtils.EchoTool()))
+            .blockingGet();
+
+    assertThat(functionResponseEvent).isNotNull();
+    assertThat(functionResponseEvent.content().get().parts().get())
+        .containsExactly(
+            Part.builder()
+                .functionResponse(
+                    FunctionResponse.builder()
+                        .id("function_call_id")
+                        .name("echo_tool")
+                        .response(ImmutableMap.of("result", ImmutableMap.of("key", "value")))
+                        .build())
+                .build());
+  }
+
+  @Test
+  public void handleFunctionCalls_withAfterToolCallback_returnsAfterToolCallbackResult() {
+    InvocationContext invocationContext =
+        createInvocationContext(
+            createTestAgentBuilder(createTestLlm(LlmResponse.builder().build()))
+                .afterToolCallback(
+                    (invocationContext1, tool, args, toolContext, response) ->
+                        Maybe.just(
+                            ImmutableMap.<String, Object>of(
+                                "after_tool_callback_result", response)))
+                .build());
+    Event event =
+        createEvent("event").toBuilder()
+            .content(
+                Content.fromParts(
+                    Part.fromText("..."),
+                    Part.builder()
+                        .functionCall(
+                            FunctionCall.builder()
+                                .id("function_call_id")
+                                .name("echo_tool")
+                                .args(ImmutableMap.of("key", "value"))
+                                .build())
+                        .build()))
+            .build();
+
+    Event functionResponseEvent =
+        Functions.handleFunctionCalls(
+                invocationContext, event, ImmutableMap.of("echo_tool", new TestUtils.EchoTool()))
+            .blockingGet();
+
+    assertThat(functionResponseEvent).isNotNull();
+    assertThat(functionResponseEvent.content().get().parts().get())
+        .containsExactly(
+            Part.builder()
+                .functionResponse(
+                    FunctionResponse.builder()
+                        .id("function_call_id")
+                        .name("echo_tool")
+                        .response(
+                            ImmutableMap.of(
+                                "after_tool_callback_result",
+                                ImmutableMap.of("result", ImmutableMap.of("key", "value"))))
+                        .build())
+                .build());
+  }
+
+  @Test
+  public void handleFunctionCalls_withAfterToolCallbackThatReturnsNull_returnsToolResult() {
+    InvocationContext invocationContext =
+        createInvocationContext(
+            createTestAgentBuilder(createTestLlm(LlmResponse.builder().build()))
+                .afterToolCallback(
+                    (invocationContext1, tool, args, toolContext, response) -> Maybe.empty())
+                .build());
+    Event event =
+        createEvent("event").toBuilder()
+            .content(
+                Content.fromParts(
+                    Part.fromText("..."),
+                    Part.builder()
+                        .functionCall(
+                            FunctionCall.builder()
+                                .id("function_call_id")
+                                .name("echo_tool")
+                                .args(ImmutableMap.of("key", "value"))
+                                .build())
+                        .build()))
+            .build();
+
+    Event functionResponseEvent =
+        Functions.handleFunctionCalls(
+                invocationContext, event, ImmutableMap.of("echo_tool", new TestUtils.EchoTool()))
+            .blockingGet();
+
+    assertThat(functionResponseEvent).isNotNull();
+    assertThat(functionResponseEvent.content().get().parts().get())
+        .containsExactly(
+            Part.builder()
+                .functionResponse(
+                    FunctionResponse.builder()
+                        .id("function_call_id")
+                        .name("echo_tool")
+                        .response(ImmutableMap.of("result", ImmutableMap.of("key", "value")))
+                        .build())
+                .build());
+  }
+
+  @Test
+  public void handleFunctionCalls_withAfterToolCallbackSync_returnsAfterToolCallbackResult() {
+    InvocationContext invocationContext =
+        createInvocationContext(
+            createTestAgentBuilder(createTestLlm(LlmResponse.builder().build()))
+                .afterToolCallbackSync(
+                    (invocationContext1, tool, args, toolContext, response) ->
+                        Optional.of(
+                            ImmutableMap.<String, Object>of(
+                                "after_tool_callback_result", response)))
+                .build());
+    Event event =
+        createEvent("event").toBuilder()
+            .content(
+                Content.fromParts(
+                    Part.fromText("..."),
+                    Part.builder()
+                        .functionCall(
+                            FunctionCall.builder()
+                                .id("function_call_id")
+                                .name("echo_tool")
+                                .args(ImmutableMap.of("key", "value"))
+                                .build())
+                        .build()))
+            .build();
+
+    Event functionResponseEvent =
+        Functions.handleFunctionCalls(
+                invocationContext, event, ImmutableMap.of("echo_tool", new TestUtils.EchoTool()))
+            .blockingGet();
+
+    assertThat(functionResponseEvent).isNotNull();
+    assertThat(functionResponseEvent.content().get().parts().get())
+        .containsExactly(
+            Part.builder()
+                .functionResponse(
+                    FunctionResponse.builder()
+                        .id("function_call_id")
+                        .name("echo_tool")
+                        .response(
+                            ImmutableMap.of(
+                                "after_tool_callback_result",
+                                ImmutableMap.of("result", ImmutableMap.of("key", "value"))))
+                        .build())
+                .build());
+  }
+
+  @Test
+  public void handleFunctionCalls_withAfterToolCallbackSyncThatReturnsNull_returnsToolResult() {
+    InvocationContext invocationContext =
+        createInvocationContext(
+            createTestAgentBuilder(createTestLlm(LlmResponse.builder().build()))
+                .afterToolCallbackSync(
+                    (invocationContext1, tool, args, toolContext, response) -> Optional.empty())
+                .build());
+    Event event =
+        createEvent("event").toBuilder()
+            .content(
+                Content.fromParts(
+                    Part.fromText("..."),
+                    Part.builder()
+                        .functionCall(
+                            FunctionCall.builder()
+                                .id("function_call_id")
+                                .name("echo_tool")
+                                .args(ImmutableMap.of("key", "value"))
+                                .build())
+                        .build()))
+            .build();
+
+    Event functionResponseEvent =
+        Functions.handleFunctionCalls(
+                invocationContext, event, ImmutableMap.of("echo_tool", new TestUtils.EchoTool()))
+            .blockingGet();
+
+    assertThat(functionResponseEvent).isNotNull();
+    assertThat(functionResponseEvent.content().get().parts().get())
+        .containsExactly(
+            Part.builder()
+                .functionResponse(
+                    FunctionResponse.builder()
+                        .id("function_call_id")
+                        .name("echo_tool")
+                        .response(ImmutableMap.of("result", ImmutableMap.of("key", "value")))
+                        .build())
+                .build());
+  }
+
+  @Test
+  public void
+      handleFunctionCalls_withBeforeAndAfterToolCallback_returnsAfterToolCallbackResultAppliedToBeforeToolCallbackResult() {
+    InvocationContext invocationContext =
+        createInvocationContext(
+            createTestAgentBuilder(createTestLlm(LlmResponse.builder().build()))
+                .beforeToolCallback(
+                    (invocationContext1, tool, args, toolContext) ->
+                        Maybe.just(
+                            ImmutableMap.<String, Object>of(
+                                "before_tool_callback_result", "value")))
+                .afterToolCallback(
+                    (invocationContext1, tool, args, toolContext, response) ->
+                        Maybe.just(
+                            ImmutableMap.<String, Object>of(
+                                "after_tool_callback_result", response)))
+                .build());
+    Event event =
+        createEvent("event").toBuilder()
+            .content(
+                Content.fromParts(
+                    Part.fromText("..."),
+                    Part.builder()
+                        .functionCall(
+                            FunctionCall.builder()
+                                .id("function_call_id")
+                                .name("echo_tool")
+                                .args(ImmutableMap.of("key", "value"))
+                                .build())
+                        .build()))
+            .build();
+
+    Event functionResponseEvent =
+        Functions.handleFunctionCalls(
+                invocationContext, event, ImmutableMap.of("echo_tool", new TestUtils.FailingEchoTool()))
+            .blockingGet();
+
+    assertThat(functionResponseEvent).isNotNull();
+    assertThat(functionResponseEvent.content().get().parts().get())
+        .containsExactly(
+            Part.builder()
+                .functionResponse(
+                    FunctionResponse.builder()
+                        .id("function_call_id")
+                        .name("echo_tool")
+                        .response(
+                            ImmutableMap.of(
+                                "after_tool_callback_result",
+                                ImmutableMap.of("before_tool_callback_result", "value")))
+                        .build())
+                .build());
   }
 }
