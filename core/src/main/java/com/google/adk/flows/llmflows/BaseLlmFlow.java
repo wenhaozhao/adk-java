@@ -19,6 +19,8 @@ package com.google.adk.flows.llmflows;
 import com.google.adk.Telemetry;
 import com.google.adk.agents.BaseAgent;
 import com.google.adk.agents.CallbackContext;
+import com.google.adk.agents.Callbacks.AfterModelCallback;
+import com.google.adk.agents.Callbacks.BeforeModelCallback;
 import com.google.adk.agents.InvocationContext;
 import com.google.adk.agents.LiveRequest;
 import com.google.adk.agents.LlmAgent;
@@ -214,10 +216,17 @@ public abstract class BaseLlmFlow implements BaseFlow {
   private Single<Optional<LlmResponse>> handleBeforeModelCallback(
       InvocationContext context, LlmRequest llmRequest, Event modelResponseEvent) {
     LlmAgent agent = (LlmAgent) context.agent();
+
+    Optional<List<BeforeModelCallback>> callbacksOpt = agent.beforeModelCallback();
+    if (callbacksOpt.isEmpty() || callbacksOpt.get().isEmpty()) {
+      return Single.just(Optional.empty());
+    }
+
     Event callbackEvent = modelResponseEvent.toBuilder().build();
-    return agent
-        .beforeModelCallback()
-        .map(
+    List<BeforeModelCallback> callbacks = callbacksOpt.get();
+
+    return Flowable.fromIterable(callbacks)
+        .concatMapSingle(
             callback -> {
               CallbackContext callbackContext =
                   new CallbackContext(context, callbackEvent.actions());
@@ -226,22 +235,37 @@ public abstract class BaseLlmFlow implements BaseFlow {
                   .map(Optional::of)
                   .defaultIfEmpty(Optional.empty());
             })
-        .orElse(Single.just(Optional.empty()));
+        .filter(Optional::isPresent)
+        .firstElement()
+        .switchIfEmpty(Single.just(Optional.empty()));
   }
 
   private Single<LlmResponse> handleAfterModelCallback(
       InvocationContext context, LlmResponse llmResponse, Event modelResponseEvent) {
     LlmAgent agent = (LlmAgent) context.agent();
+    Optional<List<AfterModelCallback>> callbacksOpt = agent.afterModelCallback();
+
+    if (callbacksOpt.isEmpty() || callbacksOpt.get().isEmpty()) {
+      return Single.just(llmResponse);
+    }
+
     Event callbackEvent = modelResponseEvent.toBuilder().content(llmResponse.content()).build();
-    return agent
-        .afterModelCallback()
-        .map(
+    List<AfterModelCallback> callbacks = callbacksOpt.get();
+
+    return Flowable.fromIterable(callbacks)
+        .concatMapSingle(
             callback -> {
               CallbackContext callbackContext =
                   new CallbackContext(context, callbackEvent.actions());
-              return callback.call(callbackContext, llmResponse).defaultIfEmpty(llmResponse);
+              return callback
+                  .call(callbackContext, llmResponse)
+                  .map(Optional::of)
+                  .defaultIfEmpty(Optional.empty());
             })
-        .orElse(Single.just(llmResponse));
+        .filter(Optional::isPresent)
+        .firstElement()
+        .map(Optional::get)
+        .switchIfEmpty(Single.just(llmResponse));
   }
 
   private Flowable<Event> runOneStep(InvocationContext context) {

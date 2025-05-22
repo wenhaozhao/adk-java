@@ -53,9 +53,13 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** The LLM-based agent. */
 public class LlmAgent extends BaseAgent {
+
+  private static final Logger logger = LoggerFactory.getLogger(LlmAgent.class);
 
   /**
    * Enum to define if contents of previous events should be included in requests to the underlying
@@ -77,8 +81,8 @@ public class LlmAgent extends BaseAgent {
   private final boolean planning;
   private final boolean disallowTransferToParent;
   private final boolean disallowTransferToPeers;
-  private final Optional<BeforeModelCallback> beforeModelCallback;
-  private final Optional<AfterModelCallback> afterModelCallback;
+  private final Optional<List<BeforeModelCallback>> beforeModelCallback;
+  private final Optional<List<AfterModelCallback>> afterModelCallback;
   private final Optional<BeforeToolCallback> beforeToolCallback;
   private final Optional<AfterToolCallback> afterToolCallback;
   private final Optional<Schema> inputSchema;
@@ -144,8 +148,8 @@ public class LlmAgent extends BaseAgent {
     private Boolean planning;
     private Boolean disallowTransferToParent;
     private Boolean disallowTransferToPeers;
-    private BeforeModelCallback beforeModelCallback;
-    private AfterModelCallback afterModelCallback;
+    private List<BeforeModelCallback> beforeModelCallback;
+    private List<AfterModelCallback> afterModelCallback;
     private BeforeAgentCallback beforeAgentCallback;
     private AfterAgentCallback afterAgentCallback;
     private BeforeToolCallback beforeToolCallback;
@@ -277,29 +281,89 @@ public class LlmAgent extends BaseAgent {
 
     @CanIgnoreReturnValue
     public Builder beforeModelCallback(BeforeModelCallback beforeModelCallback) {
-      this.beforeModelCallback = beforeModelCallback;
+      this.beforeModelCallback = ImmutableList.of(beforeModelCallback);
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    public Builder beforeModelCallback(List<Object> beforeModelCallback) {
+      if (beforeModelCallback == null) {
+        this.beforeModelCallback = null;
+      } else if (beforeModelCallback.isEmpty()) {
+        this.beforeModelCallback = ImmutableList.of();
+      } else {
+        ImmutableList.Builder<BeforeModelCallback> builder = ImmutableList.builder();
+        for (Object callback : beforeModelCallback) {
+          if (callback instanceof BeforeModelCallback beforeModelCallbackInstance) {
+            builder.add(beforeModelCallbackInstance);
+          } else if (callback instanceof BeforeModelCallbackSync beforeModelCallbackSyncInstance) {
+            builder.add(
+                (BeforeModelCallback)
+                    (callbackContext, llmRequest) ->
+                        Maybe.fromOptional(
+                            beforeModelCallbackSyncInstance.call(callbackContext, llmRequest)));
+          } else {
+            logger.warn(
+                "Invalid beforeModelCallback callback type: %s. Ignoring this callback.",
+                callback.getClass().getName());
+          }
+        }
+        this.beforeModelCallback = builder.build();
+      }
+
       return this;
     }
 
     @CanIgnoreReturnValue
     public Builder beforeModelCallbackSync(BeforeModelCallbackSync beforeModelCallbackSync) {
       this.beforeModelCallback =
-          (callbackContext, llmRequest) ->
-              Maybe.fromOptional(beforeModelCallbackSync.call(callbackContext, llmRequest));
+          ImmutableList.of(
+              (callbackContext, llmRequest) ->
+                  Maybe.fromOptional(beforeModelCallbackSync.call(callbackContext, llmRequest)));
       return this;
     }
 
     @CanIgnoreReturnValue
     public Builder afterModelCallback(AfterModelCallback afterModelCallback) {
-      this.afterModelCallback = afterModelCallback;
+      this.afterModelCallback = ImmutableList.of(afterModelCallback);
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    public Builder afterModelCallback(List<Object> afterModelCallback) {
+      if (afterModelCallback == null) {
+        this.afterModelCallback = null;
+      } else if (afterModelCallback.isEmpty()) {
+        this.afterModelCallback = ImmutableList.of();
+      } else {
+        ImmutableList.Builder<AfterModelCallback> builder = ImmutableList.builder();
+        for (Object callback : afterModelCallback) {
+          if (callback instanceof AfterModelCallback afterModelCallbackInstance) {
+            builder.add(afterModelCallbackInstance);
+          } else if (callback instanceof AfterModelCallbackSync afterModelCallbackSyncInstance) {
+            builder.add(
+                (AfterModelCallback)
+                    (callbackContext, llmResponse) ->
+                        Maybe.fromOptional(
+                            afterModelCallbackSyncInstance.call(callbackContext, llmResponse)));
+          } else {
+            logger.warn(
+                "Invalid afterModelCallback callback type: %s. Ignoring this callback.",
+                callback.getClass().getName());
+          }
+        }
+        this.afterModelCallback = builder.build();
+      }
+
       return this;
     }
 
     @CanIgnoreReturnValue
     public Builder afterModelCallbackSync(AfterModelCallbackSync afterModelCallbackSync) {
       this.afterModelCallback =
-          (callbackContext, llmResponse) ->
-              Maybe.fromOptional(afterModelCallbackSync.call(callbackContext, llmResponse));
+          ImmutableList.of(
+              (callbackContext, llmResponse) ->
+                  Maybe.fromOptional(afterModelCallbackSync.call(callbackContext, llmResponse)));
       return this;
     }
 
@@ -518,11 +582,11 @@ public class LlmAgent extends BaseAgent {
     return disallowTransferToPeers;
   }
 
-  public Optional<BeforeModelCallback> beforeModelCallback() {
+  public Optional<List<BeforeModelCallback>> beforeModelCallback() {
     return beforeModelCallback;
   }
 
-  public Optional<AfterModelCallback> afterModelCallback() {
+  public Optional<List<AfterModelCallback>> afterModelCallback() {
     return afterModelCallback;
   }
 
