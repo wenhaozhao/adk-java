@@ -31,8 +31,8 @@ public class ParallelAgent extends BaseAgent {
       String name,
       String description,
       List<? extends BaseAgent> subAgents,
-      Callbacks.BeforeAgentCallback beforeAgentCallback,
-      Callbacks.AfterAgentCallback afterAgentCallback) {
+      List<Callbacks.BeforeAgentCallback> beforeAgentCallback,
+      List<Callbacks.AfterAgentCallback> afterAgentCallback) {
 
     super(name, description, subAgents, beforeAgentCallback, afterAgentCallback);
   }
@@ -42,8 +42,8 @@ public class ParallelAgent extends BaseAgent {
     private String name;
     private String description;
     private List<? extends BaseAgent> subAgents;
-    private Callbacks.BeforeAgentCallback beforeAgentCallback;
-    private Callbacks.AfterAgentCallback afterAgentCallback;
+    private List<Callbacks.BeforeAgentCallback> beforeAgentCallback;
+    private List<Callbacks.AfterAgentCallback> afterAgentCallback;
 
     @CanIgnoreReturnValue
     public Builder name(String name) {
@@ -71,13 +71,25 @@ public class ParallelAgent extends BaseAgent {
 
     @CanIgnoreReturnValue
     public Builder beforeAgentCallback(Callbacks.BeforeAgentCallback beforeAgentCallback) {
-      this.beforeAgentCallback = beforeAgentCallback;
+      this.beforeAgentCallback = ImmutableList.of(beforeAgentCallback);
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    public Builder beforeAgentCallback(List<Object> beforeAgentCallback) {
+      this.beforeAgentCallback = CallbackUtil.getBeforeAgentCallbacks(beforeAgentCallback);
       return this;
     }
 
     @CanIgnoreReturnValue
     public Builder afterAgentCallback(Callbacks.AfterAgentCallback afterAgentCallback) {
-      this.afterAgentCallback = afterAgentCallback;
+      this.afterAgentCallback = ImmutableList.of(afterAgentCallback);
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    public Builder afterAgentCallback(List<Object> afterAgentCallback) {
+      this.afterAgentCallback = CallbackUtil.getAfterAgentCallbacks(afterAgentCallback);
       return this;
     }
 

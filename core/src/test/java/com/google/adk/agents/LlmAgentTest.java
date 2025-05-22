@@ -25,6 +25,7 @@ import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.truth.Truth.assertThat;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.junit.Assert.assertThrows;
+import com.google.adk.agents.Callbacks;
 
 import com.google.adk.events.Event;
 import com.google.adk.models.LlmResponse;
@@ -259,6 +260,161 @@ public final class LlmAgentTest {
     assertThat(events.get(0).content()).hasValue(modelContent);
     assertThat(events.get(0).actions().stateDelta()).isEmpty();
     assertThat(finalState).isEmpty();
+  }
+
+  @Test
+  public void testRun_withMultipleBeforeAgentCallbacks_firstReturnsContent() {
+    Content modelContent = Content.fromParts(Part.fromText("Real LLM response"));
+    Content beforeAgentContent1 = Content.fromParts(Part.fromText("before agent content 1"));
+    Content beforeAgentContent2 = Content.fromParts(Part.fromText("before agent content 2"));
+    TestLlm testLlm = createTestLlm(createLlmResponse(modelContent));
+
+    Callbacks.BeforeAgentCallbackSync cb1 =
+        callbackContext -> {
+          var unused = callbackContext.state().put("key1", "value1");
+          return Optional.of(beforeAgentContent1);
+        };
+    Callbacks.BeforeAgentCallback cb2 =
+        callbackContext -> {
+          var unused = callbackContext.state().put("key2", "value2");
+          return Maybe.just(beforeAgentContent2);
+        };
+
+    LlmAgent agent =
+        createTestAgentBuilder(testLlm)
+            .beforeAgentCallback(ImmutableList.<Object>of(cb1, cb2))
+            .build();
+    InvocationContext invocationContext = createInvocationContext(agent);
+
+    List<Event> events = agent.runAsync(invocationContext).toList().blockingGet();
+    Map<String, Object> finalState = invocationContext.session().state();
+
+    assertThat(events).hasSize(1);
+    Event event1 = events.get(0);
+    assertThat(event1.content()).hasValue(beforeAgentContent1);
+    assertThat(event1.actions().stateDelta()).containsExactly("key1", "value1");
+
+    assertThat(finalState).containsExactly("key1", "value1");
+    assertThat(testLlm.getRequests()).isEmpty();
+  }
+
+  @Test
+  public void testRun_withMultipleBeforeAgentCallbacks_allModifyState_noneReturnContent() {
+    Content modelContent = Content.fromParts(Part.fromText("Real LLM response"));
+    TestLlm testLlm = createTestLlm(createLlmResponse(modelContent));
+
+    Callbacks.BeforeAgentCallbackSync cb1 =
+        callbackContext -> {
+          var unused = callbackContext.state().put("key1", "value1");
+          return Optional.empty();
+        };
+    Callbacks.BeforeAgentCallback cb2 =
+        callbackContext -> {
+          var unused = callbackContext.state().put("key2", "value2");
+          return Maybe.empty();
+        };
+
+    LlmAgent agent =
+        createTestAgentBuilder(testLlm)
+            .beforeAgentCallback(ImmutableList.<Object>of(cb1, cb2))
+            .build();
+    InvocationContext invocationContext = createInvocationContext(agent);
+
+    List<Event> events = agent.runAsync(invocationContext).toList().blockingGet();
+    Map<String, Object> finalState = invocationContext.session().state();
+
+    assertThat(events).hasSize(2);
+
+    Event event1 = events.get(0);
+    assertThat(event1.content().flatMap(Content::parts)).isEmpty();
+    assertThat(event1.actions().stateDelta()).containsExactly("key1", "value1", "key2", "value2");
+
+    Event event2 = events.get(1);
+    assertThat(event2.content()).hasValue(modelContent);
+    assertThat(event2.actions().stateDelta()).isEmpty();
+
+    assertThat(finalState).containsExactly("key1", "value1", "key2", "value2");
+    assertThat(testLlm.getRequests()).hasSize(1);
+  }
+
+  @Test
+  public void testRun_withMultipleAfterAgentCallbacks_firstReturnsContent() {
+    Content modelContent = Content.fromParts(Part.fromText("Real LLM response"));
+    Content afterAgentContent1 = Content.fromParts(Part.fromText("after agent content 1"));
+    Content afterAgentContent2 = Content.fromParts(Part.fromText("after agent content 2"));
+    TestLlm testLlm = createTestLlm(createLlmResponse(modelContent));
+
+    Callbacks.AfterAgentCallbackSync cb1 =
+        callbackContext -> {
+          var unused = callbackContext.state().put("key1", "value1");
+          return Optional.of(afterAgentContent1);
+        };
+    Callbacks.AfterAgentCallback cb2 =
+        callbackContext -> {
+          var unused = callbackContext.state().put("key2", "value2");
+          return Maybe.just(afterAgentContent2);
+        };
+
+    LlmAgent agent =
+        createTestAgentBuilder(testLlm)
+            .afterAgentCallback(ImmutableList.<Object>of(cb1, cb2))
+            .build();
+    InvocationContext invocationContext = createInvocationContext(agent);
+
+    List<Event> events = agent.runAsync(invocationContext).toList().blockingGet();
+    Map<String, Object> finalState = invocationContext.session().state();
+
+    assertThat(events).hasSize(2);
+
+    Event event1 = events.get(0);
+    assertThat(event1.content()).hasValue(modelContent);
+    assertThat(event1.actions().stateDelta()).isEmpty();
+
+    Event event2 = events.get(1);
+    assertThat(event2.content()).hasValue(afterAgentContent1);
+    assertThat(event2.actions().stateDelta()).containsExactly("key1", "value1");
+
+    assertThat(finalState).containsExactly("key1", "value1");
+    assertThat(testLlm.getRequests()).hasSize(1);
+  }
+
+  @Test
+  public void testRun_withMultipleAfterAgentCallbacks_allModifyState_noneReturnContent() {
+    Content modelContent = Content.fromParts(Part.fromText("Real LLM response"));
+    TestLlm testLlm = createTestLlm(createLlmResponse(modelContent));
+
+    Callbacks.AfterAgentCallbackSync cb1 =
+        callbackContext -> {
+          var unused = callbackContext.state().put("key1", "value1");
+          return Optional.empty();
+        };
+    Callbacks.AfterAgentCallback cb2 =
+        callbackContext -> {
+          var unused = callbackContext.state().put("key2", "value2");
+          return Maybe.empty();
+        };
+
+    LlmAgent agent =
+        createTestAgentBuilder(testLlm)
+            .afterAgentCallback(ImmutableList.<Object>of(cb1, cb2))
+            .build();
+    InvocationContext invocationContext = createInvocationContext(agent);
+
+    List<Event> events = agent.runAsync(invocationContext).toList().blockingGet();
+    Map<String, Object> finalState = invocationContext.session().state();
+
+    assertThat(events).hasSize(2);
+
+    Event event1 = events.get(0);
+    assertThat(event1.content()).hasValue(modelContent);
+    assertThat(event1.actions().stateDelta()).isEmpty();
+
+    Event event2 = events.get(1);
+    assertThat(event2.content().flatMap(Content::parts)).isEmpty();
+    assertThat(event2.actions().stateDelta()).containsExactly("key1", "value1", "key2", "value2");
+
+    assertThat(finalState).containsExactly("key1", "value1", "key2", "value2");
+    assertThat(testLlm.getRequests()).hasSize(1);
   }
 
   @Test

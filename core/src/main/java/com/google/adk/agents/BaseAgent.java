@@ -16,10 +16,13 @@
 
 package com.google.adk.agents;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
+
 import com.google.adk.Telemetry;
 import com.google.adk.agents.Callbacks.AfterAgentCallback;
 import com.google.adk.agents.Callbacks.BeforeAgentCallback;
 import com.google.adk.events.Event;
+import com.google.common.collect.ImmutableList;
 import com.google.genai.types.Content;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.Tracer;
@@ -53,15 +56,15 @@ public abstract class BaseAgent {
 
   private List<? extends BaseAgent> subAgents;
 
-  private final Optional<BeforeAgentCallback> beforeAgentCallback;
-  private final Optional<AfterAgentCallback> afterAgentCallback;
+  private final Optional<List<BeforeAgentCallback>> beforeAgentCallback;
+  private final Optional<List<AfterAgentCallback>> afterAgentCallback;
 
   public BaseAgent(
       String name,
       String description,
       List<? extends BaseAgent> subAgents,
-      BeforeAgentCallback beforeAgentCallback,
-      AfterAgentCallback afterAgentCallback) {
+      List<BeforeAgentCallback> beforeAgentCallback,
+      List<AfterAgentCallback> afterAgentCallback) {
     this.name = name;
     this.description = description;
     this.parentAgent = null;
@@ -154,11 +157,11 @@ public abstract class BaseAgent {
     return subAgents;
   }
 
-  public Optional<BeforeAgentCallback> beforeAgentCallback() {
+  public Optional<List<BeforeAgentCallback>> beforeAgentCallback() {
     return beforeAgentCallback;
   }
 
-  public Optional<AfterAgentCallback> afterAgentCallback() {
+  public Optional<List<AfterAgentCallback>> afterAgentCallback() {
     return afterAgentCallback;
   }
 
@@ -182,7 +185,9 @@ public abstract class BaseAgent {
 
             Flowable<Event> executionFlowable =
                 beforeAgentCallback
-                    .map(callback -> callCallback(callback::call, invocationContext))
+                    .map(
+                        callback ->
+                            callCallback(beforeCallbacksToFunctions(callback), invocationContext))
                     .orElse(Single.just(Optional.empty()))
                     .flatMapPublisher(
                         beforeEvent -> {
@@ -208,7 +213,9 @@ public abstract class BaseAgent {
                                       callback ->
                                           Flowable.defer(
                                               () ->
-                                                  callCallback(callback::call, invocationContext)
+                                                  callCallback(
+                                                          afterCallbacksToFunctions(callback),
+                                                          invocationContext)
                                                       .flatMapPublisher(Flowable::fromOptional)))
                                   .orElse(Flowable.empty());
 
@@ -219,37 +226,72 @@ public abstract class BaseAgent {
         });
   }
 
+  private ImmutableList<Function<CallbackContext, Maybe<Content>>> beforeCallbacksToFunctions(
+      List<BeforeAgentCallback> callbacks) {
+    return callbacks.stream()
+        .map(callback -> (Function<CallbackContext, Maybe<Content>>) callback::call)
+        .collect(toImmutableList());
+  }
+
+  private ImmutableList<Function<CallbackContext, Maybe<Content>>> afterCallbacksToFunctions(
+      List<AfterAgentCallback> callbacks) {
+    return callbacks.stream()
+        .map(callback -> (Function<CallbackContext, Maybe<Content>>) callback::call)
+        .collect(toImmutableList());
+  }
+
   private Single<Optional<Event>> callCallback(
-      Function<CallbackContext, Maybe<Content>> agentCallback,
+      List<Function<CallbackContext, Maybe<Content>>> agentCallbacks,
       InvocationContext invocationContext) {
+    if (agentCallbacks == null || agentCallbacks.isEmpty()) {
+      return Single.just(Optional.empty());
+    }
+
     CallbackContext callbackContext =
         new CallbackContext(invocationContext, /* eventActions= */ null);
-    return agentCallback
-        .apply(callbackContext)
-        .map(Optional::of)
-        .defaultIfEmpty(Optional.empty())
-        .map(
-            optionalContent -> {
-              boolean hasContent = optionalContent.isPresent();
-              boolean hasStateDelta = !callbackContext.eventActions().stateDelta().isEmpty();
 
-              if (hasContent || hasStateDelta) {
-                Event.Builder eventBuilder =
-                    Event.builder()
-                        .id(Event.generateEventId())
-                        .invocationId(invocationContext.invocationId())
-                        .author(name())
-                        .branch(invocationContext.branch())
-                        .actions(callbackContext.eventActions());
-                if (hasContent) {
-                  eventBuilder.content(optionalContent);
-                  return Optional.of(eventBuilder.build());
-                } else {
-                  return Optional.of(eventBuilder.build());
-                }
-              }
-              return Optional.<Event>empty();
-            });
+    return Flowable.fromIterable(agentCallbacks)
+        .concatMap(
+            callback -> {
+              Maybe<Content> maybeContent = callback.apply(callbackContext);
+
+              return maybeContent
+                  .map(
+                      content -> {
+                        Event.Builder eventBuilder =
+                            Event.builder()
+                                .id(Event.generateEventId())
+                                .invocationId(invocationContext.invocationId())
+                                .author(name())
+                                .branch(invocationContext.branch())
+                                .actions(callbackContext.eventActions());
+
+                        eventBuilder.content(Optional.of(content));
+
+                        return Optional.of(eventBuilder.build());
+                      })
+                  .toFlowable();
+            })
+        .firstElement()
+        .switchIfEmpty(
+            Single.defer(
+                () -> {
+                  boolean hasStateDelta = !callbackContext.eventActions().stateDelta().isEmpty();
+
+                  if (hasStateDelta) {
+                    Event.Builder eventBuilder =
+                        Event.builder()
+                            .id(Event.generateEventId())
+                            .invocationId(invocationContext.invocationId())
+                            .author(name())
+                            .branch(invocationContext.branch())
+                            .actions(callbackContext.eventActions());
+
+                    return Single.just(Optional.of(eventBuilder.build()));
+                  } else {
+                    return Single.just(Optional.empty());
+                  }
+                }));
   }
 
   public Flowable<Event> runLive(InvocationContext parentContext) {

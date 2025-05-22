@@ -150,8 +150,8 @@ public class LlmAgent extends BaseAgent {
     private Boolean disallowTransferToPeers;
     private List<BeforeModelCallback> beforeModelCallback;
     private List<AfterModelCallback> afterModelCallback;
-    private BeforeAgentCallback beforeAgentCallback;
-    private AfterAgentCallback afterAgentCallback;
+    private List<BeforeAgentCallback> beforeAgentCallback;
+    private List<AfterAgentCallback> afterAgentCallback;
     private BeforeToolCallback beforeToolCallback;
     private AfterToolCallback afterToolCallback;
     private Schema inputSchema;
@@ -369,27 +369,43 @@ public class LlmAgent extends BaseAgent {
 
     @CanIgnoreReturnValue
     public Builder beforeAgentCallback(BeforeAgentCallback beforeAgentCallback) {
-      this.beforeAgentCallback = beforeAgentCallback;
+      this.beforeAgentCallback = ImmutableList.of(beforeAgentCallback);
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    public Builder beforeAgentCallback(List<Object> beforeAgentCallback) {
+      this.beforeAgentCallback = CallbackUtil.getBeforeAgentCallbacks(beforeAgentCallback);
       return this;
     }
 
     @CanIgnoreReturnValue
     public Builder beforeAgentCallbackSync(BeforeAgentCallbackSync beforeAgentCallbackSync) {
       this.beforeAgentCallback =
-          (callbackContext) -> Maybe.fromOptional(beforeAgentCallbackSync.call(callbackContext));
+          ImmutableList.of(
+              (callbackContext) ->
+                  Maybe.fromOptional(beforeAgentCallbackSync.call(callbackContext)));
       return this;
     }
 
     @CanIgnoreReturnValue
     public Builder afterAgentCallback(AfterAgentCallback afterAgentCallback) {
-      this.afterAgentCallback = afterAgentCallback;
+      this.afterAgentCallback = ImmutableList.of(afterAgentCallback);
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    public Builder afterAgentCallback(List<Object> afterAgentCallback) {
+      this.afterAgentCallback = CallbackUtil.getAfterAgentCallbacks(afterAgentCallback);
       return this;
     }
 
     @CanIgnoreReturnValue
     public Builder afterAgentCallbackSync(AfterAgentCallbackSync afterAgentCallbackSync) {
       this.afterAgentCallback =
-          (callbackContext) -> Maybe.fromOptional(afterAgentCallbackSync.call(callbackContext));
+          ImmutableList.of(
+              (callbackContext) ->
+                  Maybe.fromOptional(afterAgentCallbackSync.call(callbackContext)));
       return this;
     }
 
