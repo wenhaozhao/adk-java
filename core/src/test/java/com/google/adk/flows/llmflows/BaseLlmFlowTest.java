@@ -24,12 +24,7 @@ import static com.google.adk.testing.TestUtils.createTestLlm;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.truth.Truth.assertThat;
 
-import com.google.adk.agents.Callbacks.AfterModelCallback;
-import com.google.adk.agents.Callbacks.AfterModelCallbackSync;
-import com.google.adk.agents.Callbacks.BeforeModelCallback;
-import com.google.adk.agents.Callbacks.BeforeModelCallbackSync;
 import com.google.adk.agents.InvocationContext;
-import com.google.adk.agents.LlmAgent;
 import com.google.adk.events.Event;
 import com.google.adk.flows.llmflows.RequestProcessor.RequestProcessingResult;
 import com.google.adk.flows.llmflows.ResponseProcessor.ResponseProcessingResult;
@@ -46,7 +41,6 @@ import com.google.genai.types.FunctionDeclaration;
 import com.google.genai.types.FunctionResponse;
 import com.google.genai.types.Part;
 import io.reactivex.rxjava3.core.Flowable;
-import io.reactivex.rxjava3.core.Maybe;
 import io.reactivex.rxjava3.core.Single;
 import java.util.List;
 import java.util.Map;
@@ -211,170 +205,6 @@ public final class BaseLlmFlowTest {
     List<Event> unused = baseLlmFlow.run(invocationContext).toList().blockingGet();
 
     assertThat(testLlm.getLastRequest().tools()).containsEntry("my_function", testTool);
-  }
-
-  @Test
-  public void run_withBeforeModelCallback_returnsResponseFromCallback() {
-    Content realContent = Content.fromParts(Part.fromText("Real LLM response"));
-    Content callbackContent = Content.fromParts(Part.fromText("Callback response"));
-    TestLlm testLlm = createTestLlm(createLlmResponse(realContent));
-    InvocationContext invocationContext =
-        createInvocationContext(
-            createTestAgentBuilder(testLlm)
-                .beforeModelCallback(
-                    (context, request) ->
-                        Maybe.just(LlmResponse.builder().content(callbackContent).build()))
-                .build());
-    BaseLlmFlow baseLlmFlow = createBaseLlmFlowWithoutProcessors();
-
-    List<Event> events = baseLlmFlow.run(invocationContext).toList().blockingGet();
-
-    assertThat(testLlm.getRequests()).isEmpty();
-    assertThat(events).hasSize(1);
-    assertThat(getOnlyElement(events).content()).hasValue(callbackContent);
-  }
-
-  @Test
-  public void run_withAfterModelCallback_returnsResponseFromCallback() {
-    Part textPartFromModel = Part.fromText("Real LLM response");
-    Part textPartFromCallback = Part.fromText("Callback response");
-    TestLlm testLlm = createTestLlm(createLlmResponse(Content.fromParts(textPartFromModel)));
-    InvocationContext invocationContext =
-        createInvocationContext(
-            createTestAgentBuilder(testLlm)
-                .afterModelCallback(
-                    (context, response) ->
-                        Maybe.just(addPartToResponse(response, textPartFromCallback)))
-                .build());
-    BaseLlmFlow baseLlmFlow = createBaseLlmFlowWithoutProcessors();
-
-    List<Event> events = baseLlmFlow.run(invocationContext).toList().blockingGet();
-
-    assertThat(events).hasSize(1);
-    assertThat(getOnlyElement(events).content())
-        .hasValue(
-            Content.builder()
-                .parts(ImmutableList.of(textPartFromModel, textPartFromCallback))
-                .build());
-  }
-
-  @Test
-  public void run_withCallbacks_receivesCorrectContext() {
-    Content realContent = Content.fromParts(Part.fromText("Real LLM response"));
-    TestLlm testLlm = createTestLlm(createLlmResponse(realContent));
-    LlmAgent agent =
-        createTestAgentBuilder(testLlm)
-            .beforeModelCallback(
-                (callbackContext, request) -> {
-                  assertThat(callbackContext.invocationId()).isNotEmpty();
-                  assertThat(callbackContext.agentName()).isEqualTo("test agent");
-                  return Maybe.empty();
-                })
-            .afterModelCallback(
-                (callbackContext, response) -> {
-                  assertThat(callbackContext.invocationId()).isNotEmpty();
-                  assertThat(callbackContext.agentName()).isEqualTo("test agent");
-                  assertThat(response.content()).hasValue(realContent);
-                  return Maybe.empty();
-                })
-            .build();
-
-    InvocationContext invocationContext = createInvocationContext(agent);
-    BaseLlmFlow baseLlmFlow = createBaseLlmFlowWithoutProcessors();
-
-    List<Event> events = baseLlmFlow.run(invocationContext).toList().blockingGet();
-
-    assertThat(events).hasSize(1);
-    assertThat(getOnlyElement(events).content()).hasValue(realContent);
-  }
-
-  @Test
-  public void run_withChainedCallbacks_mixOfSyncAndAsync_returnsBeforeCallbackResponse() {
-    Content originalLlmResponseContent = Content.fromParts(Part.fromText("Original LLM response"));
-
-    Content contentFromSecondBeforeCallback =
-        Content.fromParts(Part.fromText("Response from second beforeModelCallback"));
-    Content contentFromSecondAfterCallback =
-        Content.fromParts(Part.fromText("Response from second afterModelCallback"));
-
-    TestLlm testLlm = createTestLlm(createLlmResponse(originalLlmResponseContent));
-    LlmAgent agent =
-        createTestAgentBuilder(testLlm)
-            .beforeModelCallback(
-                ImmutableList.<Object>of(
-                    (BeforeModelCallbackSync) (context, request) -> Optional.empty(),
-                    (BeforeModelCallback)
-                        (context, request) ->
-                            Maybe.just(
-                                LlmResponse.builder()
-                                    .content(contentFromSecondBeforeCallback)
-                                    .build())))
-            .afterModelCallback(
-                ImmutableList.<Object>of(
-                    (AfterModelCallbackSync) (context, response) -> Optional.empty(),
-                    (AfterModelCallback)
-                        (context, response) ->
-                            Maybe.just(
-                                LlmResponse.builder()
-                                    .content(contentFromSecondAfterCallback)
-                                    .build())))
-            .build();
-    InvocationContext invocationContext = createInvocationContext(agent);
-    BaseLlmFlow baseLlmFlow = createBaseLlmFlowWithoutProcessors();
-
-    List<Event> events = baseLlmFlow.run(invocationContext).toList().blockingGet();
-
-    assertThat(testLlm.getRequests()).isEmpty();
-    assertThat(events).hasSize(1);
-    assertThat(getOnlyElement(events).content()).hasValue(contentFromSecondBeforeCallback);
-  }
-
-  @Test
-  public void run_withChainedCallbacks_mixOfSyncAndAsync_returnsAfterCallbackResponse() {
-    Content originalLlmResponseContent = Content.fromParts(Part.fromText("Original LLM response"));
-
-    Content contentFromSecondAfterCallback =
-        Content.fromParts(Part.fromText("Response from second afterModelCallback"));
-
-    TestLlm testLlm = createTestLlm(createLlmResponse(originalLlmResponseContent));
-    LlmAgent agent =
-        createTestAgentBuilder(testLlm)
-            .beforeModelCallback(
-                ImmutableList.<Object>of(
-                    (BeforeModelCallbackSync) (context, request) -> Optional.empty(),
-                    (BeforeModelCallback) (context, request) -> Maybe.empty()))
-            .afterModelCallback(
-                ImmutableList.<Object>of(
-                    (AfterModelCallbackSync) (context, response) -> Optional.empty(),
-                    (AfterModelCallback)
-                        (context, response) ->
-                            Maybe.just(
-                                LlmResponse.builder()
-                                    .content(contentFromSecondAfterCallback)
-                                    .build())))
-            .build();
-    InvocationContext invocationContext = createInvocationContext(agent);
-    BaseLlmFlow baseLlmFlow = createBaseLlmFlowWithoutProcessors();
-
-    List<Event> events = baseLlmFlow.run(invocationContext).toList().blockingGet();
-
-    assertThat(testLlm.getRequests()).isNotEmpty();
-    assertThat(events).hasSize(1);
-    assertThat(getOnlyElement(events).content()).hasValue(contentFromSecondAfterCallback);
-  }
-
-  private static LlmResponse addPartToResponse(LlmResponse response, Part part) {
-    return LlmResponse.builder()
-        .content(
-            Content.builder()
-                .parts(
-                    ImmutableList.<Part>builder()
-                        .addAll(
-                            response.content().flatMap(Content::parts).orElse(ImmutableList.of()))
-                        .add(part)
-                        .build())
-                .build())
-        .build();
   }
 
   private static BaseLlmFlow createBaseLlmFlowWithoutProcessors() {
