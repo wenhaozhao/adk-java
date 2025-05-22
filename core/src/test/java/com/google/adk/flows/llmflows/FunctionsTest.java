@@ -577,6 +577,69 @@ public final class FunctionsTest {
                 .build());
   }
 
+  @Test
+  public void populateClientFunctionCallId_withMissingId_populatesId() {
+    Event event =
+        createEvent("event").toBuilder()
+            .content(
+                Content.fromParts(
+                    Part.builder()
+                        .functionCall(
+                            FunctionCall.builder()
+                                .name("echo_tool")
+                                .args(ImmutableMap.of("key", "value"))
+                                .build())
+                        .build()))
+            .build();
+
+    Functions.populateClientFunctionCallId(event);
+    FunctionCall functionCall = event.content().get().parts().get().get(0).functionCall().get();
+    assertThat(functionCall.id()).isPresent();
+    assertThat(functionCall.id().get()).isNotEmpty();
+  }
+
+  @Test
+  public void populateClientFunctionCallId_withEmptyId_populatesId() {
+    Event event =
+        createEvent("event").toBuilder()
+            .content(
+                Content.fromParts(
+                    Part.builder()
+                        .functionCall(
+                            FunctionCall.builder()
+                                .name("echo_tool")
+                                .id("")
+                                .args(ImmutableMap.of("key", "value"))
+                                .build())
+                        .build()))
+            .build();
+
+    Functions.populateClientFunctionCallId(event);
+    FunctionCall functionCall = event.content().get().parts().get().get(0).functionCall().get();
+    assertThat(functionCall.id()).isPresent();
+    assertThat(functionCall.id().get()).isNotEmpty();
+  }
+
+  @Test
+  public void populateClientFunctionCallId_withExistingId_noChange() {
+    Event event =
+        createEvent("event").toBuilder()
+            .content(
+                Content.fromParts(
+                    Part.builder()
+                        .functionCall(
+                            FunctionCall.builder()
+                                .name("echo_tool")
+                                .id("some_id")
+                                .args(ImmutableMap.of("key", "value"))
+                                .build())
+                        .build()))
+            .build();
+
+    Functions.populateClientFunctionCallId(event);
+    assertThat(event).isEqualTo(event);
+  }
+
   private static class EchoTool extends BaseTool {
     EchoTool() {
       super("echo_tool", "description");
