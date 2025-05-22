@@ -100,11 +100,11 @@
       <artifactId>anthropic-java</artifactId>
       <version>1.4.0</version>
     </dependency>
-    <dependency>  
-    <groupId>com.anthropic</groupId>  
-    <artifactId>anthropic-java-vertex</artifactId>  
-    <version>1.4.0</version>  
-</dependency>
+    <dependency>
+      <groupId>com.anthropic</groupId>
+      <artifactId>anthropic-java-vertex</artifactId>
+      <version>1.4.0</version>
+    </dependency>
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-speech</artifactId>
