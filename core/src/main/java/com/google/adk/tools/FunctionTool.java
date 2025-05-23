@@ -151,14 +151,14 @@ public class FunctionTool extends BaseTool {
           Type type =
               ((ParameterizedType) parameters[i].getParameterizedType())
                   .getActualTypeArguments()[0];
-          arguments[i] = createList((List<Object>) argValue, paramName, (Class) type);
+          arguments[i] = createList((List<Object>) argValue, (Class) type);
           continue;
         }
       } else if (argValue instanceof Map) {
-        arguments[i] = OBJECT_MAPPER.convertValue((Map<String, Object>) argValue, paramType);
+        arguments[i] = OBJECT_MAPPER.convertValue(argValue, paramType);
         continue;
       }
-      arguments[i] = castValue(argValue, paramName, paramType);
+      arguments[i] = castValue(argValue, paramType);
     }
     Object result = func.invoke(null, arguments);
     if (result == null) {
@@ -171,11 +171,11 @@ public class FunctionTool extends BaseTool {
   }
 
   @SuppressWarnings("unchecked") // For tool parameter type casting.
-  private static List<Object> createList(List<Object> values, String name, Class<?> type)
+  private static List<Object> createList(List<Object> values, Class<?> type)
       throws JsonProcessingException, InvalidProtocolBufferException {
     List<Object> list = new ArrayList<>();
     // List of parameterized type is not supported.
-    if (!(type instanceof Class)) {
+    if (type == null) {
       return list;
     }
     Class<?> cls = (Class<?>) type;
@@ -186,7 +186,7 @@ public class FunctionTool extends BaseTool {
           || cls == Float.class
           || cls == Boolean.class
           || cls == String.class) {
-        list.add(castValue(value, name, cls));
+        list.add(castValue(value, cls));
       } else {
         list.add(OBJECT_MAPPER.convertValue((Map<String, Object>) value, type));
       }
@@ -194,7 +194,7 @@ public class FunctionTool extends BaseTool {
     return list;
   }
 
-  private static Object castValue(Object value, String name, Class<?> type) {
+  private static Object castValue(Object value, Class<?> type) {
     if (type.equals(Integer.class) || type.equals(int.class)) {
       if (value instanceof Integer) {
         return value;
