@@ -64,8 +64,7 @@ public final class LongRunningFunctionToolTest {
     setUpAgentAndRunner(
         allLlmResponses, longRunningTool, "test description for pending and results");
 
-    Content firstUserContent =
-        Content.builder().role("user").parts(ImmutableList.of(Part.fromText("test1"))).build();
+    Content firstUserContent = Content.fromParts(Part.fromText("test1"));
 
     ImmutableMap<String, Object> expectedInitialToolResponseMap;
     expectedInitialToolResponseMap = ImmutableMap.of("status", "pending");
@@ -186,8 +185,7 @@ public final class LongRunningFunctionToolTest {
       String expectedTextResponse,
       int expectedRequestCount) {
     Part responsePart = Part.fromFunctionResponse(functionName, responseMap);
-    Content responseContent =
-        Content.builder().role("user").parts(ImmutableList.of(responsePart)).build();
+    Content responseContent = Content.fromParts(responsePart);
     List<Event> events =
         runner.runAsync(session.userId(), session.id(), responseContent).toList().blockingGet();
     assertThat(testLlm.getRequests()).hasSize(expectedRequestCount);

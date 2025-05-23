@@ -101,11 +101,7 @@ public class AgentTool extends BaseTool {
       }
     } else {
       Object input = args.get("request");
-      content =
-          Content.builder()
-              .role("user")
-              .parts(ImmutableList.of(Part.builder().text(input.toString()).build()))
-              .build();
+      content = Content.fromParts(Part.fromText(input.toString()));
     }
 
     Runner runner = new InMemoryRunner(this.agent, toolContext.agentName());

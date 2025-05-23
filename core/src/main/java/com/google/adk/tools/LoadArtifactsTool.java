@@ -169,11 +169,7 @@ public final class LoadArtifactsTool extends BaseTool {
     llmRequestBuilder.contents(
         ImmutableList.<Content>builder()
             .addAll(llmRequestBuilder.build().contents())
-            .add(
-                Content.builder()
-                    .role("user")
-                    .parts(ImmutableList.of(Part.fromText(prefix), artifact))
-                    .build())
+            .add(Content.fromParts(Part.fromText(prefix), artifact))
             .build());
   }
 }
