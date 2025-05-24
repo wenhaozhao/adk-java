@@ -78,8 +78,7 @@ public class AgentTool extends BaseTool {
   }
 
   @Override
-  public Single<Map<String, Object>> runAsync(
-      Map<String, Object> args, ToolContext toolContext) {
+  public Single<Map<String, Object>> runAsync(Map<String, Object> args, ToolContext toolContext) {
 
     if (this.skipSummarization) {
       toolContext.actions().setSkipSummarization(true);
@@ -102,11 +101,7 @@ public class AgentTool extends BaseTool {
       }
     } else {
       Object input = args.get("request");
-      content =
-          Content.builder()
-              .role("user")
-              .parts(ImmutableList.of(Part.builder().text(input.toString()).build()))
-              .build();
+      content = Content.fromParts(Part.fromText(input.toString()));
     }
 
     Runner runner = new InMemoryRunner(this.agent, toolContext.agentName());

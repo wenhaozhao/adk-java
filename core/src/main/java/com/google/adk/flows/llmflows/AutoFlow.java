@@ -17,18 +17,17 @@
 package com.google.adk.flows.llmflows;
 
 import com.google.common.collect.ImmutableList;
-import java.util.List;
 
 /** */
 public class AutoFlow extends SingleFlow {
 
-  private static final List<RequestProcessor> REQUEST_PROCESSORS =
+  private static final ImmutableList<RequestProcessor> REQUEST_PROCESSORS =
       ImmutableList.<RequestProcessor>builder()
           .addAll(SingleFlow.REQUEST_PROCESSORS)
           .add(new AgentTransfer())
           .build();
 
-  private static final List<ResponseProcessor> RESPONSE_PROCESSORS = ImmutableList.of();
+  private static final ImmutableList<ResponseProcessor> RESPONSE_PROCESSORS = ImmutableList.of();
 
   public AutoFlow() {
     super(REQUEST_PROCESSORS, RESPONSE_PROCESSORS);

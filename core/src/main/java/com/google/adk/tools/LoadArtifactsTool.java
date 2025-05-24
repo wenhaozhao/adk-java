@@ -68,8 +68,7 @@ public final class LoadArtifactsTool extends BaseTool {
   }
 
   @Override
-  public Single<Map<String, Object>> runAsync(
-      Map<String, Object> args, ToolContext toolContext) {
+  public Single<Map<String, Object>> runAsync(Map<String, Object> args, ToolContext toolContext) {
     @SuppressWarnings("unchecked")
     List<String> artifactNames =
         (List<String>) args.getOrDefault("artifact_names", ImmutableList.of());
@@ -170,11 +169,7 @@ public final class LoadArtifactsTool extends BaseTool {
     llmRequestBuilder.contents(
         ImmutableList.<Content>builder()
             .addAll(llmRequestBuilder.build().contents())
-            .add(
-                Content.builder()
-                    .role("user")
-                    .parts(ImmutableList.of(Part.fromText(prefix), artifact))
-                    .build())
+            .add(Content.fromParts(Part.fromText(prefix), artifact))
             .build());
   }
 }

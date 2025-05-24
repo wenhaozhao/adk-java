@@ -72,6 +72,9 @@ public final class SchemaUtils {
       case TYPE_UNSPECIFIED:
         throw new IllegalArgumentException(
             "Unsupported type: " + type + " is not a Open API data type.");
+      default:
+        // This category includes NULL, which is not supported.
+        break;
     }
     return false;
   }

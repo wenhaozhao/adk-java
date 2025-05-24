@@ -233,11 +233,7 @@ public class Gemini extends BaseLlm {
     List<Content> contents = llmRequest.contents();
     // Last content must be from the user, otherwise the model won't respond.
     if (contents.isEmpty() || !contents.get(contents.size() - 1).role().orElse("").equals("user")) {
-      Content userContent =
-          Content.builder()
-              .role("user")
-              .parts(ImmutableList.of(Part.builder().text(CONTINUE_OUTPUT_MESSAGE).build()))
-              .build();
+      Content userContent = Content.fromParts(Part.fromText(CONTINUE_OUTPUT_MESSAGE));
       contents =
           Stream.concat(contents.stream(), Stream.of(userContent)).collect(Collectors.toList());
     }
