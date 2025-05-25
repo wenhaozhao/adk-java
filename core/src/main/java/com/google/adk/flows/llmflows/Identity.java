@@ -19,6 +19,7 @@ package com.google.adk.flows.llmflows;
 import com.google.adk.agents.BaseAgent;
 import com.google.adk.agents.InvocationContext;
 import com.google.adk.models.LlmRequest;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import io.reactivex.rxjava3.core.Single;
 
@@ -36,7 +37,7 @@ public final class Identity implements RequestProcessor {
             .append("You are an agent. Your internal name is ")
             .append(agent.name())
             .append(".");
-    if (!agent.description().isEmpty()) {
+    if (!Strings.isNullOrEmpty(agent.description())) {
       builder.append(" The description about you is ").append(agent.description());
     }
     return Single.just(
