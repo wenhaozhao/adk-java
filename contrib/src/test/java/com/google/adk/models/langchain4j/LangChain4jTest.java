@@ -1,4 +1,4 @@
-package com.google.adk.models;
+package com.google.adk.models.langchain4j;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -23,9 +23,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static dev.langchain4j.model.anthropic.AnthropicChatModelName.CLAUDE_3_7_SONNET_20250219;
-
 public class LangChain4jTest {
+
+    static final String CLAUDE_3_7_SONNET_20250219 = "claude-3-7-sonnet-20250219";
+
     @Test
     void testSimpleAgent() {
         // given
@@ -37,7 +38,7 @@ public class LangChain4jTest {
         LlmAgent agent = LlmAgent.builder()
             .name("science-app")
             .description("Science teacher agent")
-            .model(new LangChain4j(claudeModel, CLAUDE_3_7_SONNET_20250219.toString()))
+            .model(new LangChain4j(claudeModel, CLAUDE_3_7_SONNET_20250219))
             .instruction("""
                 You are a helpful science teacher that explains science concepts
                 to kids and teenagers.
@@ -69,7 +70,7 @@ public class LangChain4jTest {
         BaseAgent agent = LlmAgent.builder()
             .name("friendly-weather-app")
             .description("Friend agent that knows about the weather")
-            .model(new LangChain4j(claudeModel, CLAUDE_3_7_SONNET_20250219.toString()))
+            .model(new LangChain4j(claudeModel, CLAUDE_3_7_SONNET_20250219))
             .instruction("""
                 You are a friendly assistant.
                 

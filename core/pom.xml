@@ -171,17 +171,6 @@
         <version>${protobuf.version}</version>
     </dependency>
     <dependency>
-      <groupId>dev.langchain4j</groupId>
-      <artifactId>langchain4j-core</artifactId>
-      <version>${langchain4j.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>dev.langchain4j</groupId>
-      <artifactId>langchain4j-anthropic</artifactId>
-      <version>1.0.1-beta6</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
       <groupId>org.java-websocket</groupId>
       <artifactId>Java-WebSocket</artifactId>
       <version>${java-websocket.version}</version>
