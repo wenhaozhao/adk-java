@@ -47,6 +47,7 @@ import com.google.genai.types.GenerateContentConfig;
 import com.google.genai.types.Schema;
 import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.core.Maybe;
+import io.reactivex.rxjava3.core.Single;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -72,8 +73,8 @@ public class LlmAgent extends BaseAgent {
   }
 
   private final Optional<Model> model;
-  private final Optional<String> instruction;
-  private final Optional<String> globalInstruction;
+  private final Instruction instruction;
+  private final Instruction globalInstruction;
   private final List<BaseTool> tools;
   private final Optional<GenerateContentConfig> generateContentConfig;
   private final Optional<BaseExampleProvider> exampleProvider;
@@ -102,9 +103,10 @@ public class LlmAgent extends BaseAgent {
         builder.beforeAgentCallback,
         builder.afterAgentCallback);
     this.model = Optional.ofNullable(builder.model);
-    this.instruction = Optional.ofNullable(builder.instruction);
-    this.globalInstruction = Optional.ofNullable(builder.globalInstruction);
-
+    this.instruction =
+        builder.instruction == null ? new Instruction.Static("") : builder.instruction;
+    this.globalInstruction =
+        builder.globalInstruction == null ? new Instruction.Static("") : builder.globalInstruction;
     this.generateContentConfig = Optional.ofNullable(builder.generateContentConfig);
     this.exampleProvider = Optional.ofNullable(builder.exampleProvider);
     this.includeContents =
@@ -139,8 +141,9 @@ public class LlmAgent extends BaseAgent {
     private String description;
 
     private Model model;
-    private String instruction;
-    private String globalInstruction;
+
+    private Instruction instruction;
+    private Instruction globalInstruction;
     private List<BaseAgent> subAgents;
     private List<BaseTool> tools;
     private GenerateContentConfig generateContentConfig;
@@ -185,14 +188,27 @@ public class LlmAgent extends BaseAgent {
     }
 
     @CanIgnoreReturnValue
-    public Builder instruction(String instruction) {
+    public Builder instruction(Instruction instruction) {
       this.instruction = instruction;
       return this;
     }
 
     @CanIgnoreReturnValue
-    public Builder globalInstruction(String globalInstruction) {
+    public Builder instruction(String instruction) {
+      this.instruction = (instruction == null) ? null : new Instruction.Static(instruction);
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    public Builder globalInstruction(Instruction globalInstruction) {
       this.globalInstruction = globalInstruction;
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    public Builder globalInstruction(String globalInstruction) {
+      this.globalInstruction =
+          (globalInstruction == null) ? null : new Instruction.Static(globalInstruction);
       return this;
     }
 
@@ -620,11 +636,46 @@ public class LlmAgent extends BaseAgent {
     return llmFlow.runLive(invocationContext).doOnNext(this::maybeSaveOutputToState);
   }
 
-  public Optional<String> instruction() {
+  /**
+   * Constructs the text instruction for this agent based on the {@link #instruction} field.
+   *
+   * <p>This method is only for use by Agent Development Kit.
+   *
+   * @param context The context to retrieve the session state.
+   * @return The resolved instruction as a {@link Single} wrapped string.
+   */
+  public Single<String> canonicalInstruction(ReadonlyContext context) {
+    if (instruction instanceof Instruction.Static staticInstr) {
+      return Single.just(staticInstr.instruction());
+    } else if (instruction instanceof Instruction.Provider provider) {
+      return provider.getInstruction().apply(context);
+    }
+    throw new IllegalStateException("Unknown Instruction subtype: " + instruction.getClass());
+  }
+
+  /**
+   * Constructs the text global instruction for this agent based on the {@link #globalInstruction}
+   * field.
+   *
+   * <p>This method is only for use by Agent Development Kit.
+   *
+   * @param context The context to retrieve the session state.
+   * @return The resolved global instruction as a {@link Single} wrapped string.
+   */
+  public Single<String> canonicalGlobalInstruction(ReadonlyContext context) {
+    if (globalInstruction instanceof Instruction.Static staticInstr) {
+      return Single.just(staticInstr.instruction());
+    } else if (globalInstruction instanceof Instruction.Provider provider) {
+      return provider.getInstruction().apply(context);
+    }
+    throw new IllegalStateException("Unknown Instruction subtype: " + instruction.getClass());
+  }
+
+  public Instruction instruction() {
     return instruction;
   }
 
-  public Optional<String> globalInstruction() {
+  public Instruction globalInstruction() {
     return globalInstruction;
   }
 

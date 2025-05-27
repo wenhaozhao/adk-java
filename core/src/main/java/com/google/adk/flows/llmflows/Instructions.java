@@ -18,6 +18,7 @@ package com.google.adk.flows.llmflows;
 
 import com.google.adk.agents.InvocationContext;
 import com.google.adk.agents.LlmAgent;
+import com.google.adk.agents.ReadonlyContext;
 import com.google.adk.models.LlmRequest;
 import com.google.adk.sessions.Session;
 import com.google.adk.sessions.State;
@@ -39,27 +40,48 @@ public final class Instructions implements RequestProcessor {
   public Single<RequestProcessor.RequestProcessingResult> processRequest(
       InvocationContext context, LlmRequest request) {
     if (!(context.agent() instanceof LlmAgent)) {
-      throw new IllegalArgumentException("Agent in InvocationContext is not an instance of Agent.");
+      return Single.error(
+          new IllegalArgumentException(
+              "Agent in InvocationContext is not an instance of LlmAgent."));
     }
     LlmAgent agent = (LlmAgent) context.agent();
-
-    LlmRequest.Builder builder = request.toBuilder();
+    ReadonlyContext readonlyContext = new ReadonlyContext(context);
+    Single<LlmRequest.Builder> builderSingle = Single.just(request.toBuilder());
     if (agent.rootAgent() instanceof LlmAgent) {
       LlmAgent rootAgent = (LlmAgent) agent.rootAgent();
-
-      if (rootAgent.globalInstruction().isPresent()) {
-        builder.appendInstructions(
-            ImmutableList.of(buildSystemInstruction(context, rootAgent.globalInstruction().get())));
-      }
+      builderSingle =
+          builderSingle.flatMap(
+              builder ->
+                  rootAgent
+                      .canonicalGlobalInstruction(readonlyContext)
+                      .map(
+                          globalInstr -> {
+                            if (!globalInstr.isEmpty()) {
+                              builder.appendInstructions(
+                                  ImmutableList.of(buildSystemInstruction(context, globalInstr)));
+                            }
+                            return builder;
+                          }));
     }
 
-    if (agent.instruction().isPresent()) {
-      builder.appendInstructions(
-          ImmutableList.of(buildSystemInstruction(context, agent.instruction().get())));
-    }
+    builderSingle =
+        builderSingle.flatMap(
+            builder ->
+                agent
+                    .canonicalInstruction(readonlyContext)
+                    .map(
+                        agentInstr -> {
+                          if (!agentInstr.isEmpty()) {
+                            builder.appendInstructions(
+                                ImmutableList.of(buildSystemInstruction(context, agentInstr)));
+                          }
+                          return builder;
+                        }));
 
-    return Single.just(
-        RequestProcessor.RequestProcessingResult.create(builder.build(), ImmutableList.of()));
+    return builderSingle.map(
+        finalBuilder ->
+            RequestProcessor.RequestProcessingResult.create(
+                finalBuilder.build(), ImmutableList.of()));
   }
 
   private String buildSystemInstruction(InvocationContext context, String instructionTemplate) {
@@ -85,7 +107,7 @@ public final class Instructions implements RequestProcessor {
                 .artifactService()
                 .loadArtifact(
                     session.appName(), session.userId(), session.id(), varName, Optional.empty())
-                .blockingGet(null);
+                .blockingGet();
         if (artifact == null) {
           throw new IllegalArgumentException(String.format("Artifact %s not found.", varName));
         }
