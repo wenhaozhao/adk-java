@@ -184,6 +184,10 @@ public final class TestUtils {
     return createTestLlm(Arrays.asList(responses).iterator()::next);
   }
 
+  public static TestLlm createTestLlm(LlmResponse... responses) {
+    return new TestLlm(Arrays.asList(responses));
+  }
+
   public static TestLlm createTestLlm(Supplier<Flowable<LlmResponse>> responsesSupplier) {
     return new TestLlm(responsesSupplier);
   }

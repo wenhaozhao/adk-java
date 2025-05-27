@@ -540,7 +540,6 @@ public final class CallbacksTest {
         .build();
   }
 
-  // Tool callback tests moved from FunctionsTest
   @Test
   public void handleFunctionCalls_withBeforeToolCallback_returnsBeforeToolCallbackResult() {
     ImmutableMap<String, Object> beforeToolCallbackResult =
@@ -943,5 +942,138 @@ public final class CallbacksTest {
                                 ImmutableMap.of("before_tool_callback_result", "value")))
                         .build())
                 .build());
+  }
+
+  @Test
+  public void handleFunctionCalls_withChainedToolCallbacks_overridesResultAndPassesContext() {
+    ImmutableMap<String, Object> originalToolInputArgs =
+        ImmutableMap.of("input_key", "input_value");
+    ImmutableMap<String, Object> stateAddedByBc2 =
+        ImmutableMap.of("bc2_state_key", "bc2_state_value");
+    ImmutableMap<String, Object> responseFromAc2 =
+        ImmutableMap.of("ac2_response_key", "ac2_response_value");
+
+    Callbacks.BeforeToolCallbackSync bc1 =
+        (invCtx, toolName, args, currentToolCtx) -> Optional.empty();
+
+    Callbacks.BeforeToolCallbackSync bc2 =
+        (invCtx, toolName, args, currentToolCtx) -> {
+          currentToolCtx.state().putAll(stateAddedByBc2);
+          return Optional.empty();
+        };
+
+    TestUtils.EchoTool echoTool = new TestUtils.EchoTool();
+
+    Callbacks.AfterToolCallbackSync ac1 =
+        (invCtx, toolName, args, currentToolCtx, responseFromTool) -> Optional.empty();
+
+    Callbacks.AfterToolCallbackSync ac2 =
+        (invCtx, toolName, args, currentToolCtx, responseFromTool) -> Optional.of(responseFromAc2);
+
+    InvocationContext invocationContext =
+        createInvocationContext(
+            createTestAgentBuilder(createTestLlm(LlmResponse.builder().build()))
+                .beforeToolCallback(ImmutableList.<Object>of(bc1, bc2))
+                .afterToolCallback(ImmutableList.<Object>of(ac1, ac2))
+                .build());
+
+    Event eventWithFunctionCall =
+        createEvent("event").toBuilder()
+            .content(createFunctionCallContent("fc_id_minimal", "echo_tool", originalToolInputArgs))
+            .build();
+
+    Event functionResponseEvent =
+        Functions.handleFunctionCalls(
+                invocationContext, eventWithFunctionCall, ImmutableMap.of("echo_tool", echoTool))
+            .blockingGet();
+
+    assertThat(getFunctionResponse(functionResponseEvent)).isEqualTo(responseFromAc2);
+    assertThat(invocationContext.session().state()).containsExactlyEntriesIn(stateAddedByBc2);
+  }
+
+  @Test
+  public void agentRunAsync_withToolCallbacks_inspectsArgsAndReturnsResponse() {
+    TestUtils.EchoTool echoTool = new TestUtils.EchoTool();
+    String toolName = echoTool.declaration().get().name().get();
+    ImmutableMap<String, Object> functionArgs = ImmutableMap.of("message", "hello");
+
+    Content llmFunctionCallContent =
+        Content.builder()
+            .role("model")
+            .parts(ImmutableList.of(Part.fromFunctionCall(toolName, functionArgs)))
+            .build();
+    Content llmTextContent =
+        Content.builder().role("model").parts(ImmutableList.of(Part.fromText("hi there"))).build();
+    TestLlm testLlm =
+        createTestLlm(createLlmResponse(llmFunctionCallContent), createLlmResponse(llmTextContent));
+
+    ImmutableMap<String, Object> responseFromAfterToolCallback =
+        ImmutableMap.of("final_wrapper", "wrapped_value_from_after_callback");
+
+    Callbacks.BeforeToolCallback beforeToolCb =
+        (invCtx, tName, args, toolCtx) -> {
+          assertThat(args).isEqualTo(functionArgs);
+          return Maybe.empty();
+        };
+
+    Callbacks.AfterToolCallback afterToolCb =
+        (invCtx, tName, args, toolCtx, toolResponse) -> {
+          assertThat(args).isEqualTo(functionArgs);
+          assertThat(toolResponse).isEqualTo(ImmutableMap.of("result", functionArgs));
+          return Maybe.just(responseFromAfterToolCallback);
+        };
+
+    LlmAgent agent =
+        createTestAgentBuilder(testLlm)
+            .tools(ImmutableList.of(echoTool))
+            .beforeToolCallback(beforeToolCb)
+            .afterToolCallback(afterToolCb)
+            .build();
+
+    InvocationContext invocationContext = createInvocationContext(agent);
+
+    List<Event> events = agent.runAsync(invocationContext).toList().blockingGet();
+
+    assertThat(testLlm.getRequests()).hasSize(2);
+    assertThat(events).hasSize(3);
+
+    var functionCall = getFunctionCall(events.get(0));
+    assertThat(functionCall.args().get()).isEqualTo(functionArgs);
+    assertThat(functionCall.name()).hasValue(toolName);
+
+    var functionResponse = getFunctionResponse(events.get(1));
+    assertThat(functionResponse).isEqualTo(responseFromAfterToolCallback);
+
+    assertThat(events.get(2).content()).hasValue(llmTextContent);
+  }
+
+  private static Content createFunctionCallContent(
+      String functionCallId, String toolName, Map<String, Object> args) {
+    return Content.builder()
+        .role("model")
+        .parts(
+            ImmutableList.of(
+                Part.builder()
+                    .functionCall(
+                        FunctionCall.builder().name(toolName).id(functionCallId).args(args).build())
+                    .build()))
+        .build();
+  }
+
+  private static Map<String, Object> getFunctionResponse(Event functionResponseEvent) {
+    return functionResponseEvent
+        .content()
+        .get()
+        .parts()
+        .get()
+        .get(0)
+        .functionResponse()
+        .get()
+        .response()
+        .get();
+  }
+
+  private static FunctionCall getFunctionCall(Event functionCallEvent) {
+    return functionCallEvent.content().get().parts().get().get(0).functionCall().get();
   }
 }
