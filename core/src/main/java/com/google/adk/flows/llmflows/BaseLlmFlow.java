@@ -417,15 +417,17 @@ public abstract class BaseLlmFlow implements BaseFlow {
             .observeOn(
                 agent.executor().map(executor -> Schedulers.from(executor)).orElse(Schedulers.io()))
             .andThen(
-                liveRequests.concatMapCompletable(
-                    request -> {
-                      if (request.content().isPresent()) {
-                        return connection.sendContent(request.content().get());
-                      } else if (request.blob().isPresent()) {
-                        return connection.sendRealtime(request.blob().get());
-                      }
-                      return Completable.fromAction(connection::close);
-                    }))
+                liveRequests
+                    .onBackpressureBuffer()
+                    .concatMapCompletable(
+                        request -> {
+                          if (request.content().isPresent()) {
+                            return connection.sendContent(request.content().get());
+                          } else if (request.blob().isPresent()) {
+                            return connection.sendRealtime(request.blob().get());
+                          }
+                          return Completable.fromAction(connection::close);
+                        }))
             .subscribeWith(
                 new DisposableCompletableObserver() {
                   @Override
