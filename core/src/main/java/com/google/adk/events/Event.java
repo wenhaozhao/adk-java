@@ -537,6 +537,11 @@ public class Event extends JsonBaseModel {
   }
 
   @Override
+  public String toString() {
+    return toJson();
+  }
+
+  @Override
   public int hashCode() {
     return Objects.hash(
         id,

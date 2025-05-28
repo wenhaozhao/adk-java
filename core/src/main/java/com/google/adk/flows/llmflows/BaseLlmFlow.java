@@ -152,7 +152,7 @@ public abstract class BaseLlmFlow implements BaseFlow {
               Optional<String> transferToAgent = Optional.empty();
               if (functionCallEventOpt.isPresent()) {
                 Event functionCallEvent = functionCallEventOpt.get();
-                logger.debug("Function call event generated: {}", functionCallEvent.toJson());
+                logger.debug("Function call event generated: {}", functionCallEvent);
                 eventIterables.add(Collections.singleton(functionCallEvent));
                 transferToAgent = functionCallEvent.actions().transferToAgent();
               }
