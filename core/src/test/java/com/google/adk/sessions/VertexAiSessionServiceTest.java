@@ -129,10 +129,11 @@ public class VertexAiSessionServiceTest {
         mapper
             .readValue(MOCK_EVENT_STRING, new TypeReference<List<Map<String, Object>>>() {})
             .get(0);
+    Map<String, Object> sessionState = (Map<String, Object>) sessionJson.get("sessionState");
     return Session.builder("1")
         .appName("123")
         .userId("user")
-        .state(new ConcurrentHashMap<>((Map<String, Object>) sessionJson.get("sessionState")))
+        .state(sessionState == null ? null : new ConcurrentHashMap<>(sessionState))
         .lastUpdateTime(Instant.parse((String) sessionJson.get("updateTime")))
         .events(
             Arrays.asList(
@@ -149,8 +150,7 @@ public class VertexAiSessionServiceTest {
                         EventActions.builder()
                             .transferToAgent("agent")
                             .stateDelta(
-                                new ConcurrentHashMap<>(
-                                    (Map<String, Object>) sessionJson.get("sessionState")))
+                                sessionState == null ? null : new ConcurrentHashMap<>(sessionState))
                             .build())
                     .partial(false)
                     .turnComplete(true)
@@ -167,14 +167,8 @@ public class VertexAiSessionServiceTest {
   // private final ObjectMapper objectMapper = new ObjectMapper();
   @Mock private ApiResponse mockApiResponse;
   private VertexAiSessionService vertexAiSessionService;
-  public Map<String, String> sessionMap =
-      new HashMap<String, String>(
-          ImmutableMap.of(
-              "1", MOCK_SESSION_STRING_1,
-              "2", MOCK_SESSION_STRING_2,
-              "3", MOCK_SESSION_STRING_3));
-  public Map<String, String> eventMap =
-      new HashMap<String, String>(ImmutableMap.of("1", MOCK_EVENT_STRING));
+  public Map<String, String> sessionMap = null;
+  public Map<String, String> eventMap = null;
 
   private static final Pattern LRO_REGEX = Pattern.compile("^operations/([^/]+)$");
   private static final Pattern SESSION_REGEX =
@@ -186,6 +180,14 @@ public class VertexAiSessionServiceTest {
 
   @Before
   public void setUp() throws Exception {
+    sessionMap =
+        new HashMap<>(
+            ImmutableMap.of(
+                "1", MOCK_SESSION_STRING_1,
+                "2", MOCK_SESSION_STRING_2,
+                "3", MOCK_SESSION_STRING_3));
+    eventMap = new HashMap<>(ImmutableMap.of("1", MOCK_EVENT_STRING));
+
     MockitoAnnotations.openMocks(this);
     vertexAiSessionService =
         new VertexAiSessionService("test-project", "test-location", mockApiClient);
@@ -210,9 +212,7 @@ public class VertexAiSessionServiceTest {
                           "projects/test-project/locations/test-location/reasoningEngines/123/sessions/%s",
                           newSessionId));
                   newSessionData.put("userId", requestDict.get("userId"));
-                  newSessionData.put(
-                      "sessionState",
-                      requestDict.getOrDefault("sessionState", new ConcurrentHashMap<>()));
+                  newSessionData.put("sessionState", requestDict.get("sessionState"));
                   newSessionData.put("updateTime", "2024-12-12T12:12:12.123456Z");
 
                   sessionMap.put(newSessionId, mapper.writeValueAsString(newSessionData));
@@ -362,9 +362,26 @@ public class VertexAiSessionServiceTest {
     String newSessionJson = sessionMap.get("4");
     ObjectMapper mapper = new ObjectMapper();
     Map<String, Object> newSessionMap =
-        mapper.readValue((String) newSessionJson, new TypeReference<Map<String, Object>>() {});
+        mapper.readValue(newSessionJson, new TypeReference<Map<String, Object>>() {});
     assertThat(newSessionMap.get("userId")).isEqualTo("test_user");
     assertThat(newSessionMap.get("sessionState")).isEqualTo(sessionStateMap);
+  }
+
+  @Test
+  public void createSession_noState_success() throws Exception {
+    Single<Session> sessionSingle = vertexAiSessionService.createSession("123", "test_user");
+    Session createdSession = sessionSingle.blockingGet();
+
+    // Assert that the session was created and its properties are correct
+    assertThat(createdSession.state()).isEmpty();
+
+    // Verify that the session is now in the sessionMap
+    assertThat(sessionMap.containsKey("4")).isTrue();
+    String newSessionJson = sessionMap.get("4");
+    ObjectMapper mapper = new ObjectMapper();
+    Map<String, Object> newSessionMap =
+        mapper.readValue(newSessionJson, new TypeReference<Map<String, Object>>() {});
+    assertThat(newSessionMap.get("sessionState")).isNull();
   }
 
   @Test
@@ -432,6 +449,7 @@ public class VertexAiSessionServiceTest {
   }
 
   @Test
+  // TODO: This test doesn't work as intended.  It uses MOCK_EVENT_STRING.
   public void appendEvent_success() {
     Session session =
         vertexAiSessionService.getSession("123", "user", "1", Optional.empty()).blockingGet();
