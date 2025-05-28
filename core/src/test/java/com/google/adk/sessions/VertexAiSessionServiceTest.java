@@ -470,4 +470,16 @@ public class VertexAiSessionServiceTest {
     assertThat(events).hasSize(1);
     assertThat(events.get(0).author()).isEqualTo("user");
   }
+
+  @Test
+  public void listSessions_empty() {
+    assertThat(vertexAiSessionService.listSessions("789", "user1").blockingGet().sessions())
+        .isEmpty();
+  }
+
+  @Test
+  public void listEvents_empty() {
+    assertThat(vertexAiSessionService.listEvents("789", "user1", "3").blockingGet().events())
+        .isEmpty();
+  }
 }

@@ -21,6 +21,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.adk.JsonBaseModel;
 import com.google.adk.events.Event;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -63,46 +64,54 @@ public final class Session extends JsonBaseModel {
     @JsonCreator
     private Builder() {}
 
+    @CanIgnoreReturnValue
     @JsonProperty("id")
     public Builder id(String id) {
       this.id = id;
       return this;
     }
 
+    @CanIgnoreReturnValue
     public Builder state(State state) {
       this.state = state;
       return this;
     }
 
+    @CanIgnoreReturnValue
     @JsonProperty("state")
     public Builder state(ConcurrentMap<String, Object> state) {
       this.state = new State(state);
       return this;
     }
 
+    @CanIgnoreReturnValue
     @JsonProperty("appName")
     public Builder appName(String appName) {
       this.appName = appName;
       return this;
     }
 
+    @CanIgnoreReturnValue
     @JsonProperty("userId")
     public Builder userId(String userId) {
       this.userId = userId;
       return this;
     }
 
+    @CanIgnoreReturnValue
     @JsonProperty("events")
     public Builder events(List<Event> events) {
       this.events = events;
       return this;
     }
 
+    @CanIgnoreReturnValue
     public Builder lastUpdateTime(Instant lastUpdateTime) {
       this.lastUpdateTime = lastUpdateTime;
       return this;
     }
 
+    @CanIgnoreReturnValue
     @JsonProperty("lastUpdateTime")
     public Builder lastUpdateTimeSeconds(double seconds) {
       long secs = (long) seconds;
@@ -161,6 +170,11 @@ public final class Session extends JsonBaseModel {
     long seconds = lastUpdateTime.getEpochSecond();
     int nanos = lastUpdateTime.getNano();
     return seconds + nanos / (double) TimeUnit.SECONDS.toNanos(1);
+  }
+
+  @Override
+  public String toString() {
+    return toJson();
   }
 
   public static Session fromJson(String json) {

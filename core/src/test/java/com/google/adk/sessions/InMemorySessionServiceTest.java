@@ -28,6 +28,24 @@ import org.junit.runners.JUnit4;
 public final class InMemorySessionServiceTest {
 
   @Test
+  public void lifecycle_noSession() {
+    InMemorySessionService sessionService = new InMemorySessionService();
+
+    assertThat(
+            sessionService
+                .getSession("app-name", "user-id", "session-id", Optional.empty())
+                .blockingGet())
+        .isNull();
+
+    assertThat(sessionService.listSessions("app-name", "user-id").blockingGet().sessions())
+        .isEmpty();
+
+    assertThat(
+            sessionService.listEvents("app-name", "user-id", "session-id").blockingGet().events())
+        .isEmpty();
+  }
+
+  @Test
   public void lifecycle_createSession() {
     InMemorySessionService sessionService = new InMemorySessionService();
 
