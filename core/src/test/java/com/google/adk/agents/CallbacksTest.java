@@ -248,9 +248,7 @@ public final class CallbacksTest {
         };
 
     LlmAgent agent =
-        createTestAgentBuilder(testLlm)
-            .beforeAgentCallback(ImmutableList.<Object>of(cb1, cb2))
-            .build();
+        createTestAgentBuilder(testLlm).beforeAgentCallback(ImmutableList.of(cb1, cb2)).build();
     InvocationContext invocationContext = createInvocationContext(agent);
 
     List<Event> events = agent.runAsync(invocationContext).toList().blockingGet();
@@ -282,9 +280,7 @@ public final class CallbacksTest {
         };
 
     LlmAgent agent =
-        createTestAgentBuilder(testLlm)
-            .beforeAgentCallback(ImmutableList.<Object>of(cb1, cb2))
-            .build();
+        createTestAgentBuilder(testLlm).beforeAgentCallback(ImmutableList.of(cb1, cb2)).build();
     InvocationContext invocationContext = createInvocationContext(agent);
 
     List<Event> events = agent.runAsync(invocationContext).toList().blockingGet();
@@ -323,9 +319,7 @@ public final class CallbacksTest {
         };
 
     LlmAgent agent =
-        createTestAgentBuilder(testLlm)
-            .afterAgentCallback(ImmutableList.<Object>of(cb1, cb2))
-            .build();
+        createTestAgentBuilder(testLlm).afterAgentCallback(ImmutableList.of(cb1, cb2)).build();
     InvocationContext invocationContext = createInvocationContext(agent);
 
     List<Event> events = agent.runAsync(invocationContext).toList().blockingGet();
@@ -362,9 +356,7 @@ public final class CallbacksTest {
         };
 
     LlmAgent agent =
-        createTestAgentBuilder(testLlm)
-            .afterAgentCallback(ImmutableList.<Object>of(cb1, cb2))
-            .build();
+        createTestAgentBuilder(testLlm).afterAgentCallback(ImmutableList.of(cb1, cb2)).build();
     InvocationContext invocationContext = createInvocationContext(agent);
 
     List<Event> events = agent.runAsync(invocationContext).toList().blockingGet();
@@ -468,7 +460,7 @@ public final class CallbacksTest {
     LlmAgent agent =
         createTestAgentBuilder(testLlm)
             .beforeModelCallback(
-                ImmutableList.<Object>of(
+                ImmutableList.of(
                     (Callbacks.BeforeModelCallbackSync) (context, request) -> Optional.empty(),
                     (Callbacks.BeforeModelCallback)
                         (context, request) ->
@@ -477,7 +469,7 @@ public final class CallbacksTest {
                                     .content(contentFromSecondBeforeCallback)
                                     .build())))
             .afterModelCallback(
-                ImmutableList.<Object>of(
+                ImmutableList.of(
                     (Callbacks.AfterModelCallbackSync) (context, response) -> Optional.empty(),
                     (Callbacks.AfterModelCallback)
                         (context, response) ->
@@ -505,11 +497,11 @@ public final class CallbacksTest {
     LlmAgent agent =
         createTestAgentBuilder(testLlm)
             .beforeModelCallback(
-                ImmutableList.<Object>of(
+                ImmutableList.of(
                     (Callbacks.BeforeModelCallbackSync) (context, request) -> Optional.empty(),
                     (Callbacks.BeforeModelCallback) (context, request) -> Maybe.empty()))
             .afterModelCallback(
-                ImmutableList.<Object>of(
+                ImmutableList.of(
                     (Callbacks.AfterModelCallbackSync) (context, response) -> Optional.empty(),
                     (Callbacks.AfterModelCallback)
                         (context, response) ->
@@ -973,8 +965,8 @@ public final class CallbacksTest {
     InvocationContext invocationContext =
         createInvocationContext(
             createTestAgentBuilder(createTestLlm(LlmResponse.builder().build()))
-                .beforeToolCallback(ImmutableList.<Object>of(bc1, bc2))
-                .afterToolCallback(ImmutableList.<Object>of(ac1, ac2))
+                .beforeToolCallback(ImmutableList.of(bc1, bc2))
+                .afterToolCallback(ImmutableList.of(ac1, ac2))
                 .build());
 
     Event eventWithFunctionCall =

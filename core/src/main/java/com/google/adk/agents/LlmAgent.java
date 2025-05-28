@@ -20,15 +20,21 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.adk.SchemaUtils;
 import com.google.adk.agents.Callbacks.AfterAgentCallback;
 import com.google.adk.agents.Callbacks.AfterAgentCallbackSync;
+import com.google.adk.agents.Callbacks.AfterAgentCallbackBase;
 import com.google.adk.agents.Callbacks.AfterModelCallback;
+import com.google.adk.agents.Callbacks.AfterModelCallbackBase;
 import com.google.adk.agents.Callbacks.AfterModelCallbackSync;
 import com.google.adk.agents.Callbacks.AfterToolCallback;
+import com.google.adk.agents.Callbacks.AfterToolCallbackBase;
 import com.google.adk.agents.Callbacks.AfterToolCallbackSync;
 import com.google.adk.agents.Callbacks.BeforeAgentCallback;
+import com.google.adk.agents.Callbacks.BeforeAgentCallbackBase;
 import com.google.adk.agents.Callbacks.BeforeAgentCallbackSync;
 import com.google.adk.agents.Callbacks.BeforeModelCallback;
+import com.google.adk.agents.Callbacks.BeforeModelCallbackBase;
 import com.google.adk.agents.Callbacks.BeforeModelCallbackSync;
 import com.google.adk.agents.Callbacks.BeforeToolCallback;
+import com.google.adk.agents.Callbacks.BeforeToolCallbackBase;
 import com.google.adk.agents.Callbacks.BeforeToolCallbackSync;
 import com.google.adk.events.Event;
 import com.google.adk.examples.BaseExampleProvider;
@@ -303,14 +309,14 @@ public class LlmAgent extends BaseAgent {
     }
 
     @CanIgnoreReturnValue
-    public Builder beforeModelCallback(List<Object> beforeModelCallback) {
+    public Builder beforeModelCallback(List<BeforeModelCallbackBase> beforeModelCallback) {
       if (beforeModelCallback == null) {
         this.beforeModelCallback = null;
       } else if (beforeModelCallback.isEmpty()) {
         this.beforeModelCallback = ImmutableList.of();
       } else {
         ImmutableList.Builder<BeforeModelCallback> builder = ImmutableList.builder();
-        for (Object callback : beforeModelCallback) {
+        for (BeforeModelCallbackBase callback : beforeModelCallback) {
           if (callback instanceof BeforeModelCallback beforeModelCallbackInstance) {
             builder.add(beforeModelCallbackInstance);
           } else if (callback instanceof BeforeModelCallbackSync beforeModelCallbackSyncInstance) {
@@ -347,14 +353,14 @@ public class LlmAgent extends BaseAgent {
     }
 
     @CanIgnoreReturnValue
-    public Builder afterModelCallback(List<Object> afterModelCallback) {
+    public Builder afterModelCallback(List<AfterModelCallbackBase> afterModelCallback) {
       if (afterModelCallback == null) {
         this.afterModelCallback = null;
       } else if (afterModelCallback.isEmpty()) {
         this.afterModelCallback = ImmutableList.of();
       } else {
         ImmutableList.Builder<AfterModelCallback> builder = ImmutableList.builder();
-        for (Object callback : afterModelCallback) {
+        for (AfterModelCallbackBase callback : afterModelCallback) {
           if (callback instanceof AfterModelCallback afterModelCallbackInstance) {
             builder.add(afterModelCallbackInstance);
           } else if (callback instanceof AfterModelCallbackSync afterModelCallbackSyncInstance) {
@@ -391,7 +397,7 @@ public class LlmAgent extends BaseAgent {
     }
 
     @CanIgnoreReturnValue
-    public Builder beforeAgentCallback(List<Object> beforeAgentCallback) {
+    public Builder beforeAgentCallback(List<BeforeAgentCallbackBase> beforeAgentCallback) {
       this.beforeAgentCallback = CallbackUtil.getBeforeAgentCallbacks(beforeAgentCallback);
       return this;
     }
@@ -412,7 +418,7 @@ public class LlmAgent extends BaseAgent {
     }
 
     @CanIgnoreReturnValue
-    public Builder afterAgentCallback(List<Object> afterAgentCallback) {
+    public Builder afterAgentCallback(List<AfterAgentCallbackBase> afterAgentCallback) {
       this.afterAgentCallback = CallbackUtil.getAfterAgentCallbacks(afterAgentCallback);
       return this;
     }
@@ -432,17 +438,15 @@ public class LlmAgent extends BaseAgent {
       return this;
     }
 
-    // TODO: b/416794047 - Use a unified interface for callback instead of using
-    // Object.
     @CanIgnoreReturnValue
-    public Builder beforeToolCallback(@Nullable List<Object> beforeToolCallbacks) {
+    public Builder beforeToolCallback(@Nullable List<BeforeToolCallbackBase> beforeToolCallbacks) {
       if (beforeToolCallbacks == null) {
         this.beforeToolCallback = null;
       } else if (beforeToolCallbacks.isEmpty()) {
         this.beforeToolCallback = ImmutableList.of();
       } else {
         ImmutableList.Builder<BeforeToolCallback> builder = ImmutableList.builder();
-        for (Object callback : beforeToolCallbacks) {
+        for (BeforeToolCallbackBase callback : beforeToolCallbacks) {
           if (callback instanceof BeforeToolCallback beforeToolCallbackInstance) {
             builder.add(beforeToolCallbackInstance);
           } else if (callback instanceof BeforeToolCallbackSync beforeToolCallbackSyncInstance) {
@@ -480,14 +484,14 @@ public class LlmAgent extends BaseAgent {
     }
 
     @CanIgnoreReturnValue
-    public Builder afterToolCallback(@Nullable List<Object> afterToolCallbacks) {
+    public Builder afterToolCallback(@Nullable List<AfterToolCallbackBase> afterToolCallbacks) {
       if (afterToolCallbacks == null) {
         this.afterToolCallback = null;
       } else if (afterToolCallbacks.isEmpty()) {
         this.afterToolCallback = ImmutableList.of();
       } else {
         ImmutableList.Builder<AfterToolCallback> builder = ImmutableList.builder();
-        for (Object callback : afterToolCallbacks) {
+        for (AfterToolCallbackBase callback : afterToolCallbacks) {
           if (callback instanceof AfterToolCallback afterToolCallbackInstance) {
             builder.add(afterToolCallbackInstance);
           } else if (callback instanceof AfterToolCallbackSync afterToolCallbackSyncInstance) {

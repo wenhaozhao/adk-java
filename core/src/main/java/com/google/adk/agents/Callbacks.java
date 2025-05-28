@@ -27,56 +27,66 @@ import java.util.Optional;
 
 public final class Callbacks {
 
+  interface BeforeModelCallbackBase {}
+
   @FunctionalInterface
-  public interface BeforeModelCallback {
+  public interface BeforeModelCallback extends BeforeModelCallbackBase {
     Maybe<LlmResponse> call(CallbackContext callbackContext, LlmRequest llmRequest);
   }
 
   // Helper interface to allow for sync beforeModelCallback. The function is wrapped into an async
   // one before being processed further.
   @FunctionalInterface
-  public interface BeforeModelCallbackSync {
+  public interface BeforeModelCallbackSync extends BeforeModelCallbackBase {
     Optional<LlmResponse> call(CallbackContext callbackContext, LlmRequest llmRequest);
   }
 
+  interface AfterModelCallbackBase {}
+
   @FunctionalInterface
-  public interface AfterModelCallback {
+  public interface AfterModelCallback extends AfterModelCallbackBase {
     Maybe<LlmResponse> call(CallbackContext callbackContext, LlmResponse llmResponse);
   }
 
   // Helper interface to allow for sync afterModelCallback. The function is wrapped into an async
   // one before being processed further.
   @FunctionalInterface
-  public interface AfterModelCallbackSync {
+  public interface AfterModelCallbackSync extends AfterModelCallbackBase {
     Optional<LlmResponse> call(CallbackContext callbackContext, LlmResponse llmResponse);
   }
 
+  interface BeforeAgentCallbackBase {}
+
   @FunctionalInterface
-  public interface BeforeAgentCallback {
+  public interface BeforeAgentCallback extends BeforeAgentCallbackBase {
     Maybe<Content> call(CallbackContext callbackContext);
   }
 
   // Helper interface to allow for sync beforeAgentCallback. The function is wrapped into an async
   // one before being processed further.
   @FunctionalInterface
-  public interface BeforeAgentCallbackSync {
+  public interface BeforeAgentCallbackSync extends BeforeAgentCallbackBase {
     Optional<Content> call(CallbackContext callbackContext);
   }
 
+  interface AfterAgentCallbackBase {}
+
   @FunctionalInterface
-  public interface AfterAgentCallback {
+  public interface AfterAgentCallback extends AfterAgentCallbackBase {
     Maybe<Content> call(CallbackContext callbackContext);
   }
 
   // Helper interface to allow for sync afterAgentCallback. The function is wrapped into an async
   // one before being processed further.
   @FunctionalInterface
-  public interface AfterAgentCallbackSync {
+  public interface AfterAgentCallbackSync extends AfterAgentCallbackBase {
     Optional<Content> call(CallbackContext callbackContext);
   }
 
+  interface BeforeToolCallbackBase {}
+
   @FunctionalInterface
-  public interface BeforeToolCallback {
+  public interface BeforeToolCallback extends BeforeToolCallbackBase {
     Maybe<Map<String, Object>> call(
         InvocationContext invocationContext,
         BaseTool baseTool,
@@ -87,7 +97,7 @@ public final class Callbacks {
   // Helper interface to allow for sync beforeToolCallback. The function is wrapped into an async
   // one before being processed further.
   @FunctionalInterface
-  public interface BeforeToolCallbackSync {
+  public interface BeforeToolCallbackSync extends BeforeToolCallbackBase {
     Optional<Map<String, Object>> call(
         InvocationContext invocationContext,
         BaseTool baseTool,
@@ -95,8 +105,10 @@ public final class Callbacks {
         ToolContext toolContext);
   }
 
+  interface AfterToolCallbackBase {}
+
   @FunctionalInterface
-  public interface AfterToolCallback {
+  public interface AfterToolCallback extends AfterToolCallbackBase {
     Maybe<Map<String, Object>> call(
         InvocationContext invocationContext,
         BaseTool baseTool,
@@ -108,7 +120,7 @@ public final class Callbacks {
   // Helper interface to allow for sync afterToolCallback. The function is wrapped into an async
   // one before being processed further.
   @FunctionalInterface
-  public interface AfterToolCallbackSync {
+  public interface AfterToolCallbackSync extends AfterToolCallbackBase {
     Optional<Map<String, Object>> call(
         InvocationContext invocationContext,
         BaseTool baseTool,

@@ -20,6 +20,8 @@ import com.google.adk.agents.Callbacks.AfterAgentCallback;
 import com.google.adk.agents.Callbacks.AfterAgentCallbackSync;
 import com.google.adk.agents.Callbacks.BeforeAgentCallback;
 import com.google.adk.agents.Callbacks.BeforeAgentCallbackSync;
+import com.google.adk.agents.Callbacks.BeforeAgentCallbackBase;
+import com.google.adk.agents.Callbacks.AfterAgentCallbackBase;
 import com.google.common.collect.ImmutableList;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import io.reactivex.rxjava3.core.Maybe;
@@ -33,14 +35,14 @@ public final class CallbackUtil {
 
   @CanIgnoreReturnValue
   public static @Nullable ImmutableList<BeforeAgentCallback> getBeforeAgentCallbacks(
-      List<Object> beforeAgentCallback) {
+      List<BeforeAgentCallbackBase> beforeAgentCallback) {
     if (beforeAgentCallback == null) {
       return null;
     } else if (beforeAgentCallback.isEmpty()) {
       return ImmutableList.of();
     } else {
       ImmutableList.Builder<BeforeAgentCallback> builder = ImmutableList.builder();
-      for (Object callback : beforeAgentCallback) {
+      for (BeforeAgentCallbackBase callback : beforeAgentCallback) {
         if (callback instanceof BeforeAgentCallback beforeAgentCallbackInstance) {
           builder.add(beforeAgentCallbackInstance);
         } else if (callback instanceof BeforeAgentCallbackSync beforeAgentCallbackSyncInstance) {
@@ -60,14 +62,14 @@ public final class CallbackUtil {
 
   @CanIgnoreReturnValue
   public static @Nullable ImmutableList<AfterAgentCallback> getAfterAgentCallbacks(
-      List<Object> afterAgentCallback) {
+      List<AfterAgentCallbackBase> afterAgentCallback) {
     if (afterAgentCallback == null) {
       return null;
     } else if (afterAgentCallback.isEmpty()) {
       return ImmutableList.of();
     } else {
       ImmutableList.Builder<AfterAgentCallback> builder = ImmutableList.builder();
-      for (Object callback : afterAgentCallback) {
+      for (AfterAgentCallbackBase callback : afterAgentCallback) {
         if (callback instanceof AfterAgentCallback afterAgentCallbackInstance) {
           builder.add(afterAgentCallbackInstance);
         } else if (callback instanceof AfterAgentCallbackSync afterAgentCallbackSyncInstance) {
