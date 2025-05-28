@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.google.adk;
+package com.google.adk.utils;
 
 import com.google.common.collect.Iterables;
 

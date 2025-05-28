@@ -16,7 +16,6 @@
 
 package com.google.adk.runner;
 
-import com.google.adk.CollectionUtils;
 import com.google.adk.Telemetry;
 import com.google.adk.agents.BaseAgent;
 import com.google.adk.agents.InvocationContext;
@@ -27,6 +26,7 @@ import com.google.adk.artifacts.BaseArtifactService;
 import com.google.adk.events.Event;
 import com.google.adk.sessions.BaseSessionService;
 import com.google.adk.sessions.Session;
+import com.google.adk.utils.CollectionUtils;
 import com.google.common.collect.ImmutableList;
 import com.google.genai.types.AudioTranscriptionConfig;
 import com.google.genai.types.Content;

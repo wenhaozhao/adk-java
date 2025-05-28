@@ -138,7 +138,7 @@ public final class InstructionsTest {
         instructionsProcessor.processRequest(context, initialRequest).blockingGet();
 
     assertThat(result.updatedRequest().getSystemInstructions())
-        .containsExactly("File content: " + artifactPart.toString());
+        .containsExactly("File content: " + artifactPart.toJson());
   }
 
   @Test
