@@ -583,7 +583,7 @@ public class LlmAgent extends BaseAgent {
     }
   }
 
-  private BaseLlmFlow determineLlmFlow() {
+  protected BaseLlmFlow determineLlmFlow() {
     if (disallowTransferToParent() && disallowTransferToPeers() && subAgents().isEmpty()) {
       return new SingleFlow();
     } else {
