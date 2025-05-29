@@ -22,15 +22,16 @@ import com.google.adk.models.LlmRequest;
 import com.google.auto.value.AutoValue;
 import io.reactivex.rxjava3.core.Single;
 
-interface RequestProcessor {
+public interface RequestProcessor {
 
   @AutoValue
-  abstract static class RequestProcessingResult {
-    abstract LlmRequest updatedRequest();
+  public abstract static class RequestProcessingResult {
+    public abstract LlmRequest updatedRequest();
 
-    abstract Iterable<Event> events();
+    public abstract Iterable<Event> events();
 
-    static RequestProcessingResult create(LlmRequest updatedRequest, Iterable<Event> events) {
+    public static RequestProcessingResult create(
+        LlmRequest updatedRequest, Iterable<Event> events) {
       return new AutoValue_RequestProcessor_RequestProcessingResult(updatedRequest, events);
     }
   }
