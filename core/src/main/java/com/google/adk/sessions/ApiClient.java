@@ -17,8 +17,10 @@
 package com.google.adk.sessions;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.StandardSystemProperty.JAVA_VERSION;
 
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.common.base.Ascii;
 import com.google.common.collect.ImmutableMap;
 import com.google.genai.errors.GenAiIOException;
 import com.google.genai.types.HttpOptions;
@@ -129,7 +131,7 @@ abstract class ApiClient {
   static String libraryVersion() {
     // TODO: Automate revisions to the SDK library version.
     String libraryLabel = "google-genai-sdk/0.1.0";
-    String languageLabel = "gl-java/" + System.getProperty("java.version");
+    String languageLabel = "gl-java/" + JAVA_VERSION.value();
     return libraryLabel + " " + languageLabel;
   }
 
@@ -203,7 +205,7 @@ abstract class ApiClient {
     if (vertexAI && location.isPresent()) {
       defaultHttpOptionsBuilder
           .baseUrl(
-              location.get().equalsIgnoreCase("global")
+              Ascii.equalsIgnoreCase(location.get(), "global")
                   ? "https://aiplatform.googleapis.com"
                   : String.format("https://%s-aiplatform.googleapis.com", location.get()))
           .apiVersion("v1beta1");

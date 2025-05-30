@@ -45,6 +45,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 /** Utility class for handling function calls. */
 public final class Functions {
@@ -206,7 +207,8 @@ public final class Functions {
     return longRunningFunctionCalls;
   }
 
-  private static Event mergeParallelFunctionResponseEvents(List<Event> functionResponseEvents) {
+  private static @Nullable Event mergeParallelFunctionResponseEvents(
+      List<Event> functionResponseEvents) {
     if (functionResponseEvents.isEmpty()) {
       return null;
     }

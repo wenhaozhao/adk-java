@@ -16,6 +16,7 @@
 
 package com.google.adk.models;
 
+import static com.google.common.base.StandardSystemProperty.JAVA_VERSION;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.google.adk.Version;
@@ -56,7 +57,7 @@ public class Gemini extends BaseLlm {
 
   static {
     String frameworkLabel = "google-adk/" + Version.JAVA_ADK_VERSION;
-    String languageLabel = "gl-java/" + System.getProperty("java.version");
+    String languageLabel = "gl-java/" + JAVA_VERSION.value();
     String versionHeaderValue = String.format("%s %s", frameworkLabel, languageLabel);
 
     TRACKING_HEADERS =
