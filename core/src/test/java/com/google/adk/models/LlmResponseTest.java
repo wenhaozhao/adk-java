@@ -152,8 +152,8 @@ public final class LlmResponseTest {
     LlmResponse deserializedResponse = LlmResponse.fromJsonString(jsonWithNulls, LlmResponse.class);
 
     assertThat(deserializedResponse.content()).isPresent();
-    assertThat(deserializedResponse.content().get().parts().get().get(0).text().get())
-        .isEqualTo("Test content");
+    assertThat(deserializedResponse.content().get().parts().get().get(0).text())
+        .hasValue("Test content");
     assertThat(deserializedResponse.groundingMetadata()).isEmpty();
     assertThat(deserializedResponse.partial()).isEmpty();
     assertThat(deserializedResponse.turnComplete()).hasValue(true);
@@ -190,8 +190,8 @@ public final class LlmResponseTest {
     assertThat(deserializedResponse).isEqualTo(originalResponse);
 
     assertThat(deserializedResponse.content()).isPresent();
-    assertThat(deserializedResponse.content().get().parts().get().get(0).text().get())
-        .isEqualTo("Partial data");
+    assertThat(deserializedResponse.content().get().parts().get().get(0).text())
+        .hasValue("Partial data");
     assertThat(deserializedResponse.partial()).isEmpty();
     assertThat(deserializedResponse.turnComplete()).hasValue(true);
     assertThat(deserializedResponse.errorCode()).hasValue(new FinishReason("FATAL_ERROR"));

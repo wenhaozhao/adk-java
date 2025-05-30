@@ -358,7 +358,7 @@ public class VertexAiSessionServiceTest {
     assertThat(createdSession.id()).isEqualTo("4"); // Check the generated ID
 
     // Verify that the session is now in the sessionMap
-    assertThat(sessionMap.containsKey("4")).isTrue();
+    assertThat(sessionMap).containsKey("4");
     String newSessionJson = sessionMap.get("4");
     ObjectMapper mapper = new ObjectMapper();
     Map<String, Object> newSessionMap =
@@ -376,7 +376,7 @@ public class VertexAiSessionServiceTest {
     assertThat(createdSession.state()).isEmpty();
 
     // Verify that the session is now in the sessionMap
-    assertThat(sessionMap.containsKey("4")).isTrue();
+    assertThat(sessionMap).containsKey("4");
     String newSessionJson = sessionMap.get("4");
     ObjectMapper mapper = new ObjectMapper();
     Map<String, Object> newSessionMap =
@@ -385,14 +385,15 @@ public class VertexAiSessionServiceTest {
   }
 
   @Test
-  public void getEmptySession_success() throws RuntimeException {
+  public void getEmptySession_success() {
     RuntimeException exception =
         assertThrows(
             RuntimeException.class,
-            () -> {
-              vertexAiSessionService.getSession("123", "user", "0", Optional.empty()).blockingGet();
-            });
-    assertThat(exception.getMessage()).contains("Session not found: 0");
+            () ->
+                vertexAiSessionService
+                    .getSession("123", "user", "0", Optional.empty())
+                    .blockingGet());
+    assertThat(exception).hasMessageThat().contains("Session not found: 0");
   }
 
   @Test
@@ -404,10 +405,11 @@ public class VertexAiSessionServiceTest {
     RuntimeException exception =
         assertThrows(
             RuntimeException.class,
-            () -> {
-              vertexAiSessionService.getSession("123", "user", "1", Optional.empty()).blockingGet();
-            });
-    assertThat(exception.getMessage()).contains("Session not found: 1");
+            () ->
+                vertexAiSessionService
+                    .getSession("123", "user", "1", Optional.empty())
+                    .blockingGet());
+    assertThat(exception).hasMessageThat().contains("Session not found: 1");
   }
 
   @Test
