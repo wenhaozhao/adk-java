@@ -330,7 +330,7 @@ public final class FunctionToolTest {
 
     public static void voidReturnWithoutSchema() {}
 
-    public static Map<String, Object> returnsMap() {
+    public static ImmutableMap<String, Object> returnsMap() {
       return ImmutableMap.of("key", "value");
     }
 
@@ -338,7 +338,7 @@ public final class FunctionToolTest {
       return ImmutableMap.of("key", "value");
     }
 
-    public static Map<String, Object> returnAllSupportedParametersAsMap(
+    public static ImmutableMap<String, Object> returnAllSupportedParametersAsMap(
         String stringParam,
         boolean primitiveBoolParam,
         Boolean boolParam,
@@ -371,11 +371,11 @@ public final class FunctionToolTest {
           .buildOrThrow();
     }
 
-    public static Map<String, Object> pojoParamWithFields(PojoWithFields pojo) {
+    public static ImmutableMap<String, Object> pojoParamWithFields(PojoWithFields pojo) {
       return ImmutableMap.of("field1", pojo.field1, "field2", pojo.field2);
     }
 
-    public static Map<String, Object> pojoParamWithGettersAndSetters(
+    public static ImmutableMap<String, Object> pojoParamWithGettersAndSetters(
         PojoWithGettersAndSetters pojo) {
       return ImmutableMap.of("field1", pojo.getField1(), "field2", pojo.getField2());
     }

@@ -16,6 +16,8 @@
 
 package com.google.adk.agents;
 
+import static java.util.stream.Collectors.joining;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.adk.SchemaUtils;
 import com.google.adk.agents.Callbacks.AfterAgentCallback;
@@ -54,12 +56,10 @@ import com.google.genai.types.Schema;
 import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.core.Maybe;
 import io.reactivex.rxjava3.core.Single;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executor;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -128,7 +128,7 @@ public class LlmAgent extends BaseAgent {
     this.outputSchema = Optional.ofNullable(builder.outputSchema);
     this.executor = Optional.ofNullable(builder.executor);
     this.outputKey = Optional.ofNullable(builder.outputKey);
-    this.tools = builder.tools != null ? builder.tools : Collections.emptyList();
+    this.tools = builder.tools != null ? builder.tools : ImmutableList.of();
 
     this.llmFlow = determineLlmFlow();
 
@@ -150,18 +150,18 @@ public class LlmAgent extends BaseAgent {
 
     private Instruction instruction;
     private Instruction globalInstruction;
-    private List<BaseAgent> subAgents;
-    private List<BaseTool> tools;
+    private ImmutableList<BaseAgent> subAgents;
+    private ImmutableList<BaseTool> tools;
     private GenerateContentConfig generateContentConfig;
     private BaseExampleProvider exampleProvider;
     private IncludeContents includeContents;
     private Boolean planning;
     private Boolean disallowTransferToParent;
     private Boolean disallowTransferToPeers;
-    private List<BeforeModelCallback> beforeModelCallback;
-    private List<AfterModelCallback> afterModelCallback;
-    private List<BeforeAgentCallback> beforeAgentCallback;
-    private List<AfterAgentCallback> afterAgentCallback;
+    private ImmutableList<BeforeModelCallback> beforeModelCallback;
+    private ImmutableList<AfterModelCallback> afterModelCallback;
+    private ImmutableList<BeforeAgentCallback> beforeAgentCallback;
+    private ImmutableList<AfterAgentCallback> afterAgentCallback;
     private ImmutableList<BeforeToolCallback> beforeToolCallback;
     private ImmutableList<AfterToolCallback> afterToolCallback;
     private Schema inputSchema;
@@ -599,9 +599,9 @@ public class LlmAgent extends BaseAgent {
       // Concatenate text from all parts.
       Object output;
       String rawResult =
-          event.content().flatMap(Content::parts).orElse(Collections.emptyList()).stream()
+          event.content().flatMap(Content::parts).orElse(ImmutableList.of()).stream()
               .map(part -> part.text().orElse(""))
-              .collect(Collectors.joining());
+              .collect(joining());
 
       Optional<Schema> outputSchema = outputSchema();
       if (outputSchema.isPresent()) {

@@ -61,8 +61,8 @@ public class LoopAgent extends BaseAgent {
     private String description;
     private List<? extends BaseAgent> subAgents;
     private Optional<Integer> maxIterations = Optional.empty();
-    private List<Callbacks.BeforeAgentCallback> beforeAgentCallback;
-    private List<Callbacks.AfterAgentCallback> afterAgentCallback;
+    private ImmutableList<Callbacks.BeforeAgentCallback> beforeAgentCallback;
+    private ImmutableList<Callbacks.AfterAgentCallback> afterAgentCallback;
 
     @CanIgnoreReturnValue
     public Builder name(String name) {

@@ -21,6 +21,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import com.google.adk.Version;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Iterables;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.genai.Client;
 import com.google.genai.ResponseStream;
@@ -38,7 +39,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -232,10 +232,10 @@ public class Gemini extends BaseLlm {
 
     List<Content> contents = llmRequest.contents();
     // Last content must be from the user, otherwise the model won't respond.
-    if (contents.isEmpty() || !contents.get(contents.size() - 1).role().orElse("").equals("user")) {
+    if (contents.isEmpty() || !Iterables.getLast(contents).role().orElse("").equals("user")) {
       Content userContent = Content.fromParts(Part.fromText(CONTINUE_OUTPUT_MESSAGE));
       contents =
-          Stream.concat(contents.stream(), Stream.of(userContent)).collect(Collectors.toList());
+          Stream.concat(contents.stream(), Stream.of(userContent)).collect(toImmutableList());
     }
 
     List<Content> finalContents = stripThoughts(contents);

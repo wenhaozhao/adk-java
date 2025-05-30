@@ -30,7 +30,6 @@ import io.opentelemetry.context.Scope;
 import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.core.Maybe;
 import io.reactivex.rxjava3.core.Single;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
@@ -68,7 +67,7 @@ public abstract class BaseAgent {
     this.name = name;
     this.description = description;
     this.parentAgent = null;
-    this.subAgents = subAgents != null ? subAgents : Collections.emptyList();
+    this.subAgents = subAgents != null ? subAgents : ImmutableList.of();
     this.beforeAgentCallback = Optional.ofNullable(beforeAgentCallback);
     this.afterAgentCallback = Optional.ofNullable(afterAgentCallback);
 

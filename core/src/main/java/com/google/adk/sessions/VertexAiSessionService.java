@@ -16,6 +16,8 @@
 
 package com.google.adk.sessions;
 
+import static com.google.common.base.Strings.nullToEmpty;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toCollection;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -49,7 +51,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
@@ -124,7 +125,7 @@ public final class VertexAiSessionService implements BaseSessionService {
     logger.debug("Create Session response {}", apiResponse.getResponseBody());
     String sessionName = "";
     String operationId = "";
-    String sessId = sessionId == null ? "" : sessionId;
+    String sessId = nullToEmpty(sessionId);
     if (apiResponse.getResponseBody() != null) {
       JsonNode jsonResponse = getJsonResponse(apiResponse);
       sessionName = jsonResponse.get("name").asText();
@@ -139,7 +140,7 @@ public final class VertexAiSessionService implements BaseSessionService {
         break;
       }
       try {
-        TimeUnit.SECONDS.sleep(1);
+        SECONDS.sleep(1);
       } catch (InterruptedException e) {
         logger.warn("Error during sleep", e);
       }

@@ -58,8 +58,8 @@ public class ParallelAgent extends BaseAgent {
     private String name;
     private String description;
     private List<? extends BaseAgent> subAgents;
-    private List<Callbacks.BeforeAgentCallback> beforeAgentCallback;
-    private List<Callbacks.AfterAgentCallback> afterAgentCallback;
+    private ImmutableList<Callbacks.BeforeAgentCallback> beforeAgentCallback;
+    private ImmutableList<Callbacks.AfterAgentCallback> afterAgentCallback;
 
     @CanIgnoreReturnValue
     public Builder name(String name) {

@@ -16,6 +16,8 @@
 
 package com.google.adk.flows.llmflows;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.adk.JsonBaseModel;
 import com.google.adk.agents.InvocationContext;
@@ -104,9 +106,8 @@ public final class Contents implements RequestProcessor {
 
     return resultEvents.stream()
         .map(Event::content)
-        .filter(Optional::isPresent)
-        .map(Optional::get)
-        .collect(ImmutableList.toImmutableList());
+        .flatMap(Optional::stream)
+        .collect(toImmutableList());
   }
 
   /** Whether the event is a reply from another agent. */

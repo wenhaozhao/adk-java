@@ -179,12 +179,12 @@ abstract class ApiClient {
       mergedHttpOptionsBuilder.timeout(httpOptionsToApply.timeout().get());
     }
     if (httpOptionsToApply.headers().isPresent()) {
-      Map<String, String> mergedHeaders =
+      ImmutableMap<String, String> mergedHeaders =
           ImmutableMap.<String, String>builder()
               .putAll(httpOptionsToApply.headers().orElse(ImmutableMap.of()))
               .putAll(this.httpOptions.headers().orElse(ImmutableMap.of()))
               .putAll(getTimeoutHeader(httpOptionsToApply).orElse(ImmutableMap.of()))
-              .build();
+              .buildOrThrow();
       mergedHttpOptionsBuilder.headers(mergedHeaders);
     }
     this.httpOptions = mergedHttpOptionsBuilder.build();

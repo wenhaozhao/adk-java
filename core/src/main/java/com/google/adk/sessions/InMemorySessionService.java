@@ -16,6 +16,8 @@
 
 package com.google.adk.sessions;
 
+import static java.util.stream.Collectors.toCollection;
+
 import com.google.adk.events.Event;
 import com.google.adk.events.EventActions;
 import com.google.common.collect.ImmutableList;
@@ -32,7 +34,6 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -179,7 +180,7 @@ public final class InMemorySessionService implements BaseSessionService {
     List<Session> sessionCopies =
         userSessionsMap.values().stream()
             .map(this::copySessionMetadata)
-            .collect(Collectors.toCollection(ArrayList::new));
+            .collect(toCollection(ArrayList::new));
 
     return Single.just(ListSessionsResponse.builder().sessions(sessionCopies).build());
   }
