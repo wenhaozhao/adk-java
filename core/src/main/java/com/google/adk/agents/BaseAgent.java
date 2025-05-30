@@ -54,7 +54,7 @@ public abstract class BaseAgent {
    */
   private BaseAgent parentAgent;
 
-  private List<? extends BaseAgent> subAgents;
+  private final List<? extends BaseAgent> subAgents;
 
   private final Optional<List<BeforeAgentCallback>> beforeAgentCallback;
   private final Optional<List<AfterAgentCallback>> afterAgentCallback;

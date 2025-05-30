@@ -20,7 +20,7 @@ import com.google.genai.Client;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class LlmRegistry {
+public final class LlmRegistry {
 
   // A thread-safe cache mapping model names to LLM instances.
   private static final Map<String, BaseLlm> instances = new ConcurrentHashMap<>();
@@ -32,7 +32,7 @@ public class LlmRegistry {
   }
 
   // API clients
-  private static Client geminiApiClient = Client.builder().build();
+  private static final Client geminiApiClient = Client.builder().build();
 
   // Map of model name patterns regex to factories
   private static final Map<String, LlmFactory> llmFactories = new ConcurrentHashMap<>();
@@ -68,4 +68,6 @@ public class LlmRegistry {
     // Clear any cached instances that match this pattern to ensure test isolation.
     instances.keySet().removeIf(modelName -> modelName.matches(modelNamePattern));
   }
+
+  private LlmRegistry() {}
 }

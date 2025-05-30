@@ -46,8 +46,8 @@ public final class FunctionToolTest {
     assertThat(tool).isNotNull();
     assertThat(tool.name()).isEqualTo("voidReturnWithoutSchema");
     assertThat(tool.description()).isEmpty();
-    assertThat(tool.declaration().get())
-        .isEqualTo(
+    assertThat(tool.declaration())
+        .hasValue(
             FunctionDeclaration.builder()
                 .name("voidReturnWithoutSchema")
                 .parameters(
@@ -66,8 +66,8 @@ public final class FunctionToolTest {
     assertThat(tool).isNotNull();
     assertThat(tool.name()).isEqualTo("my_function");
     assertThat(tool.description()).isEqualTo("A test function");
-    assertThat(tool.declaration().get())
-        .isEqualTo(
+    assertThat(tool.declaration())
+        .hasValue(
             FunctionDeclaration.builder()
                 .name("my_function")
                 .description("A test function")

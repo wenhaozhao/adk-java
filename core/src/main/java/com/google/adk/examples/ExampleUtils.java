@@ -107,7 +107,7 @@ public final class ExampleUtils {
       examplesStr.append(output);
     }
 
-    return EXAMPLES_INTRO + examplesStr.toString() + EXAMPLES_END;
+    return EXAMPLES_INTRO + examplesStr + EXAMPLES_END;
   }
 
   public static String buildExampleSi(BaseExampleProvider exampleProvider, String query) {

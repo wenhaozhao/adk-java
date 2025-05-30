@@ -34,4 +34,6 @@ public final class Annotations {
 
     String description() default "";
   }
+
+  private Annotations() {}
 }

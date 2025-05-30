@@ -240,24 +240,23 @@ public class Event extends JsonBaseModel {
     StringBuilder sb = new StringBuilder();
     content()
         .ifPresent(
-            c -> {
-              c.parts()
-                  .ifPresent(
-                      parts ->
-                          parts.forEach(
-                              part -> {
-                                part.text().ifPresent(sb::append);
-                                part.functionCall()
-                                    .ifPresent(
-                                        functionCall ->
-                                            sb.append("Function Call: ").append(functionCall));
-                                part.functionResponse()
-                                    .ifPresent(
-                                        functionResponse ->
-                                            sb.append("Function Response: ")
-                                                .append(functionResponse));
-                              }));
-            });
+            c ->
+                c.parts()
+                    .ifPresent(
+                        parts ->
+                            parts.forEach(
+                                part -> {
+                                  part.text().ifPresent(sb::append);
+                                  part.functionCall()
+                                      .ifPresent(
+                                          functionCall ->
+                                              sb.append("Function Call: ").append(functionCall));
+                                  part.functionResponse()
+                                      .ifPresent(
+                                          functionResponse ->
+                                              sb.append("Function Response: ")
+                                                  .append(functionResponse));
+                                })));
     return sb.toString();
   }
 
@@ -516,10 +515,9 @@ public class Event extends JsonBaseModel {
     if (this == obj) {
       return true;
     }
-    if (!(obj instanceof Event)) {
+    if (!(obj instanceof Event other)) {
       return false;
     }
-    Event other = (Event) obj;
     return timestamp == other.timestamp
         && Objects.equals(id, other.id)
         && Objects.equals(invocationId, other.invocationId)

@@ -140,8 +140,7 @@ public final class McpTool extends BaseTool {
 
               List<String> textOutputs = new ArrayList<>();
               for (Content content : contents) {
-                if (content instanceof TextContent) {
-                  TextContent textContent = (TextContent) content;
+                if (content instanceof TextContent textContent) {
                   if (textContent.text() != null) {
                     textOutputs.add(textContent.text());
                   }

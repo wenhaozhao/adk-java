@@ -124,8 +124,8 @@ public abstract class BaseLlmFlow implements BaseFlow {
     }
     LlmResponse updatedResponse = currentLlmResponse;
 
-    if (!updatedResponse.content().isPresent()
-        && !updatedResponse.errorCode().isPresent()
+    if (updatedResponse.content().isEmpty()
+        && updatedResponse.errorCode().isEmpty()
         && !updatedResponse.interrupted().orElse(false)
         && !updatedResponse.turnComplete().orElse(false)) {
       return Single.just(
@@ -414,8 +414,7 @@ public abstract class BaseLlmFlow implements BaseFlow {
     Flowable<LiveRequest> liveRequests = invocationContext.liveRequestQueue().get().get();
     Disposable sendTask =
         historySent
-            .observeOn(
-                agent.executor().map(executor -> Schedulers.from(executor)).orElse(Schedulers.io()))
+            .observeOn(agent.executor().map(Schedulers::from).orElse(Schedulers.io()))
             .andThen(
                 liveRequests
                     .onBackpressureBuffer()

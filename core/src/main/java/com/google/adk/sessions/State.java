@@ -69,10 +69,9 @@ public final class State implements ConcurrentMap<String, Object> {
     if (o == this) {
       return true;
     }
-    if (!(o instanceof State)) {
+    if (!(o instanceof State other)) {
       return false;
     }
-    State other = (State) o;
     return state.equals(other.state);
   }
 

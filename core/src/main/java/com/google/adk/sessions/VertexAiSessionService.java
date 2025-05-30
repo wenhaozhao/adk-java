@@ -127,10 +127,10 @@ public final class VertexAiSessionService implements BaseSessionService {
     String sessId = sessionId == null ? "" : sessionId;
     if (apiResponse.getResponseBody() != null) {
       JsonNode jsonResponse = getJsonResponse(apiResponse);
-      sessionName = (String) jsonResponse.get("name").asText();
+      sessionName = jsonResponse.get("name").asText();
       List<String> parts = Splitter.on('/').splitToList(sessionName);
       sessId = parts.get(parts.size() - 3);
-      operationId = parts.get(parts.size() - 1);
+      operationId = Iterables.getLast(parts);
     }
     for (int i = 0; i < MAX_RETRY_ATTEMPTS; i++) {
       ApiResponse lroResponse = apiClient.request("GET", "operations/" + operationId, "");
@@ -204,7 +204,7 @@ public final class VertexAiSessionService implements BaseSessionService {
     for (Map<String, Object> apiSession : apiSessions) {
       String name = (String) apiSession.get("name");
       List<String> parts = Splitter.on('/').splitToList(name);
-      String sessionId = parts.get(parts.size() - 1);
+      String sessionId = Iterables.getLast(parts);
       Instant updateTimestamp = Instant.parse((String) apiSession.get("updateTime"));
       Session session =
           Session.builder(sessionId)
@@ -265,7 +265,6 @@ public final class VertexAiSessionService implements BaseSessionService {
         Optional.ofNullable(getSessionResponseMap.get("name"))
             .map(name -> Iterables.getLast(Splitter.on('/').splitToList(name.asText())))
             .orElse(sessionId);
-
     Instant updateTimestamp =
         Optional.ofNullable(getSessionResponseMap.get("updateTime"))
             .map(updateTime -> Instant.parse(updateTime.asText()))
@@ -514,8 +513,8 @@ public final class VertexAiSessionService implements BaseSessionService {
             .actions(eventActions)
             .content(
                 Optional.ofNullable(apiEvent.get("content"))
-                    .map(rawContentValue -> convertMapToContent(rawContentValue))
-                    .map(contentObject -> SessionUtils.decodeContent(contentObject))
+                    .map(this::convertMapToContent)
+                    .map(SessionUtils::decodeContent)
                     .orElse(null))
             .timestamp(Instant.parse((String) apiEvent.get("timestamp")).toEpochMilli())
             .errorCode(

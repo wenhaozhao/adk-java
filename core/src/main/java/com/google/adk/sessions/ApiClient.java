@@ -102,7 +102,7 @@ abstract class ApiClient {
       throw new IllegalArgumentException("Location must not be empty.");
     }
 
-    this.credentials = Optional.of(credentials.orElseGet(() -> defaultCredentials()));
+    this.credentials = Optional.of(credentials.orElseGet(this::defaultCredentials));
 
     this.httpOptions = defaultHttpOptions(/* vertexAI= */ true, this.location);
 
@@ -192,12 +192,13 @@ abstract class ApiClient {
 
   static HttpOptions defaultHttpOptions(boolean vertexAI, Optional<String> location) {
     ImmutableMap.Builder<String, String> defaultHeaders = ImmutableMap.builder();
-    defaultHeaders.put("Content-Type", "application/json");
-    defaultHeaders.put("user-agent", libraryVersion());
-    defaultHeaders.put("x-goog-api-client", libraryVersion());
+    defaultHeaders
+        .put("Content-Type", "application/json")
+        .put("user-agent", libraryVersion())
+        .put("x-goog-api-client", libraryVersion());
 
     HttpOptions.Builder defaultHttpOptionsBuilder =
-        HttpOptions.builder().headers(defaultHeaders.build());
+        HttpOptions.builder().headers(defaultHeaders.buildOrThrow());
 
     if (vertexAI && location.isPresent()) {
       defaultHttpOptionsBuilder
@@ -206,7 +207,7 @@ abstract class ApiClient {
                   ? "https://aiplatform.googleapis.com"
                   : String.format("https://%s-aiplatform.googleapis.com", location.get()))
           .apiVersion("v1beta1");
-    } else if (vertexAI && !location.isPresent()) {
+    } else if (vertexAI && location.isEmpty()) {
       throw new IllegalArgumentException("Location must be provided for Vertex AI APIs.");
     } else {
       defaultHttpOptionsBuilder

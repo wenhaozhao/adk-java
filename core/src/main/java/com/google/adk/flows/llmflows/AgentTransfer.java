@@ -38,11 +38,10 @@ public final class AgentTransfer implements RequestProcessor {
   public Single<RequestProcessor.RequestProcessingResult> processRequest(
       InvocationContext context, LlmRequest request) {
     BaseAgent baseAgent = context.agent();
-    if (!(baseAgent instanceof LlmAgent)) {
+    if (!(baseAgent instanceof LlmAgent agent)) {
       throw new IllegalArgumentException(
           "Base agent in InvocationContext is not an instance of Agent.");
     }
-    LlmAgent agent = (LlmAgent) baseAgent;
 
     List<BaseAgent> transferTargets = getTransferTargets(agent);
     if (transferTargets.isEmpty()) {
@@ -50,9 +49,10 @@ public final class AgentTransfer implements RequestProcessor {
           RequestProcessor.RequestProcessingResult.create(request, ImmutableList.of()));
     }
 
-    LlmRequest.Builder builder = request.toBuilder();
-    builder.appendInstructions(
-        ImmutableList.of(buildTargetAgentsInstructions(agent, transferTargets)));
+    LlmRequest.Builder builder =
+        request.toBuilder()
+            .appendInstructions(
+                ImmutableList.of(buildTargetAgentsInstructions(agent, transferTargets)));
     Method transferToAgentMethod;
     try {
       transferToAgentMethod =

@@ -16,12 +16,10 @@
 
 package com.google.adk.tools;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.genai.types.FunctionDeclaration;
-import com.google.protobuf.InvalidProtocolBufferException;
 import io.reactivex.rxjava3.core.Maybe;
 import io.reactivex.rxjava3.core.Single;
 import java.lang.reflect.InvocationTargetException;
@@ -43,7 +41,7 @@ public class FunctionTool extends BaseTool {
   private static final Logger logger = LoggerFactory.getLogger(FunctionTool.class);
 
   private final Method func;
-  private FunctionDeclaration funcDeclaration;
+  private final FunctionDeclaration funcDeclaration;
 
   public static FunctionTool create(Method func) {
     if (!areParametersAnnotatedWithSchema(func) && wasCompiledWithDefaultParameterNames(func)) {
@@ -53,6 +51,16 @@ public class FunctionTool extends BaseTool {
               + " tool will likely not work as expected and exit at runtime.");
     }
     return new FunctionTool(func, /* isLongRunning= */ false);
+  }
+
+  public static FunctionTool create(Class<?> cls, String methodName) {
+    for (Method method : cls.getMethods()) {
+      if (method.getName().equals(methodName)) {
+        return create(method);
+      }
+    }
+    throw new IllegalArgumentException(
+        String.format("Method %s not found in class %s.", methodName, cls.getName()));
   }
 
   private static boolean areParametersAnnotatedWithSchema(Method func) {
@@ -76,23 +84,13 @@ public class FunctionTool extends BaseTool {
     return true;
   }
 
-  public static FunctionTool create(Class<?> cls, String methodName) {
-    for (Method method : cls.getMethods()) {
-      if (method.getName().equals(methodName)) {
-        return create(method);
-      }
-    }
-    throw new IllegalArgumentException(
-        String.format("Method %s not found in class %s.", methodName, cls.getName()));
-  }
-
   protected FunctionTool(Method func, boolean isLongRunning) {
     super(
-        func.getAnnotation(Annotations.Schema.class) != null
+        func.isAnnotationPresent(Annotations.Schema.class)
                 && !func.getAnnotation(Annotations.Schema.class).name().isEmpty()
             ? func.getAnnotation(Annotations.Schema.class).name()
             : func.getName(),
-        func.getAnnotation(Annotations.Schema.class) != null
+        func.isAnnotationPresent(Annotations.Schema.class)
             ? func.getAnnotation(Annotations.Schema.class).description()
             : "",
         isLongRunning);
@@ -121,16 +119,12 @@ public class FunctionTool extends BaseTool {
 
   @SuppressWarnings("unchecked") // For tool parameter type casting.
   private Maybe<Map<String, Object>> call(Map<String, Object> args, ToolContext toolContext)
-      throws InvalidProtocolBufferException,
-          IllegalArgumentException,
-          IllegalAccessException,
-          InvocationTargetException,
-          JsonProcessingException {
+      throws IllegalAccessException, InvocationTargetException {
     Parameter[] parameters = func.getParameters();
     Object[] arguments = new Object[parameters.length];
     for (int i = 0; i < parameters.length; i++) {
       String paramName =
-          parameters[i].getAnnotation(Annotations.Schema.class) != null
+          parameters[i].isAnnotationPresent(Annotations.Schema.class)
                   && !parameters[i].getAnnotation(Annotations.Schema.class).name().isEmpty()
               ? parameters[i].getAnnotation(Annotations.Schema.class).name()
               : parameters[i].getName();
@@ -170,15 +164,13 @@ public class FunctionTool extends BaseTool {
     }
   }
 
-  @SuppressWarnings("unchecked") // For tool parameter type casting.
-  private static List<Object> createList(List<Object> values, Class<?> type)
-      throws JsonProcessingException, InvalidProtocolBufferException {
+  private static List<Object> createList(List<Object> values, Class<?> type) {
     List<Object> list = new ArrayList<>();
     // List of parameterized type is not supported.
     if (type == null) {
       return list;
     }
-    Class<?> cls = (Class<?>) type;
+    Class<?> cls = type;
     for (Object value : values) {
       if (cls == Integer.class
           || cls == Long.class
@@ -188,7 +180,7 @@ public class FunctionTool extends BaseTool {
           || cls == String.class) {
         list.add(castValue(value, cls));
       } else {
-        list.add(OBJECT_MAPPER.convertValue((Map<String, Object>) value, type));
+        list.add(OBJECT_MAPPER.convertValue(value, type));
       }
     }
     return list;
@@ -205,30 +197,30 @@ public class FunctionTool extends BaseTool {
         return value;
       }
     } else if (type.equals(Double.class) || type.equals(double.class)) {
-      if (value instanceof Double) {
-        return ((Double) value).doubleValue();
+      if (value instanceof Double d) {
+        return d.doubleValue();
       }
-      if (value instanceof Float) {
-        return ((Float) value).doubleValue();
+      if (value instanceof Float f) {
+        return f.doubleValue();
       }
-      if (value instanceof Integer) {
-        return ((Integer) value).doubleValue();
+      if (value instanceof Integer i) {
+        return i.doubleValue();
       }
-      if (value instanceof Long) {
-        return ((Long) value).doubleValue();
+      if (value instanceof Long l) {
+        return l.doubleValue();
       }
     } else if (type.equals(Float.class) || type.equals(float.class)) {
-      if (value instanceof Double) {
-        return ((Double) value).floatValue();
+      if (value instanceof Double d) {
+        return d.floatValue();
       }
-      if (value instanceof Float) {
-        return ((Float) value).floatValue();
+      if (value instanceof Float f) {
+        return f.floatValue();
       }
-      if (value instanceof Integer) {
-        return ((Integer) value).floatValue();
+      if (value instanceof Integer i) {
+        return i.floatValue();
       }
-      if (value instanceof Long) {
-        return ((Long) value).floatValue();
+      if (value instanceof Long l) {
+        return l.floatValue();
       }
     } else if (type.equals(Boolean.class) || type.equals(boolean.class)) {
       if (value instanceof Boolean) {

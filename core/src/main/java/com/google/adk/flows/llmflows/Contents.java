@@ -195,7 +195,7 @@ public final class Contents implements RequestProcessor {
       return events;
     }
 
-    Event latestEvent = events.get(events.size() - 1);
+    Event latestEvent = Iterables.getLast(events);
     // Extract function response IDs from the latest event
     Set<String> functionResponseIds = new HashSet<>();
     latestEvent
@@ -322,14 +322,13 @@ public final class Contents implements RequestProcessor {
                 for (Part part : parts) {
                   part.functionResponse()
                       .ifPresent(
-                          response -> {
-                            response
-                                .id()
-                                .ifPresent(
-                                    functionCallId -> {
-                                      functionCallIdToResponseEventIndex.put(functionCallId, index);
-                                    });
-                          });
+                          response ->
+                              response
+                                  .id()
+                                  .ifPresent(
+                                      functionCallId ->
+                                          functionCallIdToResponseEventIndex.put(
+                                              functionCallId, index)));
                 }
               });
     }
@@ -361,18 +360,17 @@ public final class Contents implements RequestProcessor {
                 part ->
                     part.functionCall()
                         .ifPresent(
-                            call -> {
-                              call.id()
-                                  .ifPresent(
-                                      functionCallId -> {
-                                        if (functionCallIdToResponseEventIndex.containsKey(
-                                            functionCallId)) {
-                                          responseEventIndices.add(
-                                              functionCallIdToResponseEventIndex.get(
-                                                  functionCallId));
-                                        }
-                                      });
-                            }));
+                            call ->
+                                call.id()
+                                    .ifPresent(
+                                        functionCallId -> {
+                                          if (functionCallIdToResponseEventIndex.containsKey(
+                                              functionCallId)) {
+                                            responseEventIndices.add(
+                                                functionCallIdToResponseEventIndex.get(
+                                                    functionCallId));
+                                          }
+                                        })));
 
         resultEvents.add(event); // Add the function call event
 

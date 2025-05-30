@@ -81,7 +81,7 @@ public abstract class BaseTool {
   @CanIgnoreReturnValue
   public Completable processLlmRequest(
       LlmRequest.Builder llmRequestBuilder, ToolContext toolContext) {
-    if (!declaration().isPresent()) {
+    if (declaration().isEmpty()) {
       return Completable.complete();
     }
 
@@ -147,7 +147,7 @@ public abstract class BaseTool {
         .map(
             tools ->
                 tools.stream()
-                    .filter(t -> !t.functionDeclarations().isPresent())
+                    .filter(t -> t.functionDeclarations().isEmpty())
                     .collect(toImmutableList()))
         .orElse(ImmutableList.of());
   }

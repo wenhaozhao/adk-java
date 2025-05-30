@@ -69,10 +69,9 @@ public final class Instructions implements RequestProcessor {
                           if (!agentInstr.isEmpty()) {
                             return InstructionUtils.injectSessionState(context, agentInstr)
                                 .map(
-                                    resolvedAgentInstr -> {
-                                      return builder.appendInstructions(
-                                          ImmutableList.of(resolvedAgentInstr));
-                                    });
+                                    resolvedAgentInstr ->
+                                        builder.appendInstructions(
+                                            ImmutableList.of(resolvedAgentInstr)));
                           }
                           return Single.just(builder);
                         }));

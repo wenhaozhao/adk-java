@@ -147,7 +147,7 @@ public final class InMemorySessionService implements BaseSessionService {
             });
 
     // Only apply timestamp filter if numRecentEvents was not applied
-    if (!config.numRecentEvents().isPresent() && config.afterTimestamp().isPresent()) {
+    if (config.numRecentEvents().isEmpty() && config.afterTimestamp().isPresent()) {
       Instant threshold = config.afterTimestamp().get();
 
       eventsInCopy.removeIf(

@@ -117,7 +117,7 @@ public class LlmAgent extends BaseAgent {
     this.exampleProvider = Optional.ofNullable(builder.exampleProvider);
     this.includeContents =
         builder.includeContents != null ? builder.includeContents : IncludeContents.DEFAULT;
-    this.planning = builder.planning != null ? builder.planning : false;
+    this.planning = builder.planning != null && builder.planning;
     this.disallowTransferToParent = builder.disallowTransferToParent;
     this.disallowTransferToPeers = builder.disallowTransferToPeers;
     this.beforeModelCallback = Optional.ofNullable(builder.beforeModelCallback);

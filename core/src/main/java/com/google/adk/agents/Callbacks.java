@@ -128,4 +128,6 @@ public final class Callbacks {
         ToolContext toolContext,
         Object response);
   }
+
+  private Callbacks() {}
 }

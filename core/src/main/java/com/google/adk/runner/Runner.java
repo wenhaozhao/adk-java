@@ -45,10 +45,10 @@ import java.util.Optional;
 
 /** The main class for the GenAI Agents runner. */
 public class Runner {
-  private BaseAgent agent;
+  private final BaseAgent agent;
   private final String appName;
-  private BaseArtifactService artifactService;
-  private BaseSessionService sessionService;
+  private final BaseArtifactService artifactService;
+  private final BaseSessionService sessionService;
 
   public Runner(
       BaseAgent agent,
@@ -82,7 +82,7 @@ public class Runner {
       Content newMessage,
       InvocationContext invocationContext,
       boolean saveInputBlobsAsArtifacts) {
-    if (!newMessage.parts().isPresent()) {
+    if (newMessage.parts().isEmpty()) {
       throw new IllegalArgumentException("No parts in the new_message.");
     }
 
@@ -252,10 +252,7 @@ public class Runner {
       return invocationContext
           .agent()
           .runLive(invocationContext)
-          .doOnNext(
-              event -> {
-                this.sessionService.appendEvent(session, event);
-              })
+          .doOnNext(event -> this.sessionService.appendEvent(session, event))
           .doOnError(
               throwable -> {
                 span.setStatus(StatusCode.ERROR, "Error in runLive Flowable execution");

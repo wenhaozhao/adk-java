@@ -40,7 +40,7 @@ public class InvocationContext {
 
   private final Optional<Content> userContent;
   private final RunConfig runConfig;
-  private boolean endInvocation;
+  private final boolean endInvocation;
   private final InvocationCostManager invocationCostManager = new InvocationCostManager();
 
   private InvocationContext(
@@ -78,7 +78,7 @@ public class InvocationContext {
         sessionService,
         artifactService,
         Optional.empty(),
-        Optional.empty(), // branch
+        /* branch= */ Optional.empty(),
         invocationId,
         agent,
         session,
@@ -98,7 +98,7 @@ public class InvocationContext {
         sessionService,
         artifactService,
         Optional.ofNullable(liveRequestQueue),
-        Optional.empty(), // branch
+        /* branch= */ Optional.empty(),
         InvocationContext.newInvocationContextId(),
         agent,
         session,
@@ -206,10 +206,9 @@ public class InvocationContext {
     if (this == o) {
       return true;
     }
-    if (!(o instanceof InvocationContext)) {
+    if (!(o instanceof InvocationContext that)) {
       return false;
     }
-    InvocationContext that = (InvocationContext) o;
     return endInvocation == that.endInvocation
         && Objects.equals(sessionService, that.sessionService)
         && Objects.equals(artifactService, that.artifactService)
