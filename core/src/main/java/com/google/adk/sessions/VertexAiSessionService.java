@@ -16,6 +16,8 @@
 
 package com.google.adk.sessions;
 
+import static java.util.stream.Collectors.toCollection;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -39,6 +41,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -258,12 +261,16 @@ public final class VertexAiSessionService implements BaseSessionService {
             "GET", "reasoningEngines/" + reasoningEngineId + "/sessions/" + sessionId, "");
     JsonNode getSessionResponseMap = getJsonResponse(apiResponse);
 
-    String name = (String) getSessionResponseMap.get("name").asText();
-    List<String> parts = Splitter.on('/').splitToList(name);
-    String sessId = parts.get(parts.size() - 1);
+    String sessId =
+        Optional.ofNullable(getSessionResponseMap.get("name"))
+            .map(name -> Iterables.getLast(Splitter.on('/').splitToList(name.asText())))
+            .orElse(sessionId);
 
     Instant updateTimestamp =
-        Instant.parse((String) getSessionResponseMap.get("updateTime").asText());
+        Optional.ofNullable(getSessionResponseMap.get("updateTime"))
+            .map(updateTime -> Instant.parse(updateTime.asText()))
+            .orElse(null);
+
     ConcurrentMap<String, Object> sessionState = new ConcurrentHashMap<>();
     try {
       if (getSessionResponseMap != null && getSessionResponseMap.has("sessionState")) {
@@ -275,13 +282,12 @@ public final class VertexAiSessionService implements BaseSessionService {
     } catch (JsonProcessingException e) {
       logger.warn("Error while parsing session state: {}", e.getMessage());
     }
-    Session session =
+    Session.Builder sessionBuilder =
         Session.builder(sessId)
             .appName(appName)
             .userId(userId)
             .lastUpdateTime(updateTimestamp)
-            .state(sessionState)
-            .build();
+            .state(sessionState);
 
     ApiResponse listEventsApiResponse =
         apiClient.request(
@@ -290,7 +296,7 @@ public final class VertexAiSessionService implements BaseSessionService {
             "");
 
     if (listEventsApiResponse.getResponseBody() == null) {
-      return Maybe.just(session);
+      return Maybe.just(sessionBuilder.build());
     }
 
     JsonNode getEventsResponseMap = getJsonResponse(listEventsApiResponse);
@@ -308,15 +314,15 @@ public final class VertexAiSessionService implements BaseSessionService {
       logger.warn("Error while parsing session events: {}", e.getMessage());
     }
 
-    List<Event> events = new ArrayList<>();
-    for (Map<String, Object> event : listEventsResponse) {
-      events.add(fromApiEvent(event));
-    }
-    events.removeIf(event -> Instant.ofEpochMilli(event.timestamp()).isAfter(updateTimestamp));
-    events.sort(
-        (event1, event2) ->
-            Instant.ofEpochMilli(event1.timestamp())
-                .compareTo(Instant.ofEpochMilli(event2.timestamp())));
+    List<Event> events =
+        listEventsResponse.stream()
+            .map(this::fromApiEvent)
+            .filter(
+                event ->
+                    updateTimestamp == null
+                        || Instant.ofEpochMilli(event.timestamp()).isBefore(updateTimestamp))
+            .sorted(Comparator.comparing(Event::timestamp))
+            .collect(toCollection(ArrayList::new));
 
     if (config.isPresent()) {
       if (config.get().numRecentEvents().isPresent()) {
@@ -339,15 +345,7 @@ public final class VertexAiSessionService implements BaseSessionService {
       }
     }
 
-    session =
-        Session.builder(sessId)
-            .appName(appName)
-            .userId(userId)
-            .lastUpdateTime(updateTimestamp)
-            .state(sessionState)
-            .events(events)
-            .build();
-    return Maybe.just(session);
+    return Maybe.just(sessionBuilder.events(events).build());
   }
 
   @Override
