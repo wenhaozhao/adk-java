@@ -25,6 +25,7 @@ import com.google.adk.events.Event;
 import com.google.adk.events.EventActions;
 import com.google.adk.tools.BaseTool;
 import com.google.adk.tools.ToolContext;
+import com.google.common.base.VerifyException;
 import com.google.common.collect.ImmutableList;
 import com.google.genai.types.Content;
 import com.google.genai.types.FunctionCall;
@@ -115,7 +116,7 @@ public final class Functions {
 
     for (FunctionCall functionCall : functionCalls) {
       if (!tools.containsKey(functionCall.name().get())) {
-        throw new RuntimeException("Tool not found: " + functionCall.name().get());
+        throw new VerifyException("Tool not found: " + functionCall.name().get());
       }
       BaseTool tool = tools.get(functionCall.name().get());
       ToolContext toolContext =
