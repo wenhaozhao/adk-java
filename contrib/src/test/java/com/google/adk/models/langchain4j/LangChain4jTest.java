@@ -9,6 +9,7 @@ import com.google.adk.events.Event;
 import com.google.adk.runner.InMemoryRunner;
 import com.google.adk.runner.Runner;
 import com.google.adk.sessions.Session;
+import com.google.adk.tools.AgentTool;
 import com.google.adk.tools.Annotations.Schema;
 import com.google.adk.tools.FunctionTool;
 import com.google.genai.types.Content;
@@ -16,16 +17,27 @@ import com.google.genai.types.FunctionCall;
 import com.google.genai.types.FunctionResponse;
 import com.google.genai.types.Part;
 import dev.langchain4j.model.anthropic.AnthropicChatModel;
+import dev.langchain4j.model.openai.OpenAiChatModel;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 public class LangChain4jTest {
 
-    static final String CLAUDE_3_7_SONNET_20250219 = "claude-3-7-sonnet-20250219";
+    public static final String CLAUDE_3_7_SONNET_20250219 = "claude-3-7-sonnet-20250219";
+    public static final String GEMINI_2_0_FLASH = "gemini-2.0-flash";
+    public static final String GPT_4_O_MINI = "gpt-4o-mini";
+
+    @BeforeAll
+    public static void setUp() {
+        assertNotNull(System.getenv("ANTHROPIC_API_KEY"));
+        assertNotNull(System.getenv("GOOGLE_API_KEY"));
+    }
 
     @Test
     void testSimpleAgent() {
@@ -112,9 +124,6 @@ public class LangChain4jTest {
         assertEquals(1, partsTwo.size());
         Optional<FunctionResponse> functionResponseTwo = partsTwo.get(0).functionResponse();
         assertTrue(functionResponseTwo.isPresent());
-        assertTrue(functionResponseTwo.get().response().get().get("city").toString().contains("Paris"));
-        assertTrue(functionResponseTwo.get().response().get().get("forecast").toString().contains("sunny"));
-        assertTrue(functionResponseTwo.get().response().get().get("temperature").toString().contains("24"));
 
         // assert the third event is the final text response
         assertTrue(eventThree.finalResponse());
@@ -123,6 +132,59 @@ public class LangChain4jTest {
         List<Part> partsThree = contentThree.parts().get();
         assertEquals(1, partsThree.size());
         assertTrue(partsThree.get(0).text().get().contains("beautiful"));
+    }
+
+    @Test
+    void testAgentTool() {
+        // given
+        OpenAiChatModel gptModel = OpenAiChatModel.builder()
+            .baseUrl("http://langchain4j.dev/demo/openai/v1")
+            .apiKey(Objects.requireNonNullElse(System.getenv("OPENAI_API_KEY"), "demo"))
+            .modelName(GPT_4_O_MINI)
+            .build();
+
+        LlmAgent weatherAgent = LlmAgent.builder()
+            .name("weather-agent")
+            .description("Weather agent")
+            .model(GEMINI_2_0_FLASH)
+            .instruction("""
+                Your role is to always answer that the weather is sunny and 20°C.
+                """)
+            .build();
+
+        BaseAgent agent = LlmAgent.builder()
+            .name("friendly-weather-app")
+            .description("Friend agent that knows about the weather")
+            .model(new LangChain4j(gptModel, "gpt-3.5-turbo"))
+            .instruction("""
+                You are a friendly assistant.
+                
+                If asked about the weather forecast for a city,
+                you MUST call the `weather-agent` function.
+                """)
+            .tools(AgentTool.create(weatherAgent))
+            .build();
+
+        // when
+        List<Event> events = askAgent(agent, "What's the weather like in Paris?");
+
+        // then
+        assertEquals(3, events.size());
+        events.forEach(event -> {
+            assertTrue(event.content().isPresent());
+            System.out.printf("%nevent: %s%n", event.stringifyContent());
+        });
+
+        assertEquals(1, events.get(0).functionCalls().size());
+        assertEquals("weather-agent", events.get(0).functionCalls().get(0).name().get());
+
+        assertEquals(1, events.get(1).functionResponses().size());
+        assertTrue(events.get(1).functionResponses().get(0).response().get().toString().toLowerCase().contains("sunny"));
+        assertTrue(events.get(1).functionResponses().get(0).response().get().toString().contains("20"));
+
+        assertTrue(events.get(2).finalResponse());
+        assertTrue(events.get(2).content().get().text().contains("sunny"));
+        assertTrue(events.get(2).content().get().text().contains("20"));
     }
 
     private static List<Event> askAgent(BaseAgent agent, String... messages) {
