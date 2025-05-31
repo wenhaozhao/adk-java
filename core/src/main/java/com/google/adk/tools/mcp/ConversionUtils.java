@@ -27,7 +27,7 @@ public final class ConversionUtils {
 
   public McpSchema.Tool adkToMcpToolType(BaseTool tool) {
     Optional<FunctionDeclaration> toolDeclaration = tool.declaration();
-    if (!toolDeclaration.isPresent()) {
+    if (toolDeclaration.isEmpty()) {
       return new McpSchema.Tool(tool.name(), tool.description(), "");
     }
     Schema geminiSchema = toolDeclaration.get().parameters().get();

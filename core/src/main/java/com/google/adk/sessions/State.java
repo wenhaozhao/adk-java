@@ -19,6 +19,7 @@ package com.google.adk.sessions;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -39,7 +40,7 @@ public final class State implements ConcurrentMap<String, Object> {
   }
 
   public State(ConcurrentMap<String, Object> state, ConcurrentMap<String, Object> delta) {
-    this.state = state;
+    this.state = Objects.requireNonNull(state);
     this.delta = delta;
   }
 
@@ -68,10 +69,9 @@ public final class State implements ConcurrentMap<String, Object> {
     if (o == this) {
       return true;
     }
-    if (!(o instanceof State)) {
+    if (!(o instanceof State other)) {
       return false;
     }
-    State other = (State) o;
     return state.equals(other.state);
   }
 

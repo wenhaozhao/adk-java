@@ -46,12 +46,12 @@ public final class FunctionCallingUtils {
           "Instance methods are not supported. Please use static methods.");
     }
     String name =
-        func.getAnnotation(Annotations.Schema.class) != null
+        func.isAnnotationPresent(Annotations.Schema.class)
                 && !func.getAnnotation(Annotations.Schema.class).name().isEmpty()
             ? func.getAnnotation(Annotations.Schema.class).name()
             : func.getName();
     FunctionDeclaration.Builder builder = FunctionDeclaration.builder().name(name);
-    if (func.getAnnotation(Annotations.Schema.class) != null
+    if (func.isAnnotationPresent(Annotations.Schema.class)
         && !func.getAnnotation(Annotations.Schema.class).description().isEmpty()) {
       builder.description(func.getAnnotation(Annotations.Schema.class).description());
     }
@@ -59,7 +59,7 @@ public final class FunctionCallingUtils {
     Map<String, Schema> properties = new LinkedHashMap<>();
     for (Parameter param : func.getParameters()) {
       String paramName =
-          param.getAnnotation(Annotations.Schema.class) != null
+          param.isAnnotationPresent(Annotations.Schema.class)
                   && !param.getAnnotation(Annotations.Schema.class).name().isEmpty()
               ? param.getAnnotation(Annotations.Schema.class).name()
               : param.getName();
@@ -102,7 +102,7 @@ public final class FunctionCallingUtils {
     checkArgument(!Strings.isNullOrEmpty(jsonString), "Input String can't be null or empty.");
     FunctionDeclaration declaration = FunctionDeclaration.fromJson(jsonString);
     declaration = declaration.toBuilder().description(description).build();
-    if (!declaration.name().isPresent() || declaration.name().get().isEmpty()) {
+    if (declaration.name().isEmpty() || declaration.name().get().isEmpty()) {
       throw new IllegalArgumentException("name field must be present.");
     }
     return declaration;
@@ -110,7 +110,7 @@ public final class FunctionCallingUtils {
 
   private static Schema buildSchemaFromParameter(Parameter param) {
     Schema.Builder builder = Schema.builder();
-    if (param.getAnnotation(Annotations.Schema.class) != null
+    if (param.isAnnotationPresent(Annotations.Schema.class)
         && !param.getAnnotation(Annotations.Schema.class).description().isEmpty()) {
       builder.description(param.getAnnotation(Annotations.Schema.class).description());
     }
@@ -175,4 +175,6 @@ public final class FunctionCallingUtils {
     }
     return builder.build();
   }
+
+  private FunctionCallingUtils() {}
 }

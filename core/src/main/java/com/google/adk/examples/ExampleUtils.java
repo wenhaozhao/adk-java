@@ -16,14 +16,16 @@
 
 package com.google.adk.examples;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.genai.types.Content;
 import com.google.genai.types.Part;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /** Utility class for examples. */
 public final class ExampleUtils {
@@ -62,11 +64,11 @@ public final class ExampleUtils {
 
       for (Content content : example.output()) {
         String rolePrefix = content.role().orElse("").equals("model") ? MODEL_PREFIX : USER_PREFIX;
-        for (Part part : content.parts().orElse(Collections.emptyList())) {
+        for (Part part : content.parts().orElse(ImmutableList.of())) {
           if (part.functionCall().isPresent()) {
             Map<String, Object> argsMap =
-                part.functionCall().get().args().orElse(Collections.emptyMap());
-            List<String> args =
+                part.functionCall().get().args().orElse(ImmutableMap.of());
+            ImmutableList<String> args =
                 argsMap.entrySet().stream()
                     .map(
                         entry -> {
@@ -78,7 +80,7 @@ public final class ExampleUtils {
                             return String.format("%s=%s", key, value);
                           }
                         })
-                    .collect(Collectors.toList());
+                    .collect(toImmutableList());
             output
                 .append(rolePrefix)
                 .append(FUNCTION_CALL_PREFIX)
@@ -93,7 +95,7 @@ public final class ExampleUtils {
                   .append(FUNCTION_RESPONSE_PREFIX)
                   .append(
                       OBJECT_MAPPER.writeValueAsString(
-                          part.functionResponse().get().response().orElse(Collections.emptyMap())))
+                          part.functionResponse().get().response().orElse(ImmutableMap.of())))
                   .append(FUNCTION_RESPONSE_SUFFIX);
             } catch (JsonProcessingException e) {
               output.append(FUNCTION_RESPONSE_PREFIX).append(FUNCTION_RESPONSE_SUFFIX);
@@ -107,7 +109,7 @@ public final class ExampleUtils {
       examplesStr.append(output);
     }
 
-    return EXAMPLES_INTRO + examplesStr.toString() + EXAMPLES_END;
+    return EXAMPLES_INTRO + examplesStr + EXAMPLES_END;
   }
 
   public static String buildExampleSi(BaseExampleProvider exampleProvider, String query) {

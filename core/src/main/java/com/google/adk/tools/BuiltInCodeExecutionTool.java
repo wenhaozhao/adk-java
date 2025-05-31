@@ -54,9 +54,9 @@ public final class BuiltInCodeExecutionTool extends BaseTool {
 
     List<Tool> existingTools = configBuilder.build().tools().orElse(ImmutableList.of());
     ImmutableList.Builder<Tool> updatedToolsBuilder = ImmutableList.builder();
-    updatedToolsBuilder.addAll(existingTools);
-    updatedToolsBuilder.add(
-        Tool.builder().codeExecution(ToolCodeExecution.builder().build()).build());
+    updatedToolsBuilder
+        .addAll(existingTools)
+        .add(Tool.builder().codeExecution(ToolCodeExecution.builder().build()).build());
     configBuilder.tools(updatedToolsBuilder.build());
     llmRequestBuilder.config(configBuilder.build());
     return Completable.complete();

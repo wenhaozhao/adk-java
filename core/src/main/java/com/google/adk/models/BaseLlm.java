@@ -26,7 +26,7 @@ import io.reactivex.rxjava3.core.Flowable;
 public abstract class BaseLlm {
 
   /** The name of the LLM model, e.g. gemini-1.5-flash or gemini-1.5-flash-001. */
-  private String model;
+  private final String model;
 
   public BaseLlm(String model) {
     this.model = model;

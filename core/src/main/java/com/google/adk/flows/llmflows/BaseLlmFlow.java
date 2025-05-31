@@ -124,8 +124,8 @@ public abstract class BaseLlmFlow implements BaseFlow {
     }
     LlmResponse updatedResponse = currentLlmResponse;
 
-    if (!updatedResponse.content().isPresent()
-        && !updatedResponse.errorCode().isPresent()
+    if (updatedResponse.content().isEmpty()
+        && updatedResponse.errorCode().isEmpty()
         && !updatedResponse.interrupted().orElse(false)
         && !updatedResponse.turnComplete().orElse(false)) {
       return Single.just(
@@ -152,7 +152,7 @@ public abstract class BaseLlmFlow implements BaseFlow {
               Optional<String> transferToAgent = Optional.empty();
               if (functionCallEventOpt.isPresent()) {
                 Event functionCallEvent = functionCallEventOpt.get();
-                logger.debug("Function call event generated: {}", functionCallEvent.toJson());
+                logger.debug("Function call event generated: {}", functionCallEvent);
                 eventIterables.add(Collections.singleton(functionCallEvent));
                 transferToAgent = functionCallEvent.actions().transferToAgent();
               }
@@ -414,18 +414,19 @@ public abstract class BaseLlmFlow implements BaseFlow {
     Flowable<LiveRequest> liveRequests = invocationContext.liveRequestQueue().get().get();
     Disposable sendTask =
         historySent
-            .observeOn(
-                agent.executor().map(executor -> Schedulers.from(executor)).orElse(Schedulers.io()))
+            .observeOn(agent.executor().map(Schedulers::from).orElse(Schedulers.io()))
             .andThen(
-                liveRequests.concatMapCompletable(
-                    request -> {
-                      if (request.content().isPresent()) {
-                        return connection.sendContent(request.content().get());
-                      } else if (request.blob().isPresent()) {
-                        return connection.sendRealtime(request.blob().get());
-                      }
-                      return Completable.fromAction(connection::close);
-                    }))
+                liveRequests
+                    .onBackpressureBuffer()
+                    .concatMapCompletable(
+                        request -> {
+                          if (request.content().isPresent()) {
+                            return connection.sendContent(request.content().get());
+                          } else if (request.blob().isPresent()) {
+                            return connection.sendRealtime(request.blob().get());
+                          }
+                          return Completable.fromAction(connection::close);
+                        }))
             .subscribeWith(
                 new DisposableCompletableObserver() {
                   @Override

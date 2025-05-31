@@ -50,10 +50,9 @@ public class McpSessionManager {
 
   public static McpSyncClient initializeSession(Object connectionParams) {
     McpClientTransport transport;
-    if (connectionParams instanceof ServerParameters) {
-      transport = new StdioClientTransport((ServerParameters) connectionParams);
-    } else if (connectionParams instanceof SseServerParameters) {
-      SseServerParameters sseServerParams = (SseServerParameters) connectionParams;
+    if (connectionParams instanceof ServerParameters serverParameters) {
+      transport = new StdioClientTransport(serverParameters);
+    } else if (connectionParams instanceof SseServerParameters sseServerParams) {
       transport =
           HttpClientSseClientTransport.builder(sseServerParams.url()).sseEndpoint("sse").build();
     } else {

@@ -44,7 +44,6 @@ import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.core.Single;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.function.Function;
 import org.junit.Test;
@@ -140,13 +139,7 @@ public final class BaseLlmFlowTest {
 
     List<Event> unused = baseLlmFlow.run(invocationContext).toList().blockingGet();
 
-    assertThat(
-            testLlm
-                .getLastRequest()
-                .config()
-                .orElseThrow(NoSuchElementException::new)
-                .systemInstruction()
-                .orElseThrow(NoSuchElementException::new))
+    assertThat(testLlm.getLastRequest().config().orElseThrow().systemInstruction().orElseThrow())
         .isEqualTo(Content.fromParts(Part.fromText("instruction from request processor")));
   }
 

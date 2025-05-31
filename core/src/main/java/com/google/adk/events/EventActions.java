@@ -125,10 +125,9 @@ public class EventActions {
     if (this == o) {
       return true;
     }
-    if (!(o instanceof EventActions)) {
+    if (!(o instanceof EventActions that)) {
       return false;
     }
-    EventActions that = (EventActions) o;
     return Objects.equals(skipSummarization, that.skipSummarization)
         && Objects.equals(stateDelta, that.stateDelta)
         && Objects.equals(artifactDelta, that.artifactDelta)

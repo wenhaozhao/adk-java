@@ -16,7 +16,6 @@
 
 package com.google.adk.runner;
 
-import com.google.adk.CollectionUtils;
 import com.google.adk.Telemetry;
 import com.google.adk.agents.BaseAgent;
 import com.google.adk.agents.InvocationContext;
@@ -27,6 +26,7 @@ import com.google.adk.artifacts.BaseArtifactService;
 import com.google.adk.events.Event;
 import com.google.adk.sessions.BaseSessionService;
 import com.google.adk.sessions.Session;
+import com.google.adk.utils.CollectionUtils;
 import com.google.common.collect.ImmutableList;
 import com.google.genai.types.AudioTranscriptionConfig;
 import com.google.genai.types.Content;
@@ -45,10 +45,10 @@ import java.util.Optional;
 
 /** The main class for the GenAI Agents runner. */
 public class Runner {
-  private BaseAgent agent;
+  private final BaseAgent agent;
   private final String appName;
-  private BaseArtifactService artifactService;
-  private BaseSessionService sessionService;
+  private final BaseArtifactService artifactService;
+  private final BaseSessionService sessionService;
 
   public Runner(
       BaseAgent agent,
@@ -82,7 +82,7 @@ public class Runner {
       Content newMessage,
       InvocationContext invocationContext,
       boolean saveInputBlobsAsArtifacts) {
-    if (!newMessage.parts().isPresent()) {
+    if (newMessage.parts().isEmpty()) {
       throw new IllegalArgumentException("No parts in the new_message.");
     }
 
@@ -252,10 +252,7 @@ public class Runner {
       return invocationContext
           .agent()
           .runLive(invocationContext)
-          .doOnNext(
-              event -> {
-                this.sessionService.appendEvent(session, event);
-              })
+          .doOnNext(event -> this.sessionService.appendEvent(session, event))
           .doOnError(
               throwable -> {
                 span.setStatus(StatusCode.ERROR, "Error in runLive Flowable execution");

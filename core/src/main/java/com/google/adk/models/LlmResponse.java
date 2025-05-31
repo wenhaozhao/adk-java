@@ -166,8 +166,7 @@ public abstract class LlmResponse extends JsonBaseModel {
     abstract LlmResponse autoBuild();
 
     public LlmResponse build() {
-      LlmResponse response = autoBuild();
-      return response;
+      return autoBuild();
     }
   }
 

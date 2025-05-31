@@ -17,12 +17,15 @@
 package com.google.adk.flows.llmflows;
 
 import com.google.adk.Telemetry;
+import com.google.adk.agents.Callbacks.AfterToolCallback;
+import com.google.adk.agents.Callbacks.BeforeToolCallback;
 import com.google.adk.agents.InvocationContext;
 import com.google.adk.agents.LlmAgent;
 import com.google.adk.events.Event;
 import com.google.adk.events.EventActions;
 import com.google.adk.tools.BaseTool;
 import com.google.adk.tools.ToolContext;
+import com.google.common.base.VerifyException;
 import com.google.common.collect.ImmutableList;
 import com.google.genai.types.Content;
 import com.google.genai.types.FunctionCall;
@@ -31,6 +34,7 @@ import com.google.genai.types.Part;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Scope;
+import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.core.Maybe;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -41,6 +45,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 /** Utility class for handling function calls. */
 public final class Functions {
@@ -112,7 +117,7 @@ public final class Functions {
 
     for (FunctionCall functionCall : functionCalls) {
       if (!tools.containsKey(functionCall.name().get())) {
-        throw new RuntimeException("Tool not found: " + functionCall.name().get());
+        throw new VerifyException("Tool not found: " + functionCall.name().get());
       }
       BaseTool tool = tools.get(functionCall.name().get());
       ToolContext toolContext =
@@ -202,7 +207,8 @@ public final class Functions {
     return longRunningFunctionCalls;
   }
 
-  private static Event mergeParallelFunctionResponseEvents(List<Event> functionResponseEvents) {
+  private static @Nullable Event mergeParallelFunctionResponseEvents(
+      List<Event> functionResponseEvents) {
     if (functionResponseEvents.isEmpty()) {
       return null;
     }
@@ -242,10 +248,17 @@ public final class Functions {
       ToolContext toolContext) {
     if (invocationContext.agent() instanceof LlmAgent) {
       LlmAgent agent = (LlmAgent) invocationContext.agent();
-      return agent
-          .beforeToolCallback()
-          .map(callback -> callback.call(invocationContext, tool, functionArgs, toolContext))
-          .orElse(Maybe.empty());
+
+      Optional<List<BeforeToolCallback>> callbacksOpt = agent.beforeToolCallback();
+      if (callbacksOpt.isEmpty() || callbacksOpt.get().isEmpty()) {
+        return Maybe.empty();
+      }
+      List<BeforeToolCallback> callbacks = callbacksOpt.get();
+
+      return Flowable.fromIterable(callbacks)
+          .concatMapMaybe(
+              callback -> callback.call(invocationContext, tool, functionArgs, toolContext))
+          .firstElement();
     }
     return Maybe.empty();
   }
@@ -258,12 +271,17 @@ public final class Functions {
       Map<String, Object> functionResult) {
     if (invocationContext.agent() instanceof LlmAgent) {
       LlmAgent agent = (LlmAgent) invocationContext.agent();
-      return agent
-          .afterToolCallback()
-          .map(
+      Optional<List<AfterToolCallback>> callbacksOpt = agent.afterToolCallback();
+      if (callbacksOpt.isEmpty() || callbacksOpt.get().isEmpty()) {
+        return Maybe.empty();
+      }
+      List<AfterToolCallback> callbacks = callbacksOpt.get();
+
+      return Flowable.fromIterable(callbacks)
+          .concatMapMaybe(
               callback ->
                   callback.call(invocationContext, tool, functionArgs, toolContext, functionResult))
-          .orElse(Maybe.empty());
+          .firstElement();
     }
     return Maybe.empty();
   }

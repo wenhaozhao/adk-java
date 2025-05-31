@@ -16,19 +16,27 @@
 
 package com.google.adk.agents;
 
+import static java.util.stream.Collectors.joining;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.adk.SchemaUtils;
 import com.google.adk.agents.Callbacks.AfterAgentCallback;
+import com.google.adk.agents.Callbacks.AfterAgentCallbackBase;
 import com.google.adk.agents.Callbacks.AfterAgentCallbackSync;
 import com.google.adk.agents.Callbacks.AfterModelCallback;
+import com.google.adk.agents.Callbacks.AfterModelCallbackBase;
 import com.google.adk.agents.Callbacks.AfterModelCallbackSync;
 import com.google.adk.agents.Callbacks.AfterToolCallback;
+import com.google.adk.agents.Callbacks.AfterToolCallbackBase;
 import com.google.adk.agents.Callbacks.AfterToolCallbackSync;
 import com.google.adk.agents.Callbacks.BeforeAgentCallback;
+import com.google.adk.agents.Callbacks.BeforeAgentCallbackBase;
 import com.google.adk.agents.Callbacks.BeforeAgentCallbackSync;
 import com.google.adk.agents.Callbacks.BeforeModelCallback;
+import com.google.adk.agents.Callbacks.BeforeModelCallbackBase;
 import com.google.adk.agents.Callbacks.BeforeModelCallbackSync;
 import com.google.adk.agents.Callbacks.BeforeToolCallback;
+import com.google.adk.agents.Callbacks.BeforeToolCallbackBase;
 import com.google.adk.agents.Callbacks.BeforeToolCallbackSync;
 import com.google.adk.events.Event;
 import com.google.adk.examples.BaseExampleProvider;
@@ -47,12 +55,12 @@ import com.google.genai.types.GenerateContentConfig;
 import com.google.genai.types.Schema;
 import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.core.Maybe;
-import java.util.Collections;
+import io.reactivex.rxjava3.core.Single;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executor;
-import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,8 +79,8 @@ public class LlmAgent extends BaseAgent {
   }
 
   private final Optional<Model> model;
-  private final Optional<String> instruction;
-  private final Optional<String> globalInstruction;
+  private final Instruction instruction;
+  private final Instruction globalInstruction;
   private final List<BaseTool> tools;
   private final Optional<GenerateContentConfig> generateContentConfig;
   private final Optional<BaseExampleProvider> exampleProvider;
@@ -83,8 +91,8 @@ public class LlmAgent extends BaseAgent {
   private final boolean disallowTransferToPeers;
   private final Optional<List<BeforeModelCallback>> beforeModelCallback;
   private final Optional<List<AfterModelCallback>> afterModelCallback;
-  private final Optional<BeforeToolCallback> beforeToolCallback;
-  private final Optional<AfterToolCallback> afterToolCallback;
+  private final Optional<List<BeforeToolCallback>> beforeToolCallback;
+  private final Optional<List<AfterToolCallback>> afterToolCallback;
   private final Optional<Schema> inputSchema;
   private final Optional<Schema> outputSchema;
   private final Optional<Executor> executor;
@@ -93,7 +101,7 @@ public class LlmAgent extends BaseAgent {
   private volatile Model resolvedModel;
   private final BaseLlmFlow llmFlow;
 
-  private LlmAgent(Builder builder) {
+  protected LlmAgent(Builder builder) {
     super(
         builder.name,
         builder.description,
@@ -101,14 +109,15 @@ public class LlmAgent extends BaseAgent {
         builder.beforeAgentCallback,
         builder.afterAgentCallback);
     this.model = Optional.ofNullable(builder.model);
-    this.instruction = Optional.ofNullable(builder.instruction);
-    this.globalInstruction = Optional.ofNullable(builder.globalInstruction);
-
+    this.instruction =
+        builder.instruction == null ? new Instruction.Static("") : builder.instruction;
+    this.globalInstruction =
+        builder.globalInstruction == null ? new Instruction.Static("") : builder.globalInstruction;
     this.generateContentConfig = Optional.ofNullable(builder.generateContentConfig);
     this.exampleProvider = Optional.ofNullable(builder.exampleProvider);
     this.includeContents =
         builder.includeContents != null ? builder.includeContents : IncludeContents.DEFAULT;
-    this.planning = builder.planning != null ? builder.planning : false;
+    this.planning = builder.planning != null && builder.planning;
     this.disallowTransferToParent = builder.disallowTransferToParent;
     this.disallowTransferToPeers = builder.disallowTransferToPeers;
     this.beforeModelCallback = Optional.ofNullable(builder.beforeModelCallback);
@@ -119,7 +128,7 @@ public class LlmAgent extends BaseAgent {
     this.outputSchema = Optional.ofNullable(builder.outputSchema);
     this.executor = Optional.ofNullable(builder.executor);
     this.outputKey = Optional.ofNullable(builder.outputKey);
-    this.tools = builder.tools != null ? builder.tools : Collections.emptyList();
+    this.tools = builder.tools != null ? builder.tools : ImmutableList.of();
 
     this.llmFlow = determineLlmFlow();
 
@@ -138,22 +147,23 @@ public class LlmAgent extends BaseAgent {
     private String description;
 
     private Model model;
-    private String instruction;
-    private String globalInstruction;
-    private List<BaseAgent> subAgents;
-    private List<BaseTool> tools;
+
+    private Instruction instruction;
+    private Instruction globalInstruction;
+    private ImmutableList<BaseAgent> subAgents;
+    private ImmutableList<BaseTool> tools;
     private GenerateContentConfig generateContentConfig;
     private BaseExampleProvider exampleProvider;
     private IncludeContents includeContents;
     private Boolean planning;
     private Boolean disallowTransferToParent;
     private Boolean disallowTransferToPeers;
-    private List<BeforeModelCallback> beforeModelCallback;
-    private List<AfterModelCallback> afterModelCallback;
-    private List<BeforeAgentCallback> beforeAgentCallback;
-    private List<AfterAgentCallback> afterAgentCallback;
-    private BeforeToolCallback beforeToolCallback;
-    private AfterToolCallback afterToolCallback;
+    private ImmutableList<BeforeModelCallback> beforeModelCallback;
+    private ImmutableList<AfterModelCallback> afterModelCallback;
+    private ImmutableList<BeforeAgentCallback> beforeAgentCallback;
+    private ImmutableList<AfterAgentCallback> afterAgentCallback;
+    private ImmutableList<BeforeToolCallback> beforeToolCallback;
+    private ImmutableList<AfterToolCallback> afterToolCallback;
     private Schema inputSchema;
     private Schema outputSchema;
     private Executor executor;
@@ -184,14 +194,27 @@ public class LlmAgent extends BaseAgent {
     }
 
     @CanIgnoreReturnValue
-    public Builder instruction(String instruction) {
+    public Builder instruction(Instruction instruction) {
       this.instruction = instruction;
       return this;
     }
 
     @CanIgnoreReturnValue
-    public Builder globalInstruction(String globalInstruction) {
+    public Builder instruction(String instruction) {
+      this.instruction = (instruction == null) ? null : new Instruction.Static(instruction);
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    public Builder globalInstruction(Instruction globalInstruction) {
       this.globalInstruction = globalInstruction;
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    public Builder globalInstruction(String globalInstruction) {
+      this.globalInstruction =
+          (globalInstruction == null) ? null : new Instruction.Static(globalInstruction);
       return this;
     }
 
@@ -286,14 +309,14 @@ public class LlmAgent extends BaseAgent {
     }
 
     @CanIgnoreReturnValue
-    public Builder beforeModelCallback(List<Object> beforeModelCallback) {
+    public Builder beforeModelCallback(List<BeforeModelCallbackBase> beforeModelCallback) {
       if (beforeModelCallback == null) {
         this.beforeModelCallback = null;
       } else if (beforeModelCallback.isEmpty()) {
         this.beforeModelCallback = ImmutableList.of();
       } else {
         ImmutableList.Builder<BeforeModelCallback> builder = ImmutableList.builder();
-        for (Object callback : beforeModelCallback) {
+        for (BeforeModelCallbackBase callback : beforeModelCallback) {
           if (callback instanceof BeforeModelCallback beforeModelCallbackInstance) {
             builder.add(beforeModelCallbackInstance);
           } else if (callback instanceof BeforeModelCallbackSync beforeModelCallbackSyncInstance) {
@@ -330,14 +353,14 @@ public class LlmAgent extends BaseAgent {
     }
 
     @CanIgnoreReturnValue
-    public Builder afterModelCallback(List<Object> afterModelCallback) {
+    public Builder afterModelCallback(List<AfterModelCallbackBase> afterModelCallback) {
       if (afterModelCallback == null) {
         this.afterModelCallback = null;
       } else if (afterModelCallback.isEmpty()) {
         this.afterModelCallback = ImmutableList.of();
       } else {
         ImmutableList.Builder<AfterModelCallback> builder = ImmutableList.builder();
-        for (Object callback : afterModelCallback) {
+        for (AfterModelCallbackBase callback : afterModelCallback) {
           if (callback instanceof AfterModelCallback afterModelCallbackInstance) {
             builder.add(afterModelCallbackInstance);
           } else if (callback instanceof AfterModelCallbackSync afterModelCallbackSyncInstance) {
@@ -374,7 +397,7 @@ public class LlmAgent extends BaseAgent {
     }
 
     @CanIgnoreReturnValue
-    public Builder beforeAgentCallback(List<Object> beforeAgentCallback) {
+    public Builder beforeAgentCallback(List<BeforeAgentCallbackBase> beforeAgentCallback) {
       this.beforeAgentCallback = CallbackUtil.getBeforeAgentCallbacks(beforeAgentCallback);
       return this;
     }
@@ -395,7 +418,7 @@ public class LlmAgent extends BaseAgent {
     }
 
     @CanIgnoreReturnValue
-    public Builder afterAgentCallback(List<Object> afterAgentCallback) {
+    public Builder afterAgentCallback(List<AfterAgentCallbackBase> afterAgentCallback) {
       this.afterAgentCallback = CallbackUtil.getAfterAgentCallbacks(afterAgentCallback);
       return this;
     }
@@ -411,32 +434,91 @@ public class LlmAgent extends BaseAgent {
 
     @CanIgnoreReturnValue
     public Builder beforeToolCallback(BeforeToolCallback beforeToolCallback) {
-      this.beforeToolCallback = beforeToolCallback;
+      this.beforeToolCallback = ImmutableList.of(beforeToolCallback);
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    public Builder beforeToolCallback(@Nullable List<BeforeToolCallbackBase> beforeToolCallbacks) {
+      if (beforeToolCallbacks == null) {
+        this.beforeToolCallback = null;
+      } else if (beforeToolCallbacks.isEmpty()) {
+        this.beforeToolCallback = ImmutableList.of();
+      } else {
+        ImmutableList.Builder<BeforeToolCallback> builder = ImmutableList.builder();
+        for (BeforeToolCallbackBase callback : beforeToolCallbacks) {
+          if (callback instanceof BeforeToolCallback beforeToolCallbackInstance) {
+            builder.add(beforeToolCallbackInstance);
+          } else if (callback instanceof BeforeToolCallbackSync beforeToolCallbackSyncInstance) {
+            builder.add(
+                (invocationContext, baseTool, input, toolContext) ->
+                    Maybe.fromOptional(
+                        beforeToolCallbackSyncInstance.call(
+                            invocationContext, baseTool, input, toolContext)));
+          } else {
+            logger.warn(
+                "Invalid beforeToolCallback callback type: {}. Ignoring this callback.",
+                callback.getClass().getName());
+          }
+        }
+        this.beforeToolCallback = builder.build();
+      }
       return this;
     }
 
     @CanIgnoreReturnValue
     public Builder beforeToolCallbackSync(BeforeToolCallbackSync beforeToolCallbackSync) {
       this.beforeToolCallback =
-          (invocationContext, baseTool, input, toolContext) ->
-              Maybe.fromOptional(
-                  beforeToolCallbackSync.call(invocationContext, baseTool, input, toolContext));
+          ImmutableList.of(
+              (invocationContext, baseTool, input, toolContext) ->
+                  Maybe.fromOptional(
+                      beforeToolCallbackSync.call(
+                          invocationContext, baseTool, input, toolContext)));
       return this;
     }
 
     @CanIgnoreReturnValue
     public Builder afterToolCallback(AfterToolCallback afterToolCallback) {
-      this.afterToolCallback = afterToolCallback;
+      this.afterToolCallback = ImmutableList.of(afterToolCallback);
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    public Builder afterToolCallback(@Nullable List<AfterToolCallbackBase> afterToolCallbacks) {
+      if (afterToolCallbacks == null) {
+        this.afterToolCallback = null;
+      } else if (afterToolCallbacks.isEmpty()) {
+        this.afterToolCallback = ImmutableList.of();
+      } else {
+        ImmutableList.Builder<AfterToolCallback> builder = ImmutableList.builder();
+        for (AfterToolCallbackBase callback : afterToolCallbacks) {
+          if (callback instanceof AfterToolCallback afterToolCallbackInstance) {
+            builder.add(afterToolCallbackInstance);
+          } else if (callback instanceof AfterToolCallbackSync afterToolCallbackSyncInstance) {
+            builder.add(
+                (invocationContext, baseTool, input, toolContext, response) ->
+                    Maybe.fromOptional(
+                        afterToolCallbackSyncInstance.call(
+                            invocationContext, baseTool, input, toolContext, response)));
+          } else {
+            logger.warn(
+                "Invalid afterToolCallback callback type: {}. Ignoring this callback.",
+                callback.getClass().getName());
+          }
+        }
+        this.afterToolCallback = builder.build();
+      }
       return this;
     }
 
     @CanIgnoreReturnValue
     public Builder afterToolCallbackSync(AfterToolCallbackSync afterToolCallbackSync) {
       this.afterToolCallback =
-          (invocationContext, baseTool, input, toolContext, response) ->
-              Maybe.fromOptional(
-                  afterToolCallbackSync.call(
-                      invocationContext, baseTool, input, toolContext, response));
+          ImmutableList.of(
+              (invocationContext, baseTool, input, toolContext, response) ->
+                  Maybe.fromOptional(
+                      afterToolCallbackSync.call(
+                          invocationContext, baseTool, input, toolContext, response)));
       return this;
     }
 
@@ -464,7 +546,7 @@ public class LlmAgent extends BaseAgent {
       return this;
     }
 
-    public LlmAgent build() {
+    protected void validate() {
       this.disallowTransferToParent =
           this.disallowTransferToParent != null && this.disallowTransferToParent;
       this.disallowTransferToPeers =
@@ -496,12 +578,15 @@ public class LlmAgent extends BaseAgent {
                   + ": if outputSchema is set, tools must be empty.");
         }
       }
+    }
 
+    public LlmAgent build() {
+      validate();
       return new LlmAgent(this);
     }
   }
 
-  private BaseLlmFlow determineLlmFlow() {
+  protected BaseLlmFlow determineLlmFlow() {
     if (disallowTransferToParent() && disallowTransferToPeers() && subAgents().isEmpty()) {
       return new SingleFlow();
     } else {
@@ -514,9 +599,9 @@ public class LlmAgent extends BaseAgent {
       // Concatenate text from all parts.
       Object output;
       String rawResult =
-          event.content().flatMap(Content::parts).orElse(Collections.emptyList()).stream()
+          event.content().flatMap(Content::parts).orElse(ImmutableList.of()).stream()
               .map(part -> part.text().orElse(""))
-              .collect(Collectors.joining());
+              .collect(joining());
 
       Optional<Schema> outputSchema = outputSchema();
       if (outputSchema.isPresent()) {
@@ -558,11 +643,46 @@ public class LlmAgent extends BaseAgent {
     return llmFlow.runLive(invocationContext).doOnNext(this::maybeSaveOutputToState);
   }
 
-  public Optional<String> instruction() {
+  /**
+   * Constructs the text instruction for this agent based on the {@link #instruction} field.
+   *
+   * <p>This method is only for use by Agent Development Kit.
+   *
+   * @param context The context to retrieve the session state.
+   * @return The resolved instruction as a {@link Single} wrapped string.
+   */
+  public Single<String> canonicalInstruction(ReadonlyContext context) {
+    if (instruction instanceof Instruction.Static staticInstr) {
+      return Single.just(staticInstr.instruction());
+    } else if (instruction instanceof Instruction.Provider provider) {
+      return provider.getInstruction().apply(context);
+    }
+    throw new IllegalStateException("Unknown Instruction subtype: " + instruction.getClass());
+  }
+
+  /**
+   * Constructs the text global instruction for this agent based on the {@link #globalInstruction}
+   * field.
+   *
+   * <p>This method is only for use by Agent Development Kit.
+   *
+   * @param context The context to retrieve the session state.
+   * @return The resolved global instruction as a {@link Single} wrapped string.
+   */
+  public Single<String> canonicalGlobalInstruction(ReadonlyContext context) {
+    if (globalInstruction instanceof Instruction.Static staticInstr) {
+      return Single.just(staticInstr.instruction());
+    } else if (globalInstruction instanceof Instruction.Provider provider) {
+      return provider.getInstruction().apply(context);
+    }
+    throw new IllegalStateException("Unknown Instruction subtype: " + instruction.getClass());
+  }
+
+  public Instruction instruction() {
     return instruction;
   }
 
-  public Optional<String> globalInstruction() {
+  public Instruction globalInstruction() {
     return globalInstruction;
   }
 
@@ -606,11 +726,11 @@ public class LlmAgent extends BaseAgent {
     return afterModelCallback;
   }
 
-  public Optional<BeforeToolCallback> beforeToolCallback() {
+  public Optional<List<BeforeToolCallback>> beforeToolCallback() {
     return beforeToolCallback;
   }
 
-  public Optional<AfterToolCallback> afterToolCallback() {
+  public Optional<List<AfterToolCallback>> afterToolCallback() {
     return afterToolCallback;
   }
 

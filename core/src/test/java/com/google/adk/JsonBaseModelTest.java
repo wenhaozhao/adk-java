@@ -26,7 +26,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.genai.types.Content;
 import com.google.genai.types.FinishReason;
 import com.google.genai.types.Part;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -101,8 +100,8 @@ public class JsonBaseModelTest {
     assertThat(event.actions().stateDelta()).containsExactly("key", "value");
     assertThat(event.partial()).hasValue(false);
     assertThat(event.turnComplete()).hasValue(true);
-    assertThat(event.errorCode()).isEqualTo(Optional.empty());
-    assertThat(event.errorMessage()).isEqualTo(Optional.empty());
+    assertThat(event.errorCode()).isEmpty();
+    assertThat(event.errorMessage()).isEmpty();
     assertThat(event.interrupted()).hasValue(false);
     assertThat(event.longRunningToolIds()).hasValue(ImmutableSet.of("tool_id_3"));
     assertThat(event.timestamp()).isEqualTo(1234567890L);

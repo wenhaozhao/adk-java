@@ -58,8 +58,8 @@ public class ParallelAgent extends BaseAgent {
     private String name;
     private String description;
     private List<? extends BaseAgent> subAgents;
-    private List<Callbacks.BeforeAgentCallback> beforeAgentCallback;
-    private List<Callbacks.AfterAgentCallback> afterAgentCallback;
+    private ImmutableList<Callbacks.BeforeAgentCallback> beforeAgentCallback;
+    private ImmutableList<Callbacks.AfterAgentCallback> afterAgentCallback;
 
     @CanIgnoreReturnValue
     public Builder name(String name) {
@@ -92,7 +92,8 @@ public class ParallelAgent extends BaseAgent {
     }
 
     @CanIgnoreReturnValue
-    public Builder beforeAgentCallback(List<Object> beforeAgentCallback) {
+    public Builder beforeAgentCallback(
+        List<Callbacks.BeforeAgentCallbackBase> beforeAgentCallback) {
       this.beforeAgentCallback = CallbackUtil.getBeforeAgentCallbacks(beforeAgentCallback);
       return this;
     }
@@ -104,7 +105,7 @@ public class ParallelAgent extends BaseAgent {
     }
 
     @CanIgnoreReturnValue
-    public Builder afterAgentCallback(List<Object> afterAgentCallback) {
+    public Builder afterAgentCallback(List<Callbacks.AfterAgentCallbackBase> afterAgentCallback) {
       this.afterAgentCallback = CallbackUtil.getAfterAgentCallbacks(afterAgentCallback);
       return this;
     }

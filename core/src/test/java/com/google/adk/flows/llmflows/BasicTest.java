@@ -29,6 +29,7 @@ import com.google.adk.agents.RunConfig;
 import com.google.adk.events.Event;
 import com.google.adk.flows.llmflows.RequestProcessor.RequestProcessingResult;
 import com.google.adk.models.LlmRequest;
+import com.google.adk.models.LlmResponse;
 import com.google.adk.testing.TestLlm;
 import com.google.common.collect.ImmutableList;
 import com.google.genai.types.AudioTranscriptionConfig;
@@ -69,7 +70,7 @@ public final class BasicTest {
   @Before
   public void setUp() {
     basicProcessor = new Basic();
-    testLlm = createTestLlm();
+    testLlm = createTestLlm(new LlmResponse[] {});
     testAgent = createTestAgent(testLlm);
     testContext = createInvocationContext(testAgent);
     initialRequest = LlmRequest.builder().build();

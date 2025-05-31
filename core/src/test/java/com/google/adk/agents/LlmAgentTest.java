@@ -35,6 +35,7 @@ import com.google.genai.types.Content;
 import com.google.genai.types.FunctionDeclaration;
 import com.google.genai.types.Part;
 import com.google.genai.types.Schema;
+import io.reactivex.rxjava3.core.Single;
 import java.util.List;
 import java.util.Optional;
 import org.junit.Test;
@@ -174,5 +175,85 @@ public final class LlmAgentTest {
         .contains(
             "Invalid config for agent agent with invalid tool config: if outputSchema is set,"
                 + " subAgents must be empty to disable agent transfer.");
+  }
+
+  @Test
+  public void testBuild_withNullInstruction_setsInstructionToEmptyString() {
+    LlmAgent agent =
+        createTestAgentBuilder(createTestLlm(LlmResponse.builder().build()))
+            .instruction((String) null)
+            .build();
+
+    assertThat(agent.instruction()).isEqualTo(new Instruction.Static(""));
+  }
+
+  @Test
+  public void testCanonicalInstruction_acceptsPlainString() {
+    String instruction = "Test static instruction";
+    LlmAgent agent =
+        createTestAgentBuilder(createTestLlm(LlmResponse.builder().build()))
+            .instruction(instruction)
+            .build();
+    ReadonlyContext invocationContext = new ReadonlyContext(createInvocationContext(agent));
+
+    String canonicalInstruction = agent.canonicalInstruction(invocationContext).blockingGet();
+
+    assertThat(canonicalInstruction).isEqualTo(instruction);
+  }
+
+  @Test
+  public void testCanonicalInstruction_providerInstructionInjectsContext() {
+    String instruction = "Test provider instruction for invocation: ";
+    LlmAgent agent =
+        createTestAgentBuilder(createTestLlm(LlmResponse.builder().build()))
+            .instruction(
+                new Instruction.Provider(
+                    context -> Single.just(instruction + context.invocationId())))
+            .build();
+    ReadonlyContext invocationContext = new ReadonlyContext(createInvocationContext(agent));
+
+    String canonicalInstruction = agent.canonicalInstruction(invocationContext).blockingGet();
+
+    assertThat(canonicalInstruction).isEqualTo(instruction + invocationContext.invocationId());
+  }
+
+  @Test
+  public void testBuild_withNullGlobalInstruction_setsGlobalInstructionToEmptyString() {
+    LlmAgent agent =
+        createTestAgentBuilder(createTestLlm(LlmResponse.builder().build()))
+            .globalInstruction((String) null)
+            .build();
+
+    assertThat(agent.globalInstruction()).isEqualTo(new Instruction.Static(""));
+  }
+
+  @Test
+  public void testCanonicalGlobalInstruction_acceptsPlainString() {
+    String instruction = "Test static global instruction";
+    LlmAgent agent =
+        createTestAgentBuilder(createTestLlm(LlmResponse.builder().build()))
+            .globalInstruction(instruction)
+            .build();
+    ReadonlyContext invocationContext = new ReadonlyContext(createInvocationContext(agent));
+
+    String canonicalInstruction = agent.canonicalGlobalInstruction(invocationContext).blockingGet();
+
+    assertThat(canonicalInstruction).isEqualTo(instruction);
+  }
+
+  @Test
+  public void testCanonicalGlobalInstruction_providerInstructionInjectsContext() {
+    String instruction = "Test provider global instruction for invocation: ";
+    LlmAgent agent =
+        createTestAgentBuilder(createTestLlm(LlmResponse.builder().build()))
+            .globalInstruction(
+                new Instruction.Provider(
+                    context -> Single.just(instruction + context.invocationId())))
+            .build();
+    ReadonlyContext invocationContext = new ReadonlyContext(createInvocationContext(agent));
+
+    String canonicalInstruction = agent.canonicalGlobalInstruction(invocationContext).blockingGet();
+
+    assertThat(canonicalInstruction).isEqualTo(instruction + invocationContext.invocationId());
   }
 }

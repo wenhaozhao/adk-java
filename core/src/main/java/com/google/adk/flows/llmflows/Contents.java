@@ -16,6 +16,8 @@
 
 package com.google.adk.flows.llmflows;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.adk.JsonBaseModel;
 import com.google.adk.agents.InvocationContext;
@@ -104,9 +106,8 @@ public final class Contents implements RequestProcessor {
 
     return resultEvents.stream()
         .map(Event::content)
-        .filter(Optional::isPresent)
-        .map(Optional::get)
-        .collect(ImmutableList.toImmutableList());
+        .flatMap(Optional::stream)
+        .collect(toImmutableList());
   }
 
   /** Whether the event is a reply from another agent. */
@@ -195,7 +196,7 @@ public final class Contents implements RequestProcessor {
       return events;
     }
 
-    Event latestEvent = events.get(events.size() - 1);
+    Event latestEvent = Iterables.getLast(events);
     // Extract function response IDs from the latest event
     Set<String> functionResponseIds = new HashSet<>();
     latestEvent
@@ -322,14 +323,13 @@ public final class Contents implements RequestProcessor {
                 for (Part part : parts) {
                   part.functionResponse()
                       .ifPresent(
-                          response -> {
-                            response
-                                .id()
-                                .ifPresent(
-                                    functionCallId -> {
-                                      functionCallIdToResponseEventIndex.put(functionCallId, index);
-                                    });
-                          });
+                          response ->
+                              response
+                                  .id()
+                                  .ifPresent(
+                                      functionCallId ->
+                                          functionCallIdToResponseEventIndex.put(
+                                              functionCallId, index)));
                 }
               });
     }
@@ -361,18 +361,17 @@ public final class Contents implements RequestProcessor {
                 part ->
                     part.functionCall()
                         .ifPresent(
-                            call -> {
-                              call.id()
-                                  .ifPresent(
-                                      functionCallId -> {
-                                        if (functionCallIdToResponseEventIndex.containsKey(
-                                            functionCallId)) {
-                                          responseEventIndices.add(
-                                              functionCallIdToResponseEventIndex.get(
-                                                  functionCallId));
-                                        }
-                                      });
-                            }));
+                            call ->
+                                call.id()
+                                    .ifPresent(
+                                        functionCallId -> {
+                                          if (functionCallIdToResponseEventIndex.containsKey(
+                                              functionCallId)) {
+                                            responseEventIndices.add(
+                                                functionCallIdToResponseEventIndex.get(
+                                                    functionCallId));
+                                          }
+                                        })));
 
         resultEvents.add(event); // Add the function call event
 

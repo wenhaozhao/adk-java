@@ -39,8 +39,7 @@ public final class SchemaUtils {
    * @throws IllegalArgumentException If the schema type is not supported.
    */
   @SuppressWarnings("unchecked") // For tool parameter type casting.
-  private static Boolean matchType(Object value, Schema schema, Boolean isInput)
-      throws IllegalArgumentException {
+  private static Boolean matchType(Object value, Schema schema, Boolean isInput) {
     // Based on types from https://cloud.google.com/vertex-ai/docs/reference/rest/v1/Schema
     Type.Known type = schema.type().get().knownEnum();
     switch (type) {
@@ -87,8 +86,7 @@ public final class SchemaUtils {
    * @param isInput Whether the map is an input or output.
    * @throws IllegalArgumentException If the map does not match the schema.
    */
-  public static void validateMapOnSchema(Map<String, Object> args, Schema schema, Boolean isInput)
-      throws IllegalArgumentException {
+  public static void validateMapOnSchema(Map<String, Object> args, Schema schema, Boolean isInput) {
     Map<String, Schema> properties = schema.properties().get();
     for (Entry<String, Object> arg : args.entrySet()) {
       // Check if the argument is in the schema.
@@ -137,7 +135,7 @@ public final class SchemaUtils {
    */
   @SuppressWarnings("unchecked") // For tool parameter type casting.
   public static Map<String, Object> validateOutputSchema(String output, Schema schema)
-      throws IllegalArgumentException, JsonProcessingException {
+      throws JsonProcessingException {
     Map<String, Object> outputMap = JsonBaseModel.getMapper().readValue(output, HashMap.class);
     validateMapOnSchema(outputMap, schema, false);
     return outputMap;

@@ -17,8 +17,10 @@
 package com.google.adk.sessions;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.StandardSystemProperty.JAVA_VERSION;
 
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.common.base.Ascii;
 import com.google.common.collect.ImmutableMap;
 import com.google.genai.errors.GenAiIOException;
 import com.google.genai.types.HttpOptions;
@@ -102,7 +104,7 @@ abstract class ApiClient {
       throw new IllegalArgumentException("Location must not be empty.");
     }
 
-    this.credentials = Optional.of(credentials.orElseGet(() -> defaultCredentials()));
+    this.credentials = Optional.of(credentials.orElseGet(this::defaultCredentials));
 
     this.httpOptions = defaultHttpOptions(/* vertexAI= */ true, this.location);
 
@@ -129,7 +131,7 @@ abstract class ApiClient {
   static String libraryVersion() {
     // TODO: Automate revisions to the SDK library version.
     String libraryLabel = "google-genai-sdk/0.1.0";
-    String languageLabel = "gl-java/" + System.getProperty("java.version");
+    String languageLabel = "gl-java/" + JAVA_VERSION.value();
     return libraryLabel + " " + languageLabel;
   }
 
@@ -179,12 +181,12 @@ abstract class ApiClient {
       mergedHttpOptionsBuilder.timeout(httpOptionsToApply.timeout().get());
     }
     if (httpOptionsToApply.headers().isPresent()) {
-      Map<String, String> mergedHeaders =
+      ImmutableMap<String, String> mergedHeaders =
           ImmutableMap.<String, String>builder()
               .putAll(httpOptionsToApply.headers().orElse(ImmutableMap.of()))
               .putAll(this.httpOptions.headers().orElse(ImmutableMap.of()))
               .putAll(getTimeoutHeader(httpOptionsToApply).orElse(ImmutableMap.of()))
-              .build();
+              .buildOrThrow();
       mergedHttpOptionsBuilder.headers(mergedHeaders);
     }
     this.httpOptions = mergedHttpOptionsBuilder.build();
@@ -192,21 +194,22 @@ abstract class ApiClient {
 
   static HttpOptions defaultHttpOptions(boolean vertexAI, Optional<String> location) {
     ImmutableMap.Builder<String, String> defaultHeaders = ImmutableMap.builder();
-    defaultHeaders.put("Content-Type", "application/json");
-    defaultHeaders.put("user-agent", libraryVersion());
-    defaultHeaders.put("x-goog-api-client", libraryVersion());
+    defaultHeaders
+        .put("Content-Type", "application/json")
+        .put("user-agent", libraryVersion())
+        .put("x-goog-api-client", libraryVersion());
 
     HttpOptions.Builder defaultHttpOptionsBuilder =
-        HttpOptions.builder().headers(defaultHeaders.build());
+        HttpOptions.builder().headers(defaultHeaders.buildOrThrow());
 
     if (vertexAI && location.isPresent()) {
       defaultHttpOptionsBuilder
           .baseUrl(
-              location.get().equalsIgnoreCase("global")
+              Ascii.equalsIgnoreCase(location.get(), "global")
                   ? "https://aiplatform.googleapis.com"
                   : String.format("https://%s-aiplatform.googleapis.com", location.get()))
           .apiVersion("v1beta1");
-    } else if (vertexAI && !location.isPresent()) {
+    } else if (vertexAI && location.isEmpty()) {
       throw new IllegalArgumentException("Location must be provided for Vertex AI APIs.");
     } else {
       defaultHttpOptionsBuilder

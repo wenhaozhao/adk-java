@@ -16,6 +16,7 @@
 
 package com.google.adk.flows.llmflows;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
@@ -38,7 +39,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -527,11 +527,10 @@ public final class ContentsTest {
   }
 
   private static ImmutableList<Content> eventsToContents(List<Event> events) {
-    return ImmutableList.copyOf(
-        events.stream()
-            .map(Event::content)
-            .filter(Objects::nonNull)
-            .map(Optional::get)
-            .collect(Collectors.toList()));
+    return events.stream()
+        .map(Event::content)
+        .filter(Objects::nonNull)
+        .map(Optional::get)
+        .collect(toImmutableList());
   }
 }

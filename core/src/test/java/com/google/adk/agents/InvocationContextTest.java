@@ -23,7 +23,6 @@ import com.google.adk.artifacts.BaseArtifactService;
 import com.google.adk.sessions.BaseSessionService;
 import com.google.adk.sessions.Session;
 import com.google.genai.types.Content;
-import java.util.Optional;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -68,11 +67,11 @@ public final class InvocationContextTest {
     assertThat(context).isNotNull();
     assertThat(context.sessionService()).isEqualTo(mockSessionService);
     assertThat(context.artifactService()).isEqualTo(mockArtifactService);
-    assertThat(context.liveRequestQueue()).isEqualTo(Optional.empty());
+    assertThat(context.liveRequestQueue()).isEmpty();
     assertThat(context.invocationId()).isEqualTo(testInvocationId);
     assertThat(context.agent()).isEqualTo(mockAgent);
     assertThat(context.session()).isEqualTo(session);
-    assertThat(context.userContent()).isEqualTo(Optional.of(userContent));
+    assertThat(context.userContent()).hasValue(userContent);
     assertThat(context.runConfig()).isEqualTo(runConfig);
     assertThat(context.endInvocation()).isFalse();
   }
@@ -90,7 +89,7 @@ public final class InvocationContextTest {
             runConfig);
 
     assertThat(context).isNotNull();
-    assertThat(context.userContent()).isEqualTo(Optional.empty());
+    assertThat(context.userContent()).isEmpty();
   }
 
   @Test
@@ -107,11 +106,11 @@ public final class InvocationContextTest {
     assertThat(context).isNotNull();
     assertThat(context.sessionService()).isEqualTo(mockSessionService);
     assertThat(context.artifactService()).isEqualTo(mockArtifactService);
-    assertThat(context.liveRequestQueue()).isEqualTo(Optional.of(liveRequestQueue));
+    assertThat(context.liveRequestQueue()).hasValue(liveRequestQueue);
     assertThat(context.invocationId()).startsWith("e-"); // Check format of generated ID
     assertThat(context.agent()).isEqualTo(mockAgent);
     assertThat(context.session()).isEqualTo(session);
-    assertThat(context.userContent()).isEqualTo(Optional.empty());
+    assertThat(context.userContent()).isEmpty();
     assertThat(context.runConfig()).isEqualTo(runConfig);
     assertThat(context.endInvocation()).isFalse();
   }
@@ -158,11 +157,11 @@ public final class InvocationContextTest {
 
     assertThat(context.sessionService()).isEqualTo(mockSessionService);
     assertThat(context.artifactService()).isEqualTo(mockArtifactService);
-    assertThat(context.liveRequestQueue()).isEqualTo(Optional.empty());
+    assertThat(context.liveRequestQueue()).isEmpty();
     assertThat(context.invocationId()).isEqualTo(testInvocationId);
     assertThat(context.agent()).isEqualTo(mockAgent);
     assertThat(context.session()).isEqualTo(session);
-    assertThat(context.userContent()).isEqualTo(Optional.of(userContent));
+    assertThat(context.userContent()).hasValue(userContent);
     assertThat(context.runConfig()).isEqualTo(runConfig);
     assertThat(context.endInvocation()).isFalse();
   }

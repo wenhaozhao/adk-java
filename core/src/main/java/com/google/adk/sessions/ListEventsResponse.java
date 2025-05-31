@@ -42,6 +42,6 @@ public abstract class ListEventsResponse {
   }
 
   public static Builder builder() {
-    return new AutoValue_ListEventsResponse.Builder();
+    return new AutoValue_ListEventsResponse.Builder().events(ImmutableList.of());
   }
 }

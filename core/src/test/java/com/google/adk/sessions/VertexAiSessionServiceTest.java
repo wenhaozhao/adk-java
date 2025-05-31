@@ -129,10 +129,11 @@ public class VertexAiSessionServiceTest {
         mapper
             .readValue(MOCK_EVENT_STRING, new TypeReference<List<Map<String, Object>>>() {})
             .get(0);
+    Map<String, Object> sessionState = (Map<String, Object>) sessionJson.get("sessionState");
     return Session.builder("1")
         .appName("123")
         .userId("user")
-        .state(new ConcurrentHashMap<>((Map<String, Object>) sessionJson.get("sessionState")))
+        .state(sessionState == null ? null : new ConcurrentHashMap<>(sessionState))
         .lastUpdateTime(Instant.parse((String) sessionJson.get("updateTime")))
         .events(
             Arrays.asList(
@@ -149,8 +150,7 @@ public class VertexAiSessionServiceTest {
                         EventActions.builder()
                             .transferToAgent("agent")
                             .stateDelta(
-                                new ConcurrentHashMap<>(
-                                    (Map<String, Object>) sessionJson.get("sessionState")))
+                                sessionState == null ? null : new ConcurrentHashMap<>(sessionState))
                             .build())
                     .partial(false)
                     .turnComplete(true)
@@ -167,14 +167,8 @@ public class VertexAiSessionServiceTest {
   // private final ObjectMapper objectMapper = new ObjectMapper();
   @Mock private ApiResponse mockApiResponse;
   private VertexAiSessionService vertexAiSessionService;
-  public Map<String, String> sessionMap =
-      new HashMap<String, String>(
-          ImmutableMap.of(
-              "1", MOCK_SESSION_STRING_1,
-              "2", MOCK_SESSION_STRING_2,
-              "3", MOCK_SESSION_STRING_3));
-  public Map<String, String> eventMap =
-      new HashMap<String, String>(ImmutableMap.of("1", MOCK_EVENT_STRING));
+  public Map<String, String> sessionMap = null;
+  public Map<String, String> eventMap = null;
 
   private static final Pattern LRO_REGEX = Pattern.compile("^operations/([^/]+)$");
   private static final Pattern SESSION_REGEX =
@@ -186,6 +180,14 @@ public class VertexAiSessionServiceTest {
 
   @Before
   public void setUp() throws Exception {
+    sessionMap =
+        new HashMap<>(
+            ImmutableMap.of(
+                "1", MOCK_SESSION_STRING_1,
+                "2", MOCK_SESSION_STRING_2,
+                "3", MOCK_SESSION_STRING_3));
+    eventMap = new HashMap<>(ImmutableMap.of("1", MOCK_EVENT_STRING));
+
     MockitoAnnotations.openMocks(this);
     vertexAiSessionService =
         new VertexAiSessionService("test-project", "test-location", mockApiClient);
@@ -210,9 +212,7 @@ public class VertexAiSessionServiceTest {
                           "projects/test-project/locations/test-location/reasoningEngines/123/sessions/%s",
                           newSessionId));
                   newSessionData.put("userId", requestDict.get("userId"));
-                  newSessionData.put(
-                      "sessionState",
-                      requestDict.getOrDefault("sessionState", new ConcurrentHashMap<>()));
+                  newSessionData.put("sessionState", requestDict.get("sessionState"));
                   newSessionData.put("updateTime", "2024-12-12T12:12:12.123456Z");
 
                   sessionMap.put(newSessionId, mapper.writeValueAsString(newSessionData));
@@ -358,24 +358,42 @@ public class VertexAiSessionServiceTest {
     assertThat(createdSession.id()).isEqualTo("4"); // Check the generated ID
 
     // Verify that the session is now in the sessionMap
-    assertThat(sessionMap.containsKey("4")).isTrue();
+    assertThat(sessionMap).containsKey("4");
     String newSessionJson = sessionMap.get("4");
     ObjectMapper mapper = new ObjectMapper();
     Map<String, Object> newSessionMap =
-        mapper.readValue((String) newSessionJson, new TypeReference<Map<String, Object>>() {});
+        mapper.readValue(newSessionJson, new TypeReference<Map<String, Object>>() {});
     assertThat(newSessionMap.get("userId")).isEqualTo("test_user");
     assertThat(newSessionMap.get("sessionState")).isEqualTo(sessionStateMap);
   }
 
   @Test
-  public void getEmptySession_success() throws RuntimeException {
+  public void createSession_noState_success() throws Exception {
+    Single<Session> sessionSingle = vertexAiSessionService.createSession("123", "test_user");
+    Session createdSession = sessionSingle.blockingGet();
+
+    // Assert that the session was created and its properties are correct
+    assertThat(createdSession.state()).isEmpty();
+
+    // Verify that the session is now in the sessionMap
+    assertThat(sessionMap).containsKey("4");
+    String newSessionJson = sessionMap.get("4");
+    ObjectMapper mapper = new ObjectMapper();
+    Map<String, Object> newSessionMap =
+        mapper.readValue(newSessionJson, new TypeReference<Map<String, Object>>() {});
+    assertThat(newSessionMap.get("sessionState")).isNull();
+  }
+
+  @Test
+  public void getEmptySession_success() {
     RuntimeException exception =
         assertThrows(
             RuntimeException.class,
-            () -> {
-              vertexAiSessionService.getSession("123", "user", "0", Optional.empty()).blockingGet();
-            });
-    assertThat(exception.getMessage()).contains("Session not found: 0");
+            () ->
+                vertexAiSessionService
+                    .getSession("123", "user", "0", Optional.empty())
+                    .blockingGet());
+    assertThat(exception).hasMessageThat().contains("Session not found: 0");
   }
 
   @Test
@@ -387,10 +405,11 @@ public class VertexAiSessionServiceTest {
     RuntimeException exception =
         assertThrows(
             RuntimeException.class,
-            () -> {
-              vertexAiSessionService.getSession("123", "user", "1", Optional.empty()).blockingGet();
-            });
-    assertThat(exception.getMessage()).contains("Session not found: 1");
+            () ->
+                vertexAiSessionService
+                    .getSession("123", "user", "1", Optional.empty())
+                    .blockingGet());
+    assertThat(exception).hasMessageThat().contains("Session not found: 1");
   }
 
   @Test
@@ -432,6 +451,7 @@ public class VertexAiSessionServiceTest {
   }
 
   @Test
+  // TODO: This test doesn't work as intended.  It uses MOCK_EVENT_STRING.
   public void appendEvent_success() {
     Session session =
         vertexAiSessionService.getSession("123", "user", "1", Optional.empty()).blockingGet();
@@ -451,5 +471,17 @@ public class VertexAiSessionServiceTest {
             .events();
     assertThat(events).hasSize(1);
     assertThat(events.get(0).author()).isEqualTo("user");
+  }
+
+  @Test
+  public void listSessions_empty() {
+    assertThat(vertexAiSessionService.listSessions("789", "user1").blockingGet().sessions())
+        .isEmpty();
+  }
+
+  @Test
+  public void listEvents_empty() {
+    assertThat(vertexAiSessionService.listEvents("789", "user1", "3").blockingGet().events())
+        .isEmpty();
   }
 }

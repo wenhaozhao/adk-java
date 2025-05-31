@@ -17,6 +17,7 @@
 package com.google.adk.sessions;
 
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.common.base.Ascii;
 import com.google.common.collect.ImmutableMap;
 import com.google.genai.errors.GenAiIOException;
 import com.google.genai.types.HttpOptions;
@@ -51,7 +52,7 @@ public class HttpApiClient extends ApiClient {
   @Override
   public ApiResponse request(String httpMethod, String path, String requestJson) {
     boolean queryBaseModel =
-        httpMethod.equalsIgnoreCase("GET") && path.startsWith("publishers/google/models/");
+        Ascii.equalsIgnoreCase(httpMethod, "GET") && path.startsWith("publishers/google/models/");
     if (this.vertexAI() && !path.startsWith("projects/") && !queryBaseModel) {
       path =
           String.format("projects/%s/locations/%s/", this.project.get(), this.location.get())
@@ -64,12 +65,12 @@ public class HttpApiClient extends ApiClient {
     Request.Builder requestBuilder = new Request.Builder().url(requestUrl);
     setHeaders(requestBuilder);
 
-    if (httpMethod.equalsIgnoreCase("POST")) {
+    if (Ascii.equalsIgnoreCase(httpMethod, "POST")) {
       requestBuilder.post(RequestBody.create(MEDIA_TYPE_APPLICATION_JSON, requestJson));
 
-    } else if (httpMethod.equalsIgnoreCase("GET")) {
+    } else if (Ascii.equalsIgnoreCase(httpMethod, "GET")) {
       requestBuilder.get();
-    } else if (httpMethod.equalsIgnoreCase("DELETE")) {
+    } else if (Ascii.equalsIgnoreCase(httpMethod, "DELETE")) {
       requestBuilder.delete();
     } else {
       throw new IllegalArgumentException("Unsupported HTTP method: " + httpMethod);

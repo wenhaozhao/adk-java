@@ -16,6 +16,10 @@
 
 package com.google.adk.sessions;
 
+import static com.google.common.base.Strings.nullToEmpty;
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.stream.Collectors.toCollection;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -39,6 +43,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -46,7 +51,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
@@ -57,27 +61,20 @@ import org.slf4j.LoggerFactory;
 /** Connects to the managed Vertex AI Session Service. */
 /** TODO: Use the genai HttpApiClient and ApiResponse methods once they are public. */
 public final class VertexAiSessionService implements BaseSessionService {
-  private final String project;
-  private final String location;
-  private final HttpApiClient apiClient;
-  private String reasoningEngineId;
-  private int maxRetryAttempts = 5;
-  private Map<String, Object> sessionJsonMap;
-  private final ObjectMapper objectMapper = JsonBaseModel.getMapper();
+  private static final int MAX_RETRY_ATTEMPTS = 5;
+  private static final ObjectMapper objectMapper = JsonBaseModel.getMapper();
   private static final Logger logger = LoggerFactory.getLogger(VertexAiSessionService.class);
+
+  private final HttpApiClient apiClient;
 
   /**
    * Creates a new instance of the Vertex AI Session Service with a custom ApiClient for testing.
    */
   public VertexAiSessionService(String project, String location, HttpApiClient apiClient) {
-    this.project = project;
-    this.location = location;
     this.apiClient = apiClient;
   }
 
   public VertexAiSessionService() {
-    this.project = "";
-    this.location = "";
     this.apiClient =
         new HttpApiClient(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
   }
@@ -87,11 +84,8 @@ public final class VertexAiSessionService implements BaseSessionService {
       String location,
       Optional<GoogleCredentials> credentials,
       Optional<HttpOptions> httpOptions) {
-    this.project = project;
-    this.location = location;
     this.apiClient =
-        new HttpApiClient(
-            Optional.of(this.project), Optional.of(this.location), credentials, httpOptions);
+        new HttpApiClient(Optional.of(project), Optional.of(location), credentials, httpOptions);
   }
 
   public JsonNode getJsonResponse(ApiResponse apiResponse) {
@@ -110,8 +104,8 @@ public final class VertexAiSessionService implements BaseSessionService {
       @Nullable ConcurrentMap<String, Object> state,
       @Nullable String sessionId) {
 
-    reasoningEngineId = parseReasoningEngineId(appName);
-    sessionJsonMap = new ConcurrentHashMap<>();
+    String reasoningEngineId = parseReasoningEngineId(appName);
+    ConcurrentHashMap<String, Object> sessionJsonMap = new ConcurrentHashMap<>();
     sessionJsonMap.put("userId", userId);
     if (state != null) {
       sessionJsonMap.put("sessionState", state);
@@ -131,23 +125,22 @@ public final class VertexAiSessionService implements BaseSessionService {
     logger.debug("Create Session response {}", apiResponse.getResponseBody());
     String sessionName = "";
     String operationId = "";
-    String sessId = sessionId == null ? "" : sessionId;
+    String sessId = nullToEmpty(sessionId);
     if (apiResponse.getResponseBody() != null) {
       JsonNode jsonResponse = getJsonResponse(apiResponse);
-      sessionName = (String) jsonResponse.get("name").asText();
+      sessionName = jsonResponse.get("name").asText();
       List<String> parts = Splitter.on('/').splitToList(sessionName);
       sessId = parts.get(parts.size() - 3);
-      operationId = parts.get(parts.size() - 1);
+      operationId = Iterables.getLast(parts);
     }
-    while (maxRetryAttempts >= 0) {
+    for (int i = 0; i < MAX_RETRY_ATTEMPTS; i++) {
       ApiResponse lroResponse = apiClient.request("GET", "operations/" + operationId, "");
       JsonNode jsonResponse = getJsonResponse(lroResponse);
       if (jsonResponse.get("done") != null) {
         break;
       }
       try {
-        TimeUnit.SECONDS.sleep(1);
-        maxRetryAttempts -= 1;
+        SECONDS.sleep(1);
       } catch (InterruptedException e) {
         logger.warn("Error during sleep", e);
       }
@@ -157,9 +150,8 @@ public final class VertexAiSessionService implements BaseSessionService {
         apiClient.request(
             "GET", "reasoningEngines/" + reasoningEngineId + "/sessions/" + sessId, "");
     JsonNode getSessionResponseMap = getJsonResponse(getSessionApiResponse);
-    Instant updateTimestamp =
-        Instant.parse((String) getSessionResponseMap.get("updateTime").asText());
-    ConcurrentMap<String, Object> sessionState = new ConcurrentHashMap<>();
+    Instant updateTimestamp = Instant.parse(getSessionResponseMap.get("updateTime").asText());
+    ConcurrentMap<String, Object> sessionState = null;
     try {
       if (getSessionResponseMap != null && getSessionResponseMap.has("sessionState")) {
         JsonNode sessionStateNode = getSessionResponseMap.get("sessionState");
@@ -178,13 +170,13 @@ public final class VertexAiSessionService implements BaseSessionService {
             .appName(appName)
             .userId(userId)
             .lastUpdateTime(updateTimestamp)
-            .state(sessionState)
+            .state(sessionState == null ? new ConcurrentHashMap<>() : sessionState)
             .build());
   }
 
   @Override
   public Single<ListSessionsResponse> listSessions(String appName, String userId) {
-    reasoningEngineId = parseReasoningEngineId(appName);
+    String reasoningEngineId = parseReasoningEngineId(appName);
 
     ApiResponse apiResponse =
         apiClient.request(
@@ -205,6 +197,7 @@ public final class VertexAiSessionService implements BaseSessionService {
               listSessionsResponseMap.get("sessions").toString(),
               new TypeReference<List<Map<String, Object>>>() {});
     } catch (JsonProcessingException e) {
+      logger.warn("Error while parsing list sessions response: {}", e.getMessage());
       apiSessions = new ArrayList<>();
     }
 
@@ -212,7 +205,7 @@ public final class VertexAiSessionService implements BaseSessionService {
     for (Map<String, Object> apiSession : apiSessions) {
       String name = (String) apiSession.get("name");
       List<String> parts = Splitter.on('/').splitToList(name);
-      String sessionId = parts.get(parts.size() - 1);
+      String sessionId = Iterables.getLast(parts);
       Instant updateTimestamp = Instant.parse((String) apiSession.get("updateTime"));
       Session session =
           Session.builder(sessionId)
@@ -228,7 +221,7 @@ public final class VertexAiSessionService implements BaseSessionService {
 
   @Override
   public Single<ListEventsResponse> listEvents(String appName, String userId, String sessionId) {
-    reasoningEngineId = parseReasoningEngineId(appName);
+    String reasoningEngineId = parseReasoningEngineId(appName);
     ApiResponse apiResponse =
         apiClient.request(
             "GET",
@@ -242,13 +235,14 @@ public final class VertexAiSessionService implements BaseSessionService {
     }
 
     JsonNode getEventsResponseMap = getJsonResponse(apiResponse);
-    List<Map<String, Object>> listEventsResponse;
+    List<ConcurrentMap<String, Object>> listEventsResponse;
     try {
       listEventsResponse =
           objectMapper.readValue(
               getEventsResponseMap.get("sessionEvents").toString(),
-              new TypeReference<List<Map<String, Object>>>() {});
+              new TypeReference<List<ConcurrentMap<String, Object>>>() {});
     } catch (JsonProcessingException e) {
+      logger.warn("Error while parsing list events response: {}", e.getMessage());
       listEventsResponse = new ArrayList<>();
     }
 
@@ -262,34 +256,38 @@ public final class VertexAiSessionService implements BaseSessionService {
   @Override
   public Maybe<Session> getSession(
       String appName, String userId, String sessionId, Optional<GetSessionConfig> config) {
-    reasoningEngineId = parseReasoningEngineId(appName);
+    String reasoningEngineId = parseReasoningEngineId(appName);
     ApiResponse apiResponse =
         apiClient.request(
             "GET", "reasoningEngines/" + reasoningEngineId + "/sessions/" + sessionId, "");
     JsonNode getSessionResponseMap = getJsonResponse(apiResponse);
 
-    String name = (String) getSessionResponseMap.get("name").asText();
-    List<String> parts = Splitter.on('/').splitToList(name);
-    String sessId = parts.get(parts.size() - 1);
-
+    String sessId =
+        Optional.ofNullable(getSessionResponseMap.get("name"))
+            .map(name -> Iterables.getLast(Splitter.on('/').splitToList(name.asText())))
+            .orElse(sessionId);
     Instant updateTimestamp =
-        Instant.parse((String) getSessionResponseMap.get("updateTime").asText());
-    ConcurrentMap<String, Object> sessionState;
+        Optional.ofNullable(getSessionResponseMap.get("updateTime"))
+            .map(updateTime -> Instant.parse(updateTime.asText()))
+            .orElse(null);
+
+    ConcurrentMap<String, Object> sessionState = new ConcurrentHashMap<>();
     try {
-      sessionState =
-          objectMapper.readValue(
-              getSessionResponseMap.get("sessionState").toString(),
-              new TypeReference<ConcurrentMap<String, Object>>() {});
+      if (getSessionResponseMap != null && getSessionResponseMap.has("sessionState")) {
+        sessionState =
+            objectMapper.readValue(
+                getSessionResponseMap.get("sessionState").toString(),
+                new TypeReference<ConcurrentMap<String, Object>>() {});
+      }
     } catch (JsonProcessingException e) {
-      sessionState = new ConcurrentHashMap<>();
+      logger.warn("Error while parsing session state: {}", e.getMessage());
     }
-    Session session =
+    Session.Builder sessionBuilder =
         Session.builder(sessId)
             .appName(appName)
             .userId(userId)
             .lastUpdateTime(updateTimestamp)
-            .state(sessionState)
-            .build();
+            .state(sessionState);
 
     ApiResponse listEventsApiResponse =
         apiClient.request(
@@ -298,7 +296,7 @@ public final class VertexAiSessionService implements BaseSessionService {
             "");
 
     if (listEventsApiResponse.getResponseBody() == null) {
-      return Maybe.just(session);
+      return Maybe.just(sessionBuilder.build());
     }
 
     JsonNode getEventsResponseMap = getJsonResponse(listEventsApiResponse);
@@ -316,15 +314,15 @@ public final class VertexAiSessionService implements BaseSessionService {
       logger.warn("Error while parsing session events: {}", e.getMessage());
     }
 
-    List<Event> events = new ArrayList<>();
-    for (Map<String, Object> event : listEventsResponse) {
-      events.add(fromApiEvent(event));
-    }
-    events.removeIf(event -> Instant.ofEpochMilli(event.timestamp()).isAfter(updateTimestamp));
-    events.sort(
-        (event1, event2) ->
-            Instant.ofEpochMilli(event1.timestamp())
-                .compareTo(Instant.ofEpochMilli(event2.timestamp())));
+    List<Event> events =
+        listEventsResponse.stream()
+            .map(this::fromApiEvent)
+            .filter(
+                event ->
+                    updateTimestamp == null
+                        || Instant.ofEpochMilli(event.timestamp()).isBefore(updateTimestamp))
+            .sorted(Comparator.comparing(Event::timestamp))
+            .collect(toCollection(ArrayList::new));
 
     if (config.isPresent()) {
       if (config.get().numRecentEvents().isPresent()) {
@@ -347,20 +345,12 @@ public final class VertexAiSessionService implements BaseSessionService {
       }
     }
 
-    session =
-        Session.builder(sessId)
-            .appName(appName)
-            .userId(userId)
-            .lastUpdateTime(updateTimestamp)
-            .state(sessionState)
-            .events(events)
-            .build();
-    return Maybe.just(session);
+    return Maybe.just(sessionBuilder.events(events).build());
   }
 
   @Override
   public Completable deleteSession(String appName, String userId, String sessionId) {
-    reasoningEngineId = parseReasoningEngineId(appName);
+    String reasoningEngineId = parseReasoningEngineId(appName);
     ApiResponse unused =
         apiClient.request(
             "DELETE", "reasoningEngines/" + reasoningEngineId + "/sessions/" + sessionId, "");
@@ -371,7 +361,7 @@ public final class VertexAiSessionService implements BaseSessionService {
   public Single<Event> appendEvent(Session session, Event event) {
     BaseSessionService.super.appendEvent(session, event);
 
-    reasoningEngineId = parseReasoningEngineId(session.appName());
+    String reasoningEngineId = parseReasoningEngineId(session.appName());
     ApiResponse response =
         apiClient.request(
             "POST",
@@ -524,8 +514,8 @@ public final class VertexAiSessionService implements BaseSessionService {
             .actions(eventActions)
             .content(
                 Optional.ofNullable(apiEvent.get("content"))
-                    .map(rawContentValue -> convertMapToContent(rawContentValue))
-                    .map(contentObject -> SessionUtils.decodeContent(contentObject))
+                    .map(this::convertMapToContent)
+                    .map(SessionUtils::decodeContent)
                     .orElse(null))
             .timestamp(Instant.parse((String) apiEvent.get("timestamp")).toEpochMilli())
             .errorCode(

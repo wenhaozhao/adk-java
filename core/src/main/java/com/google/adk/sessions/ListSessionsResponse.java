@@ -42,6 +42,6 @@ public abstract class ListSessionsResponse {
   }
 
   public static Builder builder() {
-    return new AutoValue_ListSessionsResponse.Builder();
+    return new AutoValue_ListSessionsResponse.Builder().sessions(ImmutableList.of());
   }
 }

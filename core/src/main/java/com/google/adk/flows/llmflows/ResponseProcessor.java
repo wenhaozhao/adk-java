@@ -23,17 +23,17 @@ import com.google.auto.value.AutoValue;
 import io.reactivex.rxjava3.core.Single;
 import java.util.Optional;
 
-interface ResponseProcessor {
+public interface ResponseProcessor {
 
   @AutoValue
-  abstract static class ResponseProcessingResult {
-    abstract LlmResponse updatedResponse();
+  public abstract static class ResponseProcessingResult {
+    public abstract LlmResponse updatedResponse();
 
-    abstract Iterable<Event> events();
+    public abstract Iterable<Event> events();
 
-    abstract Optional<String> transferToAgent();
+    public abstract Optional<String> transferToAgent();
 
-    static ResponseProcessingResult create(
+    public static ResponseProcessingResult create(
         LlmResponse updatedResponse, Iterable<Event> events, Optional<String> transferToAgent) {
       return new AutoValue_ResponseProcessor_ResponseProcessingResult(
           updatedResponse, events, transferToAgent);
