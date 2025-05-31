@@ -22,7 +22,16 @@ import com.google.adk.models.BaseLlm;
 import com.google.adk.models.BaseLlmConnection;
 import com.google.adk.models.LlmRequest;
 import com.google.adk.models.LlmResponse;
-import com.google.genai.types.*;
+import com.google.genai.types.Content;
+import com.google.genai.types.FunctionCall;
+import com.google.genai.types.FunctionCallingConfigMode;
+import com.google.genai.types.FunctionDeclaration;
+import com.google.genai.types.FunctionResponse;
+import com.google.genai.types.GenerateContentConfig;
+import com.google.genai.types.Part;
+import com.google.genai.types.Schema;
+import com.google.genai.types.ToolConfig;
+import com.google.genai.types.Type;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
@@ -45,7 +54,12 @@ import dev.langchain4j.model.chat.request.json.JsonStringSchema;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import io.reactivex.rxjava3.core.Flowable;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
 
 public class LangChain4j extends BaseLlm {
 
@@ -91,7 +105,7 @@ public class LangChain4j extends BaseLlm {
                 return Flowable.error(new IllegalStateException("StreamingChatModel is not configured"));
             }
 
-            // TODO
+            // TODO implement streaming
             throw new UnsupportedOperationException("Streaming is not supported for LangChain4j models yet.");
         } else {
             if (this.chatModel == null) {
@@ -108,6 +122,10 @@ public class LangChain4j extends BaseLlm {
     private ChatRequest toChatRequest(LlmRequest llmRequest) {
         // TODO llmRequest.model() ?
         ChatRequest.Builder requestBuilder = ChatRequest.builder();
+
+        List<ToolSpecification> toolSpecifications = toToolSpecifications(llmRequest);
+        requestBuilder.toolSpecifications(toolSpecifications);
+
         if (llmRequest.config().isPresent()) {
             GenerateContentConfig generateContentConfig = llmRequest.config().get();
 
@@ -132,24 +150,28 @@ public class LangChain4j extends BaseLlm {
                         if (functionMode.knownEnum().equals(FunctionCallingConfigMode.Known.AUTO)) {
                             requestBuilder.toolChoice(ToolChoice.AUTO);
                         } else if (functionMode.knownEnum().equals(FunctionCallingConfigMode.Known.ANY)) {
-
+                            // TODO check if it's the correct mapping
+                            requestBuilder.toolChoice(ToolChoice.REQUIRED);
+                            functionCallingConfig.allowedFunctionNames().ifPresent(allowedFunctionNames -> {
+                                requestBuilder.toolSpecifications(
+                                toolSpecifications.stream()
+                                    .filter(toolSpecification ->
+                                        allowedFunctionNames.contains(toolSpecification.name()))
+                                    .toList());
+                            });
+                        } else if (functionMode.knownEnum().equals(FunctionCallingConfigMode.Known.NONE)) {
+                            requestBuilder.toolSpecifications(List.of());
                         }
-                    });
-                    functionCallingConfig.allowedFunctionNames().ifPresent(allowedFunctionName -> {
-                        // TODO
-
                     });
                 });
                 toolConfig.retrievalConfig().ifPresent(retrievalConfig -> {
                     // TODO? It exposes Latitude / Longitude, what to do with this?
-
                 });
             }
         }
 
         return requestBuilder
             .messages(toMessages(llmRequest))
-            .toolSpecifications(toToolSpecifications(llmRequest))
             // TODO?
             .build();
     }
@@ -171,7 +193,6 @@ public class LangChain4j extends BaseLlm {
     }
 
     private ChatMessage toUserOrToolResultMessage(Content content) {
-
         List<String> texts = new ArrayList<>();
         ToolExecutionResultMessage toolExecutionResultMessage = null;
 
@@ -199,7 +220,6 @@ public class LangChain4j extends BaseLlm {
     }
 
     private AiMessage toAiMessage(Content content) {
-
         List<String> texts = new ArrayList<>();
         List<ToolExecutionRequest> toolExecutionRequests = new ArrayList<>();
 
@@ -234,7 +254,6 @@ public class LangChain4j extends BaseLlm {
     }
 
     private List<ToolSpecification> toToolSpecifications(LlmRequest llmRequest) {
-
         List<ToolSpecification> toolSpecifications = new ArrayList<>();
 
         llmRequest.tools().values()
@@ -250,9 +269,11 @@ public class LangChain4j extends BaseLlm {
                             .build();
                         toolSpecifications.add(toolSpecification);
                     } else {
+                        // TODO exception or something else?
                         throw new IllegalStateException("Tool lacking parameters: " + baseTool);
                     }
                 } else {
+                    // TODO exception or something else?
                     throw new IllegalStateException("Tool lacking declaration: " + baseTool);
                 }
             });
@@ -262,7 +283,6 @@ public class LangChain4j extends BaseLlm {
 
     private JsonObjectSchema toParameters(Schema schema) {
         if (schema.type().isPresent() && schema.type().get().knownEnum().equals(Type.Known.OBJECT)) {
-
             return JsonObjectSchema.builder()
                 .addProperties(toProperties(schema))
                 .required(schema.required().orElse(List.of()))
@@ -305,7 +325,6 @@ public class LangChain4j extends BaseLlm {
     }
 
     private LlmResponse toLlmResponse(ChatResponse chatResponse) {
-
         Content content = Content.builder()
             .role("model")
             .parts(toParts(chatResponse.aiMessage()))
