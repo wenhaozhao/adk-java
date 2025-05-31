@@ -22,13 +22,7 @@ import com.google.adk.models.BaseLlm;
 import com.google.adk.models.BaseLlmConnection;
 import com.google.adk.models.LlmRequest;
 import com.google.adk.models.LlmResponse;
-import com.google.genai.types.Content;
-import com.google.genai.types.FunctionCall;
-import com.google.genai.types.FunctionDeclaration;
-import com.google.genai.types.FunctionResponse;
-import com.google.genai.types.Part;
-import com.google.genai.types.Schema;
-import com.google.genai.types.Type;
+import com.google.genai.types.*;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
@@ -40,6 +34,7 @@ import dev.langchain4j.exception.UnsupportedFeatureException;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.request.ToolChoice;
 import dev.langchain4j.model.chat.request.json.JsonArraySchema;
 import dev.langchain4j.model.chat.request.json.JsonBooleanSchema;
 import dev.langchain4j.model.chat.request.json.JsonIntegerSchema;
@@ -50,12 +45,7 @@ import dev.langchain4j.model.chat.request.json.JsonStringSchema;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import io.reactivex.rxjava3.core.Flowable;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 
 public class LangChain4j extends BaseLlm {
 
@@ -117,10 +107,50 @@ public class LangChain4j extends BaseLlm {
 
     private ChatRequest toChatRequest(LlmRequest llmRequest) {
         // TODO llmRequest.model() ?
-        return ChatRequest.builder()
+        ChatRequest.Builder requestBuilder = ChatRequest.builder();
+        if (llmRequest.config().isPresent()) {
+            GenerateContentConfig generateContentConfig = llmRequest.config().get();
+
+            generateContentConfig.temperature().ifPresent(temp ->
+                requestBuilder.temperature(temp.doubleValue()));
+            generateContentConfig.topP().ifPresent(topP ->
+                requestBuilder.topP(topP.doubleValue()));
+            generateContentConfig.topK().ifPresent(topK ->
+                requestBuilder.topK(topK.intValue()));
+            generateContentConfig.maxOutputTokens().ifPresent(requestBuilder::maxOutputTokens);
+            generateContentConfig.stopSequences().ifPresent(requestBuilder::stopSequences);
+            generateContentConfig.frequencyPenalty().ifPresent(freqPenalty ->
+                requestBuilder.frequencyPenalty(freqPenalty.doubleValue()));
+            generateContentConfig.presencePenalty().ifPresent(presPenalty ->
+                requestBuilder.presencePenalty(presPenalty.doubleValue()));
+
+            if (generateContentConfig.toolConfig().isPresent()) {
+                ToolConfig toolConfig = generateContentConfig.toolConfig().get();
+                toolConfig.functionCallingConfig().ifPresent(functionCallingConfig -> {
+                    functionCallingConfig.mode().ifPresent(functionMode -> {
+                        // TODO
+                        if (functionMode.knownEnum().equals(FunctionCallingConfigMode.Known.AUTO)) {
+                            requestBuilder.toolChoice(ToolChoice.AUTO);
+                        } else if (functionMode.knownEnum().equals(FunctionCallingConfigMode.Known.ANY)) {
+
+                        }
+                    });
+                    functionCallingConfig.allowedFunctionNames().ifPresent(allowedFunctionName -> {
+                        // TODO
+
+                    });
+                });
+                toolConfig.retrievalConfig().ifPresent(retrievalConfig -> {
+                    // TODO? It exposes Latitude / Longitude, what to do with this?
+
+                });
+            }
+        }
+
+        return requestBuilder
             .messages(toMessages(llmRequest))
             .toolSpecifications(toToolSpecifications(llmRequest))
-            // TODO
+            // TODO?
             .build();
     }
 
