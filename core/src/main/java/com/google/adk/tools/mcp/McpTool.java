@@ -42,29 +42,39 @@ import java.util.Optional;
 
 // TODO(b/413489523): Add support for auth. This is a TODO for Python as well.
 /**
- * """Initializes a MCPTool.
+ * Initializes a MCP tool.
  *
- * <p>This tool wraps a MCP Tool interface and an active MCP Session. It invokes the MCP Tool
- * through executing the tool from remote MCP Session.
- *
- * <p>Example: tool = MCPTool(mcp_tool=mcp_tool, mcp_session=mcp_session)
- *
- * <p>Args: mcp_tool: The MCP tool to wrap. mcp_session: The MCP session to use to call the tool.
- * auth_scheme: The authentication scheme to use. auth_credential: The authentication credential to
- * use.
- *
- * <p>Raises: ValueError: If mcp_tool or mcp_session is None.
+ * <p>This wraps a MCP Tool interface and an active MCP Session. It invokes the MCP Tool through
+ * executing the tool from remote MCP Session.
  */
 public final class McpTool extends BaseTool {
+
   Tool mcpTool;
   McpSyncClient mcpSession;
   McpSessionManager mcpSessionManager;
   ObjectMapper objectMapper;
 
+  /**
+   * Creates a new McpTool with the default ObjectMapper.
+   *
+   * @param mcpTool The MCP tool to wrap.
+   * @param mcpSession The MCP session to use to call the tool.
+   * @param mcpSessionManager The MCP session manager to use to create new sessions.
+   * @throws IllegalArgumentException If mcpTool or mcpSession are null.
+   */
   public McpTool(Tool mcpTool, McpSyncClient mcpSession, McpSessionManager mcpSessionManager) {
     this(mcpTool, mcpSession, mcpSessionManager, JsonBaseModel.getMapper());
   }
 
+  /**
+   * Creates a new McpTool with the default ObjectMapper.
+   *
+   * @param mcpTool The MCP tool to wrap.
+   * @param mcpSession The MCP session to use to call the tool.
+   * @param mcpSessionManager The MCP session manager to use to create new sessions.
+   * @param objectMapper The ObjectMapper to use to convert JSON schemas.
+   * @throws IllegalArgumentException If mcpTool or mcpSession are null.
+   */
   public McpTool(
       Tool mcpTool,
       McpSyncClient mcpSession,
