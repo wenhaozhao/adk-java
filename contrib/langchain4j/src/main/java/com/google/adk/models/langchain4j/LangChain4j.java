@@ -18,6 +18,7 @@ package com.google.adk.models.langchain4j;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.adk.events.Event;
 import com.google.adk.models.BaseLlm;
 import com.google.adk.models.BaseLlmConnection;
 import com.google.adk.models.LlmRequest;
@@ -52,6 +53,8 @@ import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import dev.langchain4j.model.chat.request.json.JsonSchemaElement;
 import dev.langchain4j.model.chat.request.json.JsonStringSchema;
 import dev.langchain4j.model.chat.response.ChatResponse;
+import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
+import io.reactivex.rxjava3.core.BackpressureStrategy;
 import io.reactivex.rxjava3.core.Flowable;
 
 import java.util.ArrayList;
@@ -109,8 +112,29 @@ public class LangChain4j extends BaseLlm {
                 return Flowable.error(new IllegalStateException("StreamingChatModel is not configured"));
             }
 
-            // TODO implement streaming
-            throw new UnsupportedOperationException("Streaming is not supported for LangChain4j models yet.");
+            ChatRequest chatRequest = toChatRequest(llmRequest);
+
+            // TODO is streaming properly implemented? What happens for function calls?
+            return Flowable.create(emitter -> {
+                streamingChatModel.chat(chatRequest, new StreamingChatResponseHandler() {
+                    @Override
+                    public void onPartialResponse(String s) {
+                        emitter.onNext(LlmResponse.builder()
+                            .content(Content.fromParts(Part.fromText(s)))
+                            .build());
+                    }
+
+                    @Override
+                    public void onCompleteResponse(ChatResponse chatResponse) {
+                        emitter.onComplete();
+                    }
+
+                    @Override
+                    public void onError(Throwable throwable) {
+                        emitter.onError(throwable);
+                    }
+                });
+            }, BackpressureStrategy.BUFFER);
         } else {
             if (this.chatModel == null) {
                 return Flowable.error(new IllegalStateException("ChatModel is not configured"));

@@ -3,10 +3,11 @@ package com.google.adk.models.langchain4j;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.google.adk.agents.BaseAgent;
-import com.google.adk.agents.InvocationContext;
 import com.google.adk.agents.LlmAgent;
 import com.google.adk.agents.RunConfig;
 import com.google.adk.events.Event;
+import com.google.adk.models.LlmRequest;
+import com.google.adk.models.LlmResponse;
 import com.google.adk.runner.InMemoryRunner;
 import com.google.adk.runner.Runner;
 import com.google.adk.sessions.Session;
@@ -19,7 +20,9 @@ import com.google.genai.types.FunctionCall;
 import com.google.genai.types.FunctionResponse;
 import com.google.genai.types.Part;
 import dev.langchain4j.model.anthropic.AnthropicChatModel;
+import dev.langchain4j.model.anthropic.AnthropicStreamingChatModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
+import io.reactivex.rxjava3.core.Flowable;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -287,6 +290,31 @@ public class LangChain4jTest {
         assertTrue(byeEvent3.content().isPresent());
         assertTrue(byeEvent3.content().get().text().toLowerCase().contains("goodbye"));
         assertTrue(byeEvent3.finalResponse());
+    }
+
+    @Test
+    void testSimpleStreamingResponse() {
+        // given
+        AnthropicStreamingChatModel claudeStreamingModel = AnthropicStreamingChatModel.builder()
+            .apiKey(System.getenv("ANTHROPIC_API_KEY"))
+            .modelName(CLAUDE_3_7_SONNET_20250219)
+            .build();
+
+        LangChain4j lc4jClaude = new LangChain4j(claudeStreamingModel, CLAUDE_3_7_SONNET_20250219);
+
+        // when
+        Flowable<LlmResponse> responses = lc4jClaude.generateContent(LlmRequest.builder()
+                .contents(List.of(Content.fromParts(Part.fromText("Why is the sky blue?"))))
+            .build(), true);
+
+        String fullResponse = String.join("", responses.blockingStream()
+            .map(llmResponse -> llmResponse.content().get().text())
+            .toList());
+
+        // then
+        assertTrue(fullResponse.contains("blue"));
+        assertTrue(fullResponse.contains("Rayleigh"));
+        assertTrue(fullResponse.contains("scatter"));
     }
 
     private static List<Event> askAgent(BaseAgent agent, String... messages) {
