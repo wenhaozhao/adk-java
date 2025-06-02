@@ -71,28 +71,32 @@ public class LangChain4j extends BaseLlm {
     private final ObjectMapper objectMapper;
 
     public LangChain4j(ChatModel chatModel) { // TODO
-        super(chatModel.defaultRequestParameters().modelName());
+        super(Objects.requireNonNull(chatModel.defaultRequestParameters().modelName(),
+            "chat model name cannot be null"));
         this.chatModel = Objects.requireNonNull(chatModel, "chatModel cannot be null");
         this.streamingChatModel = null;
         this.objectMapper = new ObjectMapper();
     }
 
     public LangChain4j(ChatModel chatModel, String modelName) { // TODO
-        super(modelName);
+        super(Objects.requireNonNull(modelName,
+            "chat model name cannot be null"));
         this.chatModel = Objects.requireNonNull(chatModel, "chatModel cannot be null");
         this.streamingChatModel = null;
         this.objectMapper = new ObjectMapper();
     }
 
     public LangChain4j(StreamingChatModel streamingChatModel) { // TODO
-        super(streamingChatModel.defaultRequestParameters().modelName());
+        super(Objects.requireNonNull(streamingChatModel.defaultRequestParameters().modelName(),
+            "streaming chat model name cannot be null"));
         this.chatModel = null;
         this.streamingChatModel = Objects.requireNonNull(streamingChatModel, "streamingChatModel cannot be null");
         this.objectMapper = new ObjectMapper();
     }
 
     public LangChain4j(StreamingChatModel streamingChatModel, String modelName) { // TODO
-        super(modelName);
+        super(Objects.requireNonNull(modelName,
+            "streaming chat model name cannot be null"));
         this.chatModel = null;
         this.streamingChatModel = Objects.requireNonNull(streamingChatModel, "streamingChatModel cannot be null");
         this.objectMapper = new ObjectMapper();

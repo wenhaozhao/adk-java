@@ -49,6 +49,8 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.version>17</java.version>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
         <maven.compiler.release>${java.version}</maven.compiler.release>
         <mcp-schema.version>0.10.0</mcp-schema.version>
         <errorprone.version>2.38.0</errorprone.version>

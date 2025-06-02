@@ -3,6 +3,7 @@ package com.google.adk.models.langchain4j;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.google.adk.agents.BaseAgent;
+import com.google.adk.agents.InvocationContext;
 import com.google.adk.agents.LlmAgent;
 import com.google.adk.agents.RunConfig;
 import com.google.adk.events.Event;
@@ -12,6 +13,7 @@ import com.google.adk.sessions.Session;
 import com.google.adk.tools.AgentTool;
 import com.google.adk.tools.Annotations.Schema;
 import com.google.adk.tools.FunctionTool;
+import com.google.adk.tools.ToolContext;
 import com.google.genai.types.Content;
 import com.google.genai.types.FunctionCall;
 import com.google.genai.types.FunctionResponse;
@@ -155,7 +157,7 @@ public class LangChain4jTest {
         BaseAgent agent = LlmAgent.builder()
             .name("friendly-weather-app")
             .description("Friend agent that knows about the weather")
-            .model(new LangChain4j(gptModel, "gpt-3.5-turbo"))
+            .model(new LangChain4j(gptModel))
             .instruction("""
                 You are a friendly assistant.
                 
@@ -207,7 +209,21 @@ public class LangChain4jTest {
     @Schema(description = "Function to get the weather forecast for a given city")
     public static Map<String, String> getWeather(
         @Schema(name = "city", description = "The city to get the weather forecast for")
-        String city) {
+        String city,
+        ToolContext toolContext) {
+
+        System.out.format("""
+            Tool context
+            - function call ID: %s
+            - invocation ID: %s
+            - agent name: %s
+            - state: %s
+            """,
+            toolContext.functionCallId(),
+            toolContext.invocationId(),
+            toolContext.agentName(),
+            toolContext.state().entrySet());
+
         return Map.of(
             "city", city,
             "forecast", "a beautiful and sunny weather",
