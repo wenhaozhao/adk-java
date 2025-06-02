@@ -189,6 +189,106 @@ public class LangChain4jTest {
         assertTrue(events.get(2).content().get().text().contains("20"));
     }
 
+    @Test
+    void testSubAgent() {
+        // given
+        OpenAiChatModel gptModel = OpenAiChatModel.builder()
+            .baseUrl("http://langchain4j.dev/demo/openai/v1")
+            .apiKey(Objects.requireNonNullElse(System.getenv("OPENAI_API_KEY"), "demo"))
+            .modelName(GPT_4_O_MINI)
+            .build();
+
+        LlmAgent greeterAgent = LlmAgent.builder()
+            .name("greeterAgent")
+            .description("Friendly agent that greets users")
+            .model(new LangChain4j(gptModel))
+            .instruction("""
+                You are a friendly that greets users.
+                """)
+            .build();
+
+        LlmAgent farewellAgent = LlmAgent.builder()
+            .name("farewellAgent")
+            .description("Friendly agent that says goodbye to users")
+            .model(new LangChain4j(gptModel))
+            .instruction("""
+                You are a friendly that says goodbye to users.
+                """)
+            .build();
+
+        LlmAgent coordinatorAgent = LlmAgent.builder()
+            .name("coordinator-agent")
+            .description("Coordinator agent")
+            .model(GEMINI_2_0_FLASH)
+            .instruction("""
+                Your role is to coordinate 2 agents:
+                - `greeterAgent`: should reply to messages saying hello, hi, etc.
+                - `farewellAgent`: should reply to messages saying bye, goodbye, etc.
+                """)
+            .subAgents(greeterAgent, farewellAgent)
+            .build();
+
+        // when
+        List<Event> hiEvents = askAgent(coordinatorAgent, "Hi");
+        List<Event> byeEvents = askAgent(coordinatorAgent, "Goodbye");
+
+        // then
+        hiEvents.forEach(event -> { System.out.println(event.stringifyContent()); });
+        byeEvents.forEach(event -> { System.out.println(event.stringifyContent()); });
+
+        // Assertions for hiEvents
+        assertEquals(3, hiEvents.size());
+
+        Event hiEvent1 = hiEvents.get(0);
+        assertTrue(hiEvent1.content().isPresent());
+        assertFalse(hiEvent1.functionCalls().isEmpty());
+        assertEquals(1, hiEvent1.functionCalls().size());
+        FunctionCall hiFunctionCall = hiEvent1.functionCalls().get(0);
+        assertTrue(hiFunctionCall.id().isPresent());
+        assertEquals(Optional.of("transferToAgent"), hiFunctionCall.name());
+        assertEquals(Optional.of(Map.of("agentName", "greeterAgent")), hiFunctionCall.args());
+
+        Event hiEvent2 = hiEvents.get(1);
+        assertTrue(hiEvent2.content().isPresent());
+        assertFalse(hiEvent2.functionResponses().isEmpty());
+        assertEquals(1, hiEvent2.functionResponses().size());
+        FunctionResponse hiFunctionResponse = hiEvent2.functionResponses().get(0);
+        assertTrue(hiFunctionResponse.id().isPresent());
+        assertEquals(Optional.of("transferToAgent"), hiFunctionResponse.name());
+        assertEquals(Optional.of(Map.of()), hiFunctionResponse.response()); // Empty map for response
+
+        Event hiEvent3 = hiEvents.get(2);
+        assertTrue(hiEvent3.content().isPresent());
+        assertTrue(hiEvent3.content().get().text().toLowerCase().contains("hello"));
+        assertTrue(hiEvent3.finalResponse());
+
+        // Assertions for byeEvents
+        assertEquals(3, byeEvents.size());
+
+        Event byeEvent1 = byeEvents.get(0);
+        assertTrue(byeEvent1.content().isPresent());
+        assertFalse(byeEvent1.functionCalls().isEmpty());
+        assertEquals(1, byeEvent1.functionCalls().size());
+        FunctionCall byeFunctionCall = byeEvent1.functionCalls().get(0);
+        assertTrue(byeFunctionCall.id().isPresent());
+        assertEquals(Optional.of("transferToAgent"), byeFunctionCall.name());
+        assertEquals(Optional.of(Map.of("agentName", "farewellAgent")), byeFunctionCall.args());
+
+        Event byeEvent2 = byeEvents.get(1);
+        assertTrue(byeEvent2.content().isPresent());
+        assertFalse(byeEvent2.functionResponses().isEmpty());
+        assertEquals(1, byeEvent2.functionResponses().size());
+        FunctionResponse byeFunctionResponse = byeEvent2.functionResponses().get(0);
+        assertTrue(byeFunctionResponse.id().isPresent());
+        assertEquals(Optional.of("transferToAgent"), byeFunctionResponse.name());
+        assertEquals(Optional.of(Map.of()), byeFunctionResponse.response()); // Empty map for response
+
+        Event byeEvent3 = byeEvents.get(2);
+        assertTrue(byeEvent3.content().isPresent());
+        assertTrue(byeEvent3.content().get().text().toLowerCase().contains("goodbye"));
+        assertTrue(byeEvent3.finalResponse());
+    }
+
     private static List<Event> askAgent(BaseAgent agent, String... messages) {
         ArrayList<Event> allEvents = new ArrayList<>();
 
