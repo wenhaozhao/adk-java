@@ -18,7 +18,6 @@ package com.google.adk.models.langchain4j;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.adk.events.Event;
 import com.google.adk.models.BaseLlm;
 import com.google.adk.models.BaseLlmConnection;
 import com.google.adk.models.LlmRequest;
@@ -98,9 +97,15 @@ public class LangChain4j extends BaseLlm {
     }
 
     public LangChain4j(StreamingChatModel streamingChatModel, String modelName) { // TODO
-        super(Objects.requireNonNull(modelName,
-            "streaming chat model name cannot be null"));
+        super(Objects.requireNonNull(modelName, "streaming chat model name cannot be null"));
         this.chatModel = null;
+        this.streamingChatModel = Objects.requireNonNull(streamingChatModel, "streamingChatModel cannot be null");
+        this.objectMapper = new ObjectMapper();
+    }
+
+    public LangChain4j(ChatModel chatModel, StreamingChatModel streamingChatModel, String modelName) {
+        super(Objects.requireNonNull(modelName, "model name cannot be null"));
+        this.chatModel = Objects.requireNonNull(chatModel, "chatModel cannot be null");
         this.streamingChatModel = Objects.requireNonNull(streamingChatModel, "streamingChatModel cannot be null");
         this.objectMapper = new ObjectMapper();
     }
@@ -126,6 +131,20 @@ public class LangChain4j extends BaseLlm {
 
                     @Override
                     public void onCompleteResponse(ChatResponse chatResponse) {
+                        if (chatResponse.aiMessage().hasToolExecutionRequests()) {
+                            AiMessage aiMessage = chatResponse.aiMessage();
+                            toParts(aiMessage).stream()
+                                .map(Part::functionCall)
+                                .forEach(functionCall -> {
+                                    functionCall.ifPresent(function -> {
+                                        emitter.onNext(LlmResponse.builder()
+                                            .content(Content.fromParts(Part.fromFunctionCall(
+                                                function.name().orElse(""),
+                                                function.args().orElse(Map.of()))))
+                                            .build());
+                                    });
+                                });
+                        }
                         emitter.onComplete();
                     }
 
@@ -182,10 +201,10 @@ public class LangChain4j extends BaseLlm {
                             requestBuilder.toolChoice(ToolChoice.REQUIRED);
                             functionCallingConfig.allowedFunctionNames().ifPresent(allowedFunctionNames -> {
                                 requestBuilder.toolSpecifications(
-                                toolSpecifications.stream()
-                                    .filter(toolSpecification ->
-                                        allowedFunctionNames.contains(toolSpecification.name()))
-                                    .toList());
+                                    toolSpecifications.stream()
+                                        .filter(toolSpecification ->
+                                            allowedFunctionNames.contains(toolSpecification.name()))
+                                        .toList());
                             });
                         } else if (functionMode.knownEnum().equals(FunctionCallingConfigMode.Known.NONE)) {
                             requestBuilder.toolSpecifications(List.of());
@@ -223,18 +242,26 @@ public class LangChain4j extends BaseLlm {
     private ChatMessage toUserOrToolResultMessage(Content content) {
         List<String> texts = new ArrayList<>();
         ToolExecutionResultMessage toolExecutionResultMessage = null;
+        ToolExecutionRequest toolExecutionRequest = null;
 
         for (Part part : content.parts().orElse(List.of())) {
             if (part.text().isPresent()) {
                 texts.add(part.text().get());
             } else if (part.functionResponse().isPresent()) {
-                // TODO multiple tool calls?
+                // TODO multiple tool calls? should be 1 per part?
                 FunctionResponse functionResponse = part.functionResponse().get();
                 toolExecutionResultMessage = ToolExecutionResultMessage.from(
                     functionResponse.id().orElseThrow(),
                     functionResponse.name().orElseThrow(),
                     toJson(functionResponse.response().orElseThrow())
                 );
+            } else if (part.functionCall().isPresent()) {
+                FunctionCall functionCall = part.functionCall().get();
+                toolExecutionRequest = ToolExecutionRequest.builder()
+                    .id(functionCall.id().orElseThrow())
+                    .name(functionCall.name().orElseThrow())
+                    .arguments(toJson(functionCall.args().orElse(Map.of())))
+                    .build();
             } else {
                 throw new IllegalStateException("Either text or functionCall is expected, but was: " + part);
             }
@@ -242,6 +269,8 @@ public class LangChain4j extends BaseLlm {
 
         if (toolExecutionResultMessage != null) {
             return toolExecutionResultMessage;
+        } else if (toolExecutionRequest != null){
+            return AiMessage.aiMessage(toolExecutionRequest);
         } else {
             return UserMessage.from(String.join("\n", texts));
         }

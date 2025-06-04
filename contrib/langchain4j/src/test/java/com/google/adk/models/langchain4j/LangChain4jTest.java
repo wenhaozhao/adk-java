@@ -21,7 +21,9 @@ import com.google.genai.types.FunctionResponse;
 import com.google.genai.types.Part;
 import dev.langchain4j.model.anthropic.AnthropicChatModel;
 import dev.langchain4j.model.anthropic.AnthropicStreamingChatModel;
+import dev.langchain4j.model.googleai.GoogleAiGeminiStreamingChatModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
+import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
 import io.reactivex.rxjava3.core.Flowable;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -317,7 +319,128 @@ public class LangChain4jTest {
         assertTrue(fullResponse.contains("scatter"));
     }
 
+    @Test
+    void testStreamingRunConfig() {
+        // given
+        OpenAiStreamingChatModel streamingModel = OpenAiStreamingChatModel.builder()
+            .baseUrl("http://langchain4j.dev/demo/openai/v1")
+            .apiKey(Objects.requireNonNullElse(System.getenv("OPENAI_API_KEY"), "demo"))
+            .modelName(GPT_4_O_MINI)
+            .build();
+
+//        AnthropicStreamingChatModel streamingModel = AnthropicStreamingChatModel.builder()
+//            .apiKey(System.getenv("ANTHROPIC_API_KEY"))
+//            .modelName(CLAUDE_3_7_SONNET_20250219)
+//            .build();
+
+//        GoogleAiGeminiStreamingChatModel streamingModel = GoogleAiGeminiStreamingChatModel.builder()
+//            .apiKey(System.getenv("GOOGLE_API_KEY"))
+//            .modelName("gemini-2.0-flash")
+//            .build();
+
+        LlmAgent agent = LlmAgent.builder()
+            .name("streaming-agent")
+            .description("Friendly science teacher agent")
+            .instruction("""
+                You're a friendly science teacher.
+                You give concise answers about science topics.
+                
+                When someone greets you, respond with "Hello".
+                If someone asks about the weather, call the `getWeather` function.
+                """)
+            .model(new LangChain4j(streamingModel, "GPT_4_O_MINI"))
+//            .model(new LangChain4j(streamingModel, CLAUDE_3_7_SONNET_20250219))
+            .tools(FunctionTool.create(LangChain4jTest.class, "getWeather"))
+            .build();
+
+        // when
+        List<Event> eventsHi = askAgentStreaming(agent, "Hi");
+        String responseToHi = String.join("", eventsHi.stream()
+            .map(event -> event.content().get().text())
+            .toList());
+
+        List<Event> eventsQubit = askAgentStreaming(agent, "Tell me about qubits");
+        String responseToQubit = String.join("", eventsQubit.stream()
+            .map(event -> event.content().get().text())
+            .toList());
+
+        List<Event> eventsWeather = askAgentStreaming(agent, "What's the weather in Paris?");
+        String responseToWeather = String.join("", eventsWeather.stream()
+            .map(Event::stringifyContent)
+            .toList());
+
+        // then
+
+        // Assertions for "Hi"
+        assertFalse(eventsHi.isEmpty(), "eventsHi should not be empty");
+        // Depending on the model and streaming behavior, the number of events can vary.
+        // If a single "Hello" is expected in one event:
+        // assertEquals(1, eventsHi.size(), "Expected 1 event for 'Hi'");
+        // assertEquals("Hello", responseToHi, "Response to 'Hi' should be 'Hello'");
+        // If "Hello" can be streamed in multiple parts:
+        assertTrue(eventsHi.size() >= 1, "Expected at least 1 event for 'Hi'");
+        assertTrue(responseToHi.trim().contains("Hello"), "Response to 'Hi' should be 'Hello'");
+
+
+        // Assertions for "Tell me about qubits"
+        assertTrue(eventsQubit.size() > 1, "Expected multiple streaming events for 'qubit' question");
+        assertTrue(responseToQubit.toLowerCase().contains("qubit"), "Response to 'qubit' should contain 'qubit'");
+        assertTrue(responseToQubit.toLowerCase().contains("quantum"), "Response to 'qubit' should contain 'quantum'");
+        assertTrue(responseToQubit.toLowerCase().contains("superposition"), "Response to 'qubit' should contain 'superposition'");
+
+        // Assertions for "What's the weather in Paris?"
+        assertTrue(eventsWeather.size() > 2, "Expected multiple events for weather question (function call, response, text)");
+
+        // Check for function call
+        Optional<Event> functionCallEvent = eventsWeather.stream()
+            .filter(e -> !e.functionCalls().isEmpty())
+            .findFirst();
+        assertTrue(functionCallEvent.isPresent(), "Should contain a function call event for weather");
+        FunctionCall fc = functionCallEvent.get().functionCalls().get(0);
+        assertEquals(Optional.of("getWeather"), fc.name(), "Function call name should be 'getWeather'");
+        assertTrue(fc.args().isPresent() && "Paris".equals(fc.args().get().get("city")), "Function call should be for 'Paris'");
+
+        // Check for function response
+        Optional<Event> functionResponseEvent = eventsWeather.stream()
+            .filter(e -> !e.functionResponses().isEmpty())
+            .findFirst();
+        assertTrue(functionResponseEvent.isPresent(), "Should contain a function response event for weather");
+        FunctionResponse fr = functionResponseEvent.get().functionResponses().get(0);
+        assertEquals(Optional.of("getWeather"), fr.name(), "Function response name should be 'getWeather'");
+        assertTrue(fr.response().isPresent());
+        Map<String, Object> weatherResponseMap = (Map<String, Object>) fr.response().get();
+        assertEquals("Paris", weatherResponseMap.get("city"));
+        assertTrue(weatherResponseMap.get("forecast").toString().contains("beautiful and sunny"));
+
+        // Check the final aggregated text response
+        // Consolidate text parts from events that are not function calls or responses
+        String finalWeatherTextResponse = eventsWeather.stream()
+            .filter(event -> event.functionCalls().isEmpty() && event.functionResponses().isEmpty() && event.content().isPresent() && event.content().get().text() != null)
+            .map(event -> event.content().get().text())
+            .collect(java.util.stream.Collectors.joining())
+            .trim();
+
+        assertTrue(finalWeatherTextResponse.contains("Paris"), "Final weather response should mention Paris");
+        assertTrue(finalWeatherTextResponse.toLowerCase().contains("beautiful and sunny"), "Final weather response should mention 'beautiful and sunny'");
+        assertTrue(finalWeatherTextResponse.contains("10"), "Final weather response should mention '10'");
+        assertTrue(finalWeatherTextResponse.contains("24"), "Final weather response should mention '24'");
+
+        // You can also assert on the concatenated `responseToWeather` if it's meant to capture the full interaction text
+        assertTrue(responseToWeather.contains("Function Call") && responseToWeather.contains("getWeather") && responseToWeather.contains("Paris"));
+        assertTrue(responseToWeather.contains("Function Response") && responseToWeather.contains("beautiful and sunny weather"));
+        assertTrue(responseToWeather.contains("sunny"));
+        assertTrue(responseToWeather.contains("24"));
+    }
+
     private static List<Event> askAgent(BaseAgent agent, String... messages) {
+        return runLoop(agent, false, messages);
+    }
+
+    private static List<Event> askAgentStreaming(BaseAgent agent, String... messages) {
+        return runLoop(agent, true, messages);
+    }
+
+    private static List<Event> runLoop(BaseAgent agent, boolean streaming, String... messages) {
         ArrayList<Event> allEvents = new ArrayList<>();
 
         Runner runner = new InMemoryRunner(agent, agent.name());
@@ -326,8 +449,12 @@ public class LangChain4jTest {
         for (String message : messages) {
             Content messageContent = Content.fromParts(Part.fromText(message));
             allEvents.addAll(
-                runner.runAsync(session, messageContent, RunConfig.builder().build())
-                    .blockingStream().toList()
+                runner.runAsync(session, messageContent,
+                        RunConfig.builder()
+                            .setStreamingMode(streaming ? RunConfig.StreamingMode.SSE : RunConfig.StreamingMode.NONE)
+                            .build())
+                    .blockingStream()
+                    .toList()
             );
         }
 
@@ -339,18 +466,6 @@ public class LangChain4jTest {
         @Schema(name = "city", description = "The city to get the weather forecast for")
         String city,
         ToolContext toolContext) {
-
-        System.out.format("""
-            Tool context
-            - function call ID: %s
-            - invocation ID: %s
-            - agent name: %s
-            - state: %s
-            """,
-            toolContext.functionCallId(),
-            toolContext.invocationId(),
-            toolContext.agentName(),
-            toolContext.state().entrySet());
 
         return Map.of(
             "city", city,
