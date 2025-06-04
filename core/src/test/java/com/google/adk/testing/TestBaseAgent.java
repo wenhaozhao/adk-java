@@ -17,6 +17,8 @@
 package com.google.adk.testing;
 
 import com.google.adk.agents.BaseAgent;
+import com.google.adk.agents.Callbacks.AfterAgentCallback;
+import com.google.adk.agents.Callbacks.BeforeAgentCallback;
 import com.google.adk.agents.InvocationContext;
 import com.google.adk.events.Event;
 import io.reactivex.rxjava3.core.Flowable;
@@ -29,10 +31,29 @@ public final class TestBaseAgent extends BaseAgent {
   private int invocationCount = 0;
   private InvocationContext lastInvocationContext;
 
+  public TestBaseAgent(
+      String name,
+      String description,
+      Supplier<Flowable<Event>> eventSupplier,
+      List<? extends BaseAgent> subAgents,
+      List<BeforeAgentCallback> beforeAgentCallbacks,
+      List<AfterAgentCallback> afterAgentCallbacks) {
+    super(name, description, subAgents, beforeAgentCallbacks, afterAgentCallbacks);
+    this.eventSupplier = eventSupplier;
+  }
+
   TestBaseAgent(
       String name, Supplier<Flowable<Event>> eventSupplier, List<? extends BaseAgent> subAgents) {
-    super(name, "description", subAgents, null, null);
-    this.eventSupplier = eventSupplier;
+    this(name, "description", eventSupplier, subAgents, null, null);
+  }
+
+  public TestBaseAgent(
+      String name,
+      String description,
+      List<BeforeAgentCallback> beforeAgentCallbacks,
+      List<AfterAgentCallback> afterAgentCallbacks,
+      Supplier<Flowable<Event>> eventSupplier) {
+    this(name, description, eventSupplier, null, beforeAgentCallbacks, afterAgentCallbacks);
   }
 
   @Override

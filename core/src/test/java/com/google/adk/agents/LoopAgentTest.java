@@ -20,15 +20,21 @@ import static com.google.adk.testing.TestUtils.createEscalateEvent;
 import static com.google.adk.testing.TestUtils.createEvent;
 import static com.google.adk.testing.TestUtils.createInvocationContext;
 import static com.google.adk.testing.TestUtils.createSubAgent;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
 
+import com.google.adk.agents.Callbacks.BeforeAgentCallback;
 import com.google.adk.events.Event;
 import com.google.adk.testing.TestBaseAgent;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import com.google.genai.types.Content;
+import com.google.genai.types.Part;
 import io.reactivex.rxjava3.core.Flowable;
+import io.reactivex.rxjava3.core.Maybe;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -172,5 +178,71 @@ public final class LoopAgentTest {
         .containsExactly(
             event1, event2, event1, event2, event1, event2, event1, event2, event1, event2)
         .inOrder();
+  }
+
+  @Test
+  public void runAsync_withEndInvocationInSubAgentCallback_stopsSubAgentButLoopContinues() {
+    AtomicInteger normalAgentRunCount = new AtomicInteger(0);
+    TestBaseAgent normalAgent =
+        createSubAgent(
+            "NormalAgent",
+            () -> {
+              int count = normalAgentRunCount.incrementAndGet();
+              return Flowable.just(createEvent("Normal Agent Run " + count));
+            });
+
+    AtomicInteger subAgent2CallbackCount = new AtomicInteger(0);
+    AtomicInteger subAgent2RunCount = new AtomicInteger(0);
+
+    BeforeAgentCallback subAgent2BeforeCallback =
+        (callbackContext) -> {
+          int callbackCount = subAgent2CallbackCount.incrementAndGet();
+          if (callbackCount > 1) {
+            return Maybe.just(
+                Content.fromParts(
+                    Part.fromText("Exit Callback Triggered After " + callbackCount + " Runs")));
+          }
+          return Maybe.empty();
+        };
+
+    TestBaseAgent earlyExitAgent =
+        new TestBaseAgent(
+            "EarlyExitAgent",
+            "An agent that exits early after its callback is called once",
+            () -> {
+              int count = subAgent2RunCount.incrementAndGet();
+              return Flowable.just(createEvent("Early Exit Agent Run " + count));
+            },
+            /* subAgents= */ ImmutableList.of(),
+            /* beforeAgentCallbacks= */ ImmutableList.of(subAgent2BeforeCallback),
+            /* afterAgentCallbacks= */ ImmutableList.of());
+    LoopAgent loopAgent =
+        LoopAgent.builder()
+            .name("loopAgent")
+            .subAgents(ImmutableList.of(normalAgent, earlyExitAgent))
+            .maxIterations(3)
+            .build();
+    InvocationContext invocationContext = createInvocationContext(loopAgent);
+
+    List<Event> events = loopAgent.runAsync(invocationContext).toList().blockingGet();
+
+    ImmutableList<String> eventTexts =
+        events.stream()
+            .filter(e -> e.content().isPresent())
+            .map(e -> e.content().get().text())
+            .collect(toImmutableList());
+
+    assertThat(eventTexts)
+        .containsExactly(
+            "content for event Normal Agent Run 1",
+            "content for event Early Exit Agent Run 1",
+            "content for event Normal Agent Run 2",
+            "Exit Callback Triggered After 2 Runs",
+            "content for event Normal Agent Run 3",
+            "Exit Callback Triggered After 3 Runs")
+        .inOrder();
+
+    assertThat(normalAgentRunCount.get()).isEqualTo(3);
+    assertThat(subAgent2RunCount.get()).isEqualTo(1);
   }
 }
