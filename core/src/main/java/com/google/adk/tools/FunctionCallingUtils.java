@@ -26,7 +26,6 @@ import com.google.common.base.Strings;
 import com.google.genai.types.FunctionDeclaration;
 import com.google.genai.types.Schema;
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -41,10 +40,6 @@ public final class FunctionCallingUtils {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   static FunctionDeclaration buildFunctionDeclaration(Method func, List<String> ignoreParams) {
-    if (!Modifier.isStatic(func.getModifiers())) {
-      throw new IllegalArgumentException(
-          "Instance methods are not supported. Please use static methods.");
-    }
     String name =
         func.isAnnotationPresent(Annotations.Schema.class)
                 && !func.getAnnotation(Annotations.Schema.class).name().isEmpty()
