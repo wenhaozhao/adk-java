@@ -35,7 +35,6 @@ import com.google.adk.models.BaseLlmConnection;
 import com.google.adk.models.LlmRegistry;
 import com.google.adk.models.LlmRequest;
 import com.google.adk.models.LlmResponse;
-import com.google.adk.tools.BaseTool;
 import com.google.adk.tools.ToolContext;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -76,30 +75,47 @@ public abstract class BaseLlmFlow implements BaseFlow {
    * Pre-processes the LLM request before sending it to the LLM. Executes all registered {@link
    * RequestProcessor}.
    */
-  protected RequestProcessingResult preprocess(InvocationContext context, LlmRequest llmRequest) {
+  protected Single<RequestProcessingResult> preprocess(
+      InvocationContext context, LlmRequest llmRequest) {
 
-    LlmRequest updatedRequest = llmRequest;
     List<Iterable<Event>> eventIterables = new ArrayList<>();
-
-    // Execute all registered request processors.
-    for (RequestProcessor processor : requestProcessors) {
-      RequestProcessingResult result =
-          processor.processRequest(context, updatedRequest).blockingGet();
-      if (result.events() != null) {
-        eventIterables.add(result.events());
-      }
-      updatedRequest = result.updatedRequest();
-    }
-
     LlmAgent agent = (LlmAgent) context.agent();
-    LlmRequest.Builder updatedRequestBuilder = updatedRequest.toBuilder();
-    for (BaseTool tool : agent.tools()) {
-      tool.processLlmRequest(updatedRequestBuilder, ToolContext.builder(context).build());
-    }
 
-    // Return a single on-demand (lazy) Iterable by concatenating each processor's iterable.
-    Iterable<Event> combinedEvents = Iterables.concat(eventIterables);
-    return RequestProcessingResult.create(updatedRequestBuilder.build(), combinedEvents);
+    Single<LlmRequest> processedRequestSingle =
+        Flowable.fromIterable(requestProcessors)
+            .reduce(
+                llmRequest,
+                (currentRequest, processor) ->
+                    processor
+                        .processRequest(context, currentRequest)
+                        .doOnSuccess(
+                            result -> {
+                              if (result.events() != null) {
+                                eventIterables.add(result.events());
+                              }
+                            })
+                        .map(RequestProcessingResult::updatedRequest)
+                        .blockingGet());
+
+    return processedRequestSingle.flatMap(
+        processedRequest -> {
+          LlmRequest.Builder updatedRequestBuilder = processedRequest.toBuilder();
+
+          Completable toolProcessingCompletable =
+              Flowable.fromIterable(agent.tools())
+                  .concatMapCompletable(
+                      tool ->
+                          tool.processLlmRequest(
+                              updatedRequestBuilder, ToolContext.builder(context).build()));
+
+          return toolProcessingCompletable.andThen(
+              Single.fromCallable(
+                  () -> {
+                    Iterable<Event> combinedEvents = Iterables.concat(eventIterables);
+                    return RequestProcessingResult.create(
+                        updatedRequestBuilder.build(), combinedEvents);
+                  }));
+        });
   }
 
   /**
@@ -270,75 +286,89 @@ public abstract class BaseLlmFlow implements BaseFlow {
 
   private Flowable<Event> runOneStep(InvocationContext context) {
     LlmRequest initialLlmRequest = LlmRequest.builder().build();
-    RequestProcessingResult preResult = preprocess(context, initialLlmRequest);
-    LlmRequest llmRequestAfterPreprocess = preResult.updatedRequest();
-    Iterable<Event> preEvents = preResult.events();
 
-    logger.debug("Pre-processing result: {}", preResult);
-    if (context.endInvocation()) {
-      logger.debug("End invocation requested during preprocessing.");
-      return Flowable.fromIterable(preEvents);
-    }
+    return preprocess(context, initialLlmRequest)
+        .flatMapPublisher(
+            preResult -> {
+              LlmRequest llmRequestAfterPreprocess = preResult.updatedRequest();
+              Iterable<Event> preEvents = preResult.events();
 
-    try {
-      context.incrementLlmCallsCount();
-    } catch (LlmCallsLimitExceededException e) {
-      logger.error("LLM calls limit exceeded.", e);
-      return Flowable.fromIterable(preEvents).concatWith(Flowable.error(e));
-    }
-
-    final Event mutableEventTemplate =
-        Event.builder()
-            .id(Event.generateEventId())
-            .invocationId(context.invocationId())
-            .author(context.agent().name())
-            .branch(context.branch())
-            .build();
-
-    logger.debug("Starting LLM call with request: {}", llmRequestAfterPreprocess);
-    return callLlm(context, llmRequestAfterPreprocess, mutableEventTemplate)
-        .concatMap(
-            llmResponse -> {
-              logger.debug("Processing LlmResponse with Event ID: {}", mutableEventTemplate.id());
-              logger.debug("LLM response for current step: {}", llmResponse);
-
-              Single<ResponseProcessingResult> postResultSingle =
-                  postprocess(
-                      context, mutableEventTemplate, llmRequestAfterPreprocess, llmResponse);
-
-              return postResultSingle
-                  .doOnSuccess(
-                      ignored -> {
-                        String oldId = mutableEventTemplate.id();
-                        mutableEventTemplate.setId(Event.generateEventId());
-                        logger.debug(
-                            "Updated mutableEventTemplate ID from {} to {} for next LlmResponse",
-                            oldId,
-                            mutableEventTemplate.id());
-                      })
-                  .toFlowable();
-            })
-        .concatMap(
-            postResult -> {
-              logger.debug("Post-processing result: {}", postResult);
-              Flowable<Event> postProcessedEvents = Flowable.fromIterable(postResult.events());
-              if (postResult.transferToAgent().isPresent()) {
-                String agentToTransfer = postResult.transferToAgent().get();
-                logger.debug("Transferring to agent: {}", agentToTransfer);
-                BaseAgent rootAgent = context.agent().rootAgent();
-                BaseAgent nextAgent = rootAgent.findAgent(agentToTransfer);
-                if (nextAgent == null) {
-                  String errorMsg = "Agent not found for transfer: " + agentToTransfer;
-                  logger.error(errorMsg);
-                  return postProcessedEvents.concatWith(
-                      Flowable.error(new IllegalStateException(errorMsg)));
-                }
-                return postProcessedEvents.concatWith(
-                    Flowable.defer(() -> nextAgent.runAsync(context)));
+              logger.debug("Pre-processing result: {}", preResult);
+              if (context.endInvocation()) {
+                logger.debug("End invocation requested during preprocessing.");
+                return Flowable.fromIterable(preEvents);
               }
-              return postProcessedEvents;
-            })
-        .startWithIterable(preEvents);
+
+              try {
+                context.incrementLlmCallsCount();
+              } catch (LlmCallsLimitExceededException e) {
+                logger.error("LLM calls limit exceeded.", e);
+                return Flowable.fromIterable(preEvents).concatWith(Flowable.error(e));
+              }
+
+              final Event mutableEventTemplate =
+                  Event.builder()
+                      .id(Event.generateEventId())
+                      .invocationId(context.invocationId())
+                      .author(context.agent().name())
+                      .branch(context.branch())
+                      .build();
+
+              logger.debug("Starting LLM call with request: {}", llmRequestAfterPreprocess);
+              Flowable<Event> restOfFlow =
+                  callLlm(context, llmRequestAfterPreprocess, mutableEventTemplate)
+                      .concatMap(
+                          llmResponse -> {
+                            logger.debug(
+                                "Processing LlmResponse with Event ID: {}",
+                                mutableEventTemplate.id());
+                            logger.debug("LLM response for current step: {}", llmResponse);
+
+                            Single<ResponseProcessingResult> postResultSingle =
+                                postprocess(
+                                    context,
+                                    mutableEventTemplate,
+                                    llmRequestAfterPreprocess,
+                                    llmResponse);
+
+                            return postResultSingle
+                                .doOnSuccess(
+                                    ignored -> {
+                                      String oldId = mutableEventTemplate.id();
+                                      mutableEventTemplate.setId(Event.generateEventId());
+                                      logger.debug(
+                                          "Updated mutableEventTemplate ID from {} to {} for next"
+                                              + " LlmResponse",
+                                          oldId,
+                                          mutableEventTemplate.id());
+                                    })
+                                .toFlowable();
+                          })
+                      .concatMap(
+                          postResult -> {
+                            logger.debug("Post-processing result: {}", postResult);
+                            Flowable<Event> postProcessedEvents =
+                                Flowable.fromIterable(postResult.events());
+                            if (postResult.transferToAgent().isPresent()) {
+                              String agentToTransfer = postResult.transferToAgent().get();
+                              logger.debug("Transferring to agent: {}", agentToTransfer);
+                              BaseAgent rootAgent = context.agent().rootAgent();
+                              BaseAgent nextAgent = rootAgent.findAgent(agentToTransfer);
+                              if (nextAgent == null) {
+                                String errorMsg =
+                                    "Agent not found for transfer: " + agentToTransfer;
+                                logger.error(errorMsg);
+                                return postProcessedEvents.concatWith(
+                                    Flowable.error(new IllegalStateException(errorMsg)));
+                              }
+                              return postProcessedEvents.concatWith(
+                                  Flowable.defer(() -> nextAgent.runAsync(context)));
+                            }
+                            return postProcessedEvents;
+                          });
+
+              return restOfFlow.startWithIterable(preEvents);
+            });
   }
 
   @Override
@@ -363,131 +393,146 @@ public abstract class BaseLlmFlow implements BaseFlow {
   @Override
   public Flowable<Event> runLive(InvocationContext invocationContext) {
     LlmRequest llmRequest = LlmRequest.builder().build();
-    String eventIdForSendData = Event.generateEventId();
 
-    // Preprocess before calling the LLM.
-    RequestProcessingResult preResult = preprocess(invocationContext, llmRequest);
-    LlmRequest llmRequestAfterPreprocess = preResult.updatedRequest();
-    if (invocationContext.endInvocation()) {
-      return Flowable.fromIterable(preResult.events());
-    }
+    return preprocess(invocationContext, llmRequest)
+        .flatMapPublisher(
+            preResult -> {
+              LlmRequest llmRequestAfterPreprocess = preResult.updatedRequest();
+              if (invocationContext.endInvocation()) {
+                return Flowable.fromIterable(preResult.events());
+              }
 
-    LlmAgent agent = (LlmAgent) invocationContext.agent();
-    BaseLlm llm =
-        agent.resolvedModel().model().isPresent()
-            ? agent.resolvedModel().model().get()
-            : LlmRegistry.getLlm(agent.resolvedModel().modelName().get());
-    BaseLlmConnection connection = llm.connect(llmRequestAfterPreprocess);
-    Completable historySent =
-        llmRequestAfterPreprocess.contents().isEmpty()
-            ? Completable.complete()
-            : Completable.defer(
-                () -> {
-                  Span sendDataSpan = Telemetry.getTracer().spanBuilder("send_data").startSpan();
-                  try (Scope scope = sendDataSpan.makeCurrent()) {
-                    return connection
-                        .sendHistory(llmRequestAfterPreprocess.contents())
-                        .doOnComplete(
-                            () -> {
-                              try (Scope innerScope = sendDataSpan.makeCurrent()) {
-                                Telemetry.traceSendData(
-                                    invocationContext,
-                                    eventIdForSendData,
-                                    llmRequestAfterPreprocess.contents());
+              String eventIdForSendData = Event.generateEventId();
+              LlmAgent agent = (LlmAgent) invocationContext.agent();
+              BaseLlm llm =
+                  agent.resolvedModel().model().isPresent()
+                      ? agent.resolvedModel().model().get()
+                      : LlmRegistry.getLlm(agent.resolvedModel().modelName().get());
+              BaseLlmConnection connection = llm.connect(llmRequestAfterPreprocess);
+              Completable historySent =
+                  llmRequestAfterPreprocess.contents().isEmpty()
+                      ? Completable.complete()
+                      : Completable.defer(
+                          () -> {
+                            Span sendDataSpan =
+                                Telemetry.getTracer().spanBuilder("send_data").startSpan();
+                            try (Scope scope = sendDataSpan.makeCurrent()) {
+                              return connection
+                                  .sendHistory(llmRequestAfterPreprocess.contents())
+                                  .doOnComplete(
+                                      () -> {
+                                        try (Scope innerScope = sendDataSpan.makeCurrent()) {
+                                          Telemetry.traceSendData(
+                                              invocationContext,
+                                              eventIdForSendData,
+                                              llmRequestAfterPreprocess.contents());
+                                        }
+                                      })
+                                  .doOnError(
+                                      error -> {
+                                        sendDataSpan.setStatus(
+                                            StatusCode.ERROR, error.getMessage());
+                                        sendDataSpan.recordException(error);
+                                        try (Scope innerScope = sendDataSpan.makeCurrent()) {
+                                          Telemetry.traceSendData(
+                                              invocationContext,
+                                              eventIdForSendData,
+                                              llmRequestAfterPreprocess.contents());
+                                        }
+                                      })
+                                  .doFinally(sendDataSpan::end);
+                            }
+                          });
+
+              Flowable<LiveRequest> liveRequests = invocationContext.liveRequestQueue().get().get();
+              Disposable sendTask =
+                  historySent
+                      .observeOn(agent.executor().map(Schedulers::from).orElse(Schedulers.io()))
+                      .andThen(
+                          liveRequests
+                              .onBackpressureBuffer()
+                              .concatMapCompletable(
+                                  request -> {
+                                    if (request.content().isPresent()) {
+                                      return connection.sendContent(request.content().get());
+                                    } else if (request.blob().isPresent()) {
+                                      return connection.sendRealtime(request.blob().get());
+                                    }
+                                    return Completable.fromAction(connection::close);
+                                  }))
+                      .subscribeWith(
+                          new DisposableCompletableObserver() {
+                            @Override
+                            public void onComplete() {
+                              connection.close();
+                            }
+
+                            @Override
+                            public void onError(Throwable e) {
+                              connection.close(e);
+                            }
+                          });
+
+              Event.Builder liveEventBuilderTemplate =
+                  Event.builder()
+                      .invocationId(invocationContext.invocationId())
+                      .author(invocationContext.agent().name())
+                      .branch(invocationContext.branch());
+
+              Flowable<Event> receiveFlow =
+                  connection
+                      .receive()
+                      .flatMapSingle(
+                          llmResponse -> {
+                            Event baseEventForThisLlmResponse =
+                                liveEventBuilderTemplate.id(Event.generateEventId()).build();
+                            return postprocess(
+                                invocationContext,
+                                baseEventForThisLlmResponse,
+                                llmRequestAfterPreprocess,
+                                llmResponse);
+                          })
+                      .flatMap(
+                          postResult -> {
+                            Flowable<Event> events = Flowable.fromIterable(postResult.events());
+                            if (postResult.transferToAgent().isPresent()) {
+                              BaseAgent rootAgent = invocationContext.agent().rootAgent();
+                              BaseAgent nextAgent =
+                                  rootAgent.findAgent(postResult.transferToAgent().get());
+                              if (nextAgent == null) {
+                                throw new IllegalStateException(
+                                    "Agent not found: " + postResult.transferToAgent().get());
                               }
-                            })
-                        .doOnError(
-                            error -> {
-                              sendDataSpan.setStatus(StatusCode.ERROR, error.getMessage());
-                              sendDataSpan.recordException(error);
-                              try (Scope innerScope = sendDataSpan.makeCurrent()) {
-                                Telemetry.traceSendData(
-                                    invocationContext,
-                                    eventIdForSendData,
-                                    llmRequestAfterPreprocess.contents());
-                              }
-                            })
-                        .doFinally(sendDataSpan::end);
-                  }
-                });
+                              Flowable<Event> nextAgentEvents =
+                                  nextAgent.runLive(invocationContext);
+                              events = Flowable.concat(events, nextAgentEvents);
+                            }
+                            return events;
+                          })
+                      .doOnNext(
+                          event -> {
+                            ImmutableList<FunctionResponse> functionResponses =
+                                event.functionResponses();
+                            if (!functionResponses.isEmpty()) {
+                              invocationContext
+                                  .liveRequestQueue()
+                                  .get()
+                                  .content(event.content().get());
+                            }
+                            if (functionResponses.stream()
+                                .anyMatch(
+                                    functionResponse ->
+                                        functionResponse
+                                            .name()
+                                            .orElse("")
+                                            .equals("transferToAgent"))) {
+                              sendTask.dispose();
+                              connection.close();
+                            }
+                          });
 
-    Flowable<LiveRequest> liveRequests = invocationContext.liveRequestQueue().get().get();
-    Disposable sendTask =
-        historySent
-            .observeOn(agent.executor().map(Schedulers::from).orElse(Schedulers.io()))
-            .andThen(
-                liveRequests
-                    .onBackpressureBuffer()
-                    .concatMapCompletable(
-                        request -> {
-                          if (request.content().isPresent()) {
-                            return connection.sendContent(request.content().get());
-                          } else if (request.blob().isPresent()) {
-                            return connection.sendRealtime(request.blob().get());
-                          }
-                          return Completable.fromAction(connection::close);
-                        }))
-            .subscribeWith(
-                new DisposableCompletableObserver() {
-                  @Override
-                  public void onComplete() {
-                    connection.close();
-                  }
-
-                  @Override
-                  public void onError(Throwable e) {
-                    connection.close(e);
-                  }
-                });
-
-    Event.Builder liveEventBuilderTemplate =
-        Event.builder()
-            .invocationId(invocationContext.invocationId())
-            .author(invocationContext.agent().name())
-            .branch(invocationContext.branch());
-
-    return connection
-        .receive()
-        .flatMapSingle(
-            llmResponse -> {
-              Event baseEventForThisLlmResponse =
-                  liveEventBuilderTemplate.id(Event.generateEventId()).build();
-              return postprocess(
-                  invocationContext,
-                  baseEventForThisLlmResponse,
-                  llmRequestAfterPreprocess,
-                  llmResponse);
-            })
-        .flatMap(
-            postResult -> {
-              Flowable<Event> events = Flowable.fromIterable(postResult.events());
-              if (postResult.transferToAgent().isPresent()) {
-                BaseAgent rootAgent = invocationContext.agent().rootAgent();
-                BaseAgent nextAgent = rootAgent.findAgent(postResult.transferToAgent().get());
-                if (nextAgent == null) {
-                  throw new IllegalStateException(
-                      "Agent not found: " + postResult.transferToAgent().get());
-                }
-                Flowable<Event> nextAgentEvents = nextAgent.runLive(invocationContext);
-                events = Flowable.concat(events, nextAgentEvents);
-              }
-              return events;
-            })
-        .doOnNext(
-            event -> {
-              ImmutableList<FunctionResponse> functionResponses = event.functionResponses();
-              if (!functionResponses.isEmpty()) {
-                invocationContext.liveRequestQueue().get().content(event.content().get());
-              }
-              if (functionResponses.stream()
-                  .anyMatch(
-                      functionResponse ->
-                          functionResponse.name().orElse("").equals("transferToAgent"))) {
-                sendTask.dispose();
-                connection.close();
-              }
-            })
-        .startWithIterable(preResult.events());
+              return receiveFlow.startWithIterable(preResult.events());
+            });
   }
 
   private Event buildModelResponseEvent(
