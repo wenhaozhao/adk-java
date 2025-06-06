@@ -32,6 +32,7 @@ import com.google.genai.types.Part;
 import com.google.genai.types.Schema;
 import com.google.genai.types.ToolConfig;
 import com.google.genai.types.Type;
+import dev.langchain4j.Experimental;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
@@ -63,6 +64,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
+@Experimental
 public class LangChain4j extends BaseLlm {
 
     private static final TypeReference<Map<String, Object>> MAP_TYPE_REFERENCE = new TypeReference<>() {
