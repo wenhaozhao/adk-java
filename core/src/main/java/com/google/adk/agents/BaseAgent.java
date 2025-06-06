@@ -189,21 +189,12 @@ public abstract class BaseAgent {
                             callCallback(beforeCallbacksToFunctions(callback), invocationContext))
                     .orElse(Single.just(Optional.empty()))
                     .flatMapPublisher(
-                        beforeEvent -> {
-                          if (beforeEvent.isPresent()) {
-                            if (beforeEvent.get().content().isPresent()) {
-                              return Flowable.just(beforeEvent.get());
-                            }
-                            // TODO (b/413093657): Currently endInvocation cannot be set by
-                            // tools/callbacks,
-                            // so this will be a no-op.
-                            // We should allow it to be settable in the invocation context.
-                            if (invocationContext.endInvocation()) {
-                              return Flowable.just(beforeEvent.get());
-                            }
+                        beforeEventOpt -> {
+                          if (invocationContext.endInvocation()) {
+                            return Flowable.fromOptional(beforeEventOpt);
                           }
 
-                          Flowable<Event> beforeEvents = Flowable.fromOptional(beforeEvent);
+                          Flowable<Event> beforeEvents = Flowable.fromOptional(beforeEventOpt);
                           Flowable<Event> mainEvents =
                               Flowable.defer(() -> runAsyncImpl(invocationContext));
                           Flowable<Event> afterEvents =
@@ -266,7 +257,7 @@ public abstract class BaseAgent {
                                 .actions(callbackContext.eventActions());
 
                         eventBuilder.content(Optional.of(content));
-
+                        invocationContext.setEndInvocation(true);
                         return Optional.of(eventBuilder.build());
                       })
                   .toFlowable();

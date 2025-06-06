@@ -18,6 +18,7 @@ package com.google.adk.agents;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import java.util.Optional;
 
 /** Provides read-only access to the context of an agent run. */
 public class ReadonlyContext {
@@ -31,6 +32,11 @@ public class ReadonlyContext {
   /** Returns the ID of the current invocation. */
   public String invocationId() {
     return invocationContext.invocationId();
+  }
+
+  /** Returns the branch of the current invocation, if present. */
+  public Optional<String> branch() {
+    return invocationContext.branch();
   }
 
   /** Returns the name of the agent currently running. */

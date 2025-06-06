@@ -40,7 +40,7 @@ public class InvocationContext {
 
   private final Optional<Content> userContent;
   private final RunConfig runConfig;
-  private final boolean endInvocation;
+  private boolean endInvocation;
   private final InvocationCostManager invocationCostManager = new InvocationCostManager();
 
   private InvocationContext(
@@ -167,6 +167,10 @@ public class InvocationContext {
 
   public boolean endInvocation() {
     return endInvocation;
+  }
+
+  public void setEndInvocation(boolean endInvocation) {
+    this.endInvocation = endInvocation;
   }
 
   public String appName() {

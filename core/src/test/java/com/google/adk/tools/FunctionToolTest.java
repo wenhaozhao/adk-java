@@ -38,7 +38,7 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public final class FunctionToolTest {
   @Test
-  public void create_withMethod_success() throws NoSuchMethodException {
+  public void create_withStaticMethod_success() throws NoSuchMethodException {
     Method method = Functions.class.getMethod("voidReturnWithoutSchema");
 
     FunctionTool tool = FunctionTool.create(method);
@@ -60,7 +60,7 @@ public final class FunctionToolTest {
   }
 
   @Test
-  public void create_withClassAndMethodName_success() {
+  public void create_withClassAndStaticMethodName_success() {
     FunctionTool tool = FunctionTool.create(Functions.class, "voidReturnWithSchemaAndToolContext");
 
     assertThat(tool).isNotNull();
@@ -99,10 +99,33 @@ public final class FunctionToolTest {
   }
 
   @Test
-  public void create_nonStaticMethod() {
+  public void create_nonStaticMethodWithoutInstance_throwsException() {
     assertThrows(
         IllegalArgumentException.class,
-        () -> FunctionTool.create(Functions.class, "nonStaticMethod"));
+        () -> FunctionTool.create(Functions.class, "nonStaticVoidReturnWithoutSchema"));
+  }
+
+  @Test
+  public void create_withInstanceAndNonStaticMethodName_success() throws NoSuchMethodException {
+    Functions functions = new Functions();
+    Method method = Functions.class.getMethod("nonStaticVoidReturnWithoutSchema");
+
+    FunctionTool tool = FunctionTool.create(functions, method);
+
+    assertThat(tool).isNotNull();
+    assertThat(tool.name()).isEqualTo("nonStaticVoidReturnWithoutSchema");
+    assertThat(tool.description()).isEmpty();
+    assertThat(tool.declaration())
+        .hasValue(
+            FunctionDeclaration.builder()
+                .name("nonStaticVoidReturnWithoutSchema")
+                .parameters(
+                    Schema.builder()
+                        .type("OBJECT")
+                        .properties(ImmutableMap.of())
+                        .required(ImmutableList.of())
+                        .build())
+                .build());
   }
 
   @Test
@@ -320,6 +343,58 @@ public final class FunctionToolTest {
         () -> FunctionTool.create(Functions.class, "returnsMaybeString"));
   }
 
+  @Test
+  public void call_nonStaticWithAllSupportedParameterTypes() throws Exception {
+    Functions functions = new Functions();
+    FunctionTool tool =
+        FunctionTool.create(functions, "nonStaticReturnAllSupportedParametersAsMap");
+    ToolContext toolContext =
+        ToolContext.builder(
+                InvocationContext.create(
+                    null, null, null, Session.builder("123").build(), null, null))
+            .functionCallId("functionCallId")
+            .build();
+
+    Map<String, Object> result =
+        tool.runAsync(
+                ImmutableMap.<String, Object>builder()
+                    .put("stringParam", "stringParam")
+                    .put("primitiveBoolParam", true)
+                    .put("boolParam", Boolean.FALSE)
+                    .put("primitiveIntParam", 1)
+                    .put("intParam", Integer.valueOf(2))
+                    .put("primitiveLongParam", 3L)
+                    .put("longParam", Long.valueOf(4))
+                    .put("primitiveFloatParam", 5.0f)
+                    .put("floatParam", Float.valueOf(5.0f))
+                    .put("primitiveDoubleParam", 7.0)
+                    .put("doubleParam", Double.valueOf(8.0))
+                    .put("listParam", ImmutableList.of("a", "b"))
+                    .put("mapParam", ImmutableMap.of("key1", "value1"))
+                    .buildOrThrow(),
+                toolContext)
+            .blockingGet();
+
+    assertThat(result)
+        .containsExactlyEntriesIn(
+            ImmutableMap.<String, Object>builder()
+                .put("stringParam", "stringParam")
+                .put("primitiveBoolParam", true)
+                .put("boolParam", Boolean.FALSE)
+                .put("primitiveIntParam", 1)
+                .put("intParam", Integer.valueOf(2))
+                .put("primitiveLongParam", 3L)
+                .put("longParam", Long.valueOf(4))
+                .put("primitiveFloatParam", 5.0f)
+                .put("floatParam", Float.valueOf(5.0f))
+                .put("primitiveDoubleParam", 7.0)
+                .put("doubleParam", Double.valueOf(8.0))
+                .put("listParam", ImmutableList.of("a", "b"))
+                .put("mapParam", ImmutableMap.of("key1", "value1"))
+                .put("toolContext", toolContext.toString())
+                .buildOrThrow());
+  }
+
   static class Functions {
     @Annotations.Schema(name = "my_function", description = "A test function")
     public static void voidReturnWithSchemaAndToolContext(
@@ -388,8 +463,39 @@ public final class FunctionToolTest {
       return Maybe.just("not supported");
     }
 
-    public String nonStaticMethod() {
-      return "non static method";
+    public void nonStaticVoidReturnWithoutSchema() {}
+
+    public ImmutableMap<String, Object> nonStaticReturnAllSupportedParametersAsMap(
+        String stringParam,
+        boolean primitiveBoolParam,
+        Boolean boolParam,
+        int primitiveIntParam,
+        Integer intParam,
+        long primitiveLongParam,
+        Long longParam,
+        float primitiveFloatParam,
+        Float floatParam,
+        double primitiveDoubleParam,
+        Double doubleParam,
+        List<String> listParam,
+        Map<String, String> mapParam,
+        ToolContext toolContext) {
+      return ImmutableMap.<String, Object>builder()
+          .put("stringParam", stringParam)
+          .put("primitiveBoolParam", primitiveBoolParam)
+          .put("boolParam", boolParam)
+          .put("primitiveIntParam", primitiveIntParam)
+          .put("intParam", intParam)
+          .put("primitiveLongParam", primitiveLongParam)
+          .put("longParam", longParam)
+          .put("primitiveFloatParam", primitiveFloatParam)
+          .put("floatParam", floatParam)
+          .put("primitiveDoubleParam", primitiveDoubleParam)
+          .put("doubleParam", doubleParam)
+          .put("listParam", listParam)
+          .put("mapParam", mapParam)
+          .put("toolContext", toolContext.toString())
+          .buildOrThrow();
     }
   }
 

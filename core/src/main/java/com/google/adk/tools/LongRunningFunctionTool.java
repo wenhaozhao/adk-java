@@ -36,6 +36,6 @@ public class LongRunningFunctionTool extends FunctionTool {
   }
 
   private LongRunningFunctionTool(Method func) {
-    super(func, /* isLongRunning= */ true);
+    super(null, func, /* isLongRunning= */ true);
   }
 }

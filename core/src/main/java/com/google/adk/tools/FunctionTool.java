@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,8 +41,26 @@ public class FunctionTool extends BaseTool {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final Logger logger = LoggerFactory.getLogger(FunctionTool.class);
 
+  @Nullable private final Object instance;
   private final Method func;
   private final FunctionDeclaration funcDeclaration;
+
+  public static FunctionTool create(Object instance, Method func) {
+    if (!areParametersAnnotatedWithSchema(func) && wasCompiledWithDefaultParameterNames(func)) {
+      logger.error(
+          "Functions used in tools must have their parameters annotated with @Schema or at least"
+              + " the code must be compiled with the -parameters flag as a fallback. Your function"
+              + " tool will likely not work as expected and exit at runtime.");
+    }
+    if (!Modifier.isStatic(func.getModifiers()) && !func.getDeclaringClass().isInstance(instance)) {
+      throw new IllegalArgumentException(
+          String.format(
+              "The instance provided is not an instance of the declaring class of the method."
+                  + " Expected: %s, Actual: %s",
+              func.getDeclaringClass().getName(), instance.getClass().getName()));
+    }
+    return new FunctionTool(instance, func, /* isLongRunning= */ false);
+  }
 
   public static FunctionTool create(Method func) {
     if (!areParametersAnnotatedWithSchema(func) && wasCompiledWithDefaultParameterNames(func)) {
@@ -50,17 +69,31 @@ public class FunctionTool extends BaseTool {
               + " the code must be compiled with the -parameters flag as a fallback. Your function"
               + " tool will likely not work as expected and exit at runtime.");
     }
-    return new FunctionTool(func, /* isLongRunning= */ false);
+    if (!Modifier.isStatic(func.getModifiers())) {
+      throw new IllegalArgumentException("The method provided must be static.");
+    }
+    return new FunctionTool(null, func, /* isLongRunning= */ false);
   }
 
   public static FunctionTool create(Class<?> cls, String methodName) {
     for (Method method : cls.getMethods()) {
-      if (method.getName().equals(methodName)) {
-        return create(method);
+      if (method.getName().equals(methodName) && Modifier.isStatic(method.getModifiers())) {
+        return create(null, method);
       }
     }
     throw new IllegalArgumentException(
-        String.format("Method %s not found in class %s.", methodName, cls.getName()));
+        String.format("Static method %s not found in class %s.", methodName, cls.getName()));
+  }
+
+  public static FunctionTool create(Object instance, String methodName) {
+    Class<?> cls = instance.getClass();
+    for (Method method : cls.getMethods()) {
+      if (method.getName().equals(methodName) && !Modifier.isStatic(method.getModifiers())) {
+        return create(instance, method);
+      }
+    }
+    throw new IllegalArgumentException(
+        String.format("Instance method %s not found in class %s.", methodName, cls.getName()));
   }
 
   private static boolean areParametersAnnotatedWithSchema(Method func) {
@@ -84,7 +117,7 @@ public class FunctionTool extends BaseTool {
     return true;
   }
 
-  protected FunctionTool(Method func, boolean isLongRunning) {
+  protected FunctionTool(@Nullable Object instance, Method func, boolean isLongRunning) {
     super(
         func.isAnnotationPresent(Annotations.Schema.class)
                 && !func.getAnnotation(Annotations.Schema.class).name().isEmpty()
@@ -94,9 +127,14 @@ public class FunctionTool extends BaseTool {
             ? func.getAnnotation(Annotations.Schema.class).description()
             : "",
         isLongRunning);
-    if (!Modifier.isStatic(func.getModifiers())) {
-      throw new IllegalArgumentException("Function tool only supports static methods.");
+    boolean isStatic = Modifier.isStatic(func.getModifiers());
+    if (isStatic && instance != null) {
+      throw new IllegalArgumentException("Static function tool must not have an instance.");
+    } else if (!isStatic && instance == null) {
+      throw new IllegalArgumentException("Instance function tool must have an instance.");
     }
+
+    this.instance = instance;
     this.func = func;
     this.funcDeclaration =
         FunctionCallingUtils.buildFunctionDeclaration(this.func, ImmutableList.of("toolContext"));
@@ -154,7 +192,7 @@ public class FunctionTool extends BaseTool {
       }
       arguments[i] = castValue(argValue, paramType);
     }
-    Object result = func.invoke(null, arguments);
+    Object result = func.invoke(instance, arguments);
     if (result == null) {
       return Maybe.empty();
     } else if (result instanceof Maybe) {
