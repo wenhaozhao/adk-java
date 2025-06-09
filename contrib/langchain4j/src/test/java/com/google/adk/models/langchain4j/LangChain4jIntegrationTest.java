@@ -39,8 +39,8 @@ import dev.langchain4j.model.anthropic.AnthropicStreamingChatModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
 import io.reactivex.rxjava3.core.Flowable;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -54,13 +54,8 @@ class LangChain4jIntegrationTest {
     public static final String GEMINI_2_0_FLASH = "gemini-2.0-flash";
     public static final String GPT_4_O_MINI = "gpt-4o-mini";
 
-    @BeforeAll
-    public static void setUp() {
-        assertNotNull(System.getenv("ANTHROPIC_API_KEY"));
-        assertNotNull(System.getenv("GOOGLE_API_KEY"));
-    }
-
     @Test
+    @EnabledIfEnvironmentVariable(named = "ANTHROPIC_API_KEY", matches = "\\S+")
     void testSimpleAgent() {
         // given
         AnthropicChatModel claudeModel = AnthropicChatModel.builder()
@@ -93,6 +88,7 @@ class LangChain4jIntegrationTest {
     }
 
     @Test
+    @EnabledIfEnvironmentVariable(named = "ANTHROPIC_API_KEY", matches = "\\S+")
     void testSingleAgentWithTools() {
         // given
         AnthropicChatModel claudeModel = AnthropicChatModel.builder()
@@ -156,6 +152,7 @@ class LangChain4jIntegrationTest {
     }
 
     @Test
+    @EnabledIfEnvironmentVariable(named = "OPENAI_API_KEY", matches = "\\S+")
     void testAgentTool() {
         // given
         OpenAiChatModel gptModel = OpenAiChatModel.builder()
@@ -213,6 +210,8 @@ class LangChain4jIntegrationTest {
     }
 
     @Test
+    @EnabledIfEnvironmentVariable(named = "GOOGLE_API_KEY", matches = "\\S+")
+    @EnabledIfEnvironmentVariable(named = "OPENAI_API_KEY", matches = "\\S+")
     void testSubAgent() {
         // given
         OpenAiChatModel gptModel = OpenAiChatModel.builder()
@@ -313,6 +312,7 @@ class LangChain4jIntegrationTest {
     }
 
     @Test
+    @EnabledIfEnvironmentVariable(named = "ANTHROPIC_API_KEY", matches = "\\S+")
     void testSimpleStreamingResponse() {
         // given
         AnthropicStreamingChatModel claudeStreamingModel = AnthropicStreamingChatModel.builder()
@@ -338,6 +338,7 @@ class LangChain4jIntegrationTest {
     }
 
     @Test
+    @EnabledIfEnvironmentVariable(named = "OPENAI_API_KEY", matches = "\\S+")
     void testStreamingRunConfig() {
         // given
         OpenAiStreamingChatModel streamingModel = OpenAiStreamingChatModel.builder()
