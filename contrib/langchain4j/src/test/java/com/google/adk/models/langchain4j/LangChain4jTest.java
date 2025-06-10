@@ -1,491 +1,575 @@
-/*
- * Copyright 2025 Google LLC
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package com.google.adk.models.langchain4j;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-import com.google.adk.agents.BaseAgent;
-import com.google.adk.agents.LlmAgent;
-import com.google.adk.agents.RunConfig;
-import com.google.adk.events.Event;
 import com.google.adk.models.LlmRequest;
 import com.google.adk.models.LlmResponse;
-import com.google.adk.runner.InMemoryRunner;
-import com.google.adk.runner.Runner;
-import com.google.adk.sessions.Session;
-import com.google.adk.tools.AgentTool;
-import com.google.adk.tools.Annotations.Schema;
 import com.google.adk.tools.FunctionTool;
-import com.google.adk.tools.ToolContext;
-import com.google.genai.types.Content;
-import com.google.genai.types.FunctionCall;
-import com.google.genai.types.FunctionResponse;
-import com.google.genai.types.Part;
-import dev.langchain4j.model.anthropic.AnthropicChatModel;
-import dev.langchain4j.model.anthropic.AnthropicStreamingChatModel;
-import dev.langchain4j.model.googleai.GoogleAiGeminiStreamingChatModel;
-import dev.langchain4j.model.openai.OpenAiChatModel;
-import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
+import com.google.genai.types.*;
+import dev.langchain4j.agent.tool.ToolExecutionRequest;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.StreamingChatModel;
+import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
+import dev.langchain4j.model.chat.request.json.JsonStringSchema;
+import dev.langchain4j.model.chat.response.ChatResponse;
+import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import io.reactivex.rxjava3.core.Flowable;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 
-public class LangChain4jTest {
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
-    public static final String CLAUDE_3_7_SONNET_20250219 = "claude-3-7-sonnet-20250219";
-    public static final String GEMINI_2_0_FLASH = "gemini-2.0-flash";
-    public static final String GPT_4_O_MINI = "gpt-4o-mini";
+class LangChain4jTest {
 
-    @BeforeAll
-    public static void setUp() {
-        assertNotNull(System.getenv("ANTHROPIC_API_KEY"));
-        assertNotNull(System.getenv("GOOGLE_API_KEY"));
+    private static final String MODEL_NAME = "test-model";
+
+    private ChatModel chatModel;
+    private StreamingChatModel streamingChatModel;
+    private LangChain4j langChain4j;
+    private LangChain4j streamingLangChain4j;
+
+    @BeforeEach
+    void setUp() {
+        chatModel = mock(ChatModel.class);
+        streamingChatModel = mock(StreamingChatModel.class);
+
+        langChain4j = new LangChain4j(chatModel, MODEL_NAME);
+        streamingLangChain4j = new LangChain4j(streamingChatModel, MODEL_NAME);
     }
 
     @Test
-    void testSimpleAgent() {
-        // given
-        AnthropicChatModel claudeModel = AnthropicChatModel.builder()
-            .apiKey(System.getenv("ANTHROPIC_API_KEY"))
-            .modelName(CLAUDE_3_7_SONNET_20250219)
-            .build();
+    @DisplayName("Should generate content using non-streaming chat model")
+    void testGenerateContentWithChatModel() {
+        // Given
+        final LlmRequest llmRequest = LlmRequest.builder()
+                .contents(List.of(
+                        Content.fromParts(Part.fromText("Hello"))
+                ))
+                .build();
 
-        LlmAgent agent = LlmAgent.builder()
-            .name("science-app")
-            .description("Science teacher agent")
-            .model(new LangChain4j(claudeModel, CLAUDE_3_7_SONNET_20250219))
-            .instruction("""
-                You are a helpful science teacher that explains science concepts
-                to kids and teenagers.
-                """)
-            .build();
+        final ChatResponse chatResponse = mock(ChatResponse.class);
+        final AiMessage aiMessage = AiMessage.from("Hello, how can I help you?");
+        when(chatResponse.aiMessage()).thenReturn(aiMessage);
+        when(chatModel.chat(any(ChatRequest.class))).thenReturn(chatResponse);
 
-        // when
-        List<Event> events = askAgent(agent, "What is a qubit?");
+        // When
+        final Flowable<LlmResponse> responseFlowable = langChain4j.generateContent(llmRequest, false);
+        final LlmResponse response = responseFlowable.blockingFirst();
 
-        // then
-        assertEquals(1, events.size());
+        // Then
+        assertThat(response).isNotNull();
+        assertThat(response.content()).isPresent();
+        assertThat(response.content().get().text()).isEqualTo("Hello, how can I help you?");
 
-        Event firstEvent = events.get(0);
-        assertTrue(firstEvent.content().isPresent());
+        // Verify the request conversion
+        final ArgumentCaptor<ChatRequest> requestCaptor = ArgumentCaptor.forClass(ChatRequest.class);
+        verify(chatModel).chat(requestCaptor.capture());
+        final ChatRequest capturedRequest = requestCaptor.getValue();
 
-        Content content = firstEvent.content().get();
-        System.out.println("Answer: " + content.text());
-        assertTrue(content.text().contains("quantum"));
+        assertThat(capturedRequest.messages()).hasSize(1);
+        assertThat(capturedRequest.messages().get(0)).isInstanceOf(UserMessage.class);
     }
 
     @Test
-    void testSingleAgentWithTools() {
-        // given
-        AnthropicChatModel claudeModel = AnthropicChatModel.builder()
-            .apiKey(System.getenv("ANTHROPIC_API_KEY"))
-            .modelName(CLAUDE_3_7_SONNET_20250219)
-            .build();
+    @DisplayName("Should handle function calls in LLM responses")
+    void testGenerateContentWithFunctionCall() {
+        // Given
+        // Create a mock FunctionTool
+        final FunctionTool weatherTool = mock(FunctionTool.class);
+        when(weatherTool.name()).thenReturn("getWeather");
+        when(weatherTool.description()).thenReturn("Get weather for a city");
 
-        BaseAgent agent = LlmAgent.builder()
-            .name("friendly-weather-app")
-            .description("Friend agent that knows about the weather")
-            .model(new LangChain4j(claudeModel, CLAUDE_3_7_SONNET_20250219))
-            .instruction("""
-                You are a friendly assistant.
-                
-                If asked about the weather forecast for a city,
-                you MUST call the `getWeather` function.
-                """)
-            .tools(FunctionTool.create(LangChain4jTest.class, "getWeather"))
-            .build();
+        // Create a mock FunctionDeclaration
+        final FunctionDeclaration functionDeclaration = mock(FunctionDeclaration.class);
+        when(weatherTool.declaration()).thenReturn(Optional.of(functionDeclaration));
 
-        // when
-        List<Event> events = askAgent(agent, "What's the weather like in Paris?");
+        // Create a mock Schema
+        final Schema schema = mock(Schema.class);
+        when(functionDeclaration.parameters()).thenReturn(Optional.of(schema));
 
-        // then
-        assertEquals(3, events.size());
+        // Create a mock Type
+        final Type type = mock(Type.class);
+        when(schema.type()).thenReturn(Optional.of(type));
+        when(type.knownEnum()).thenReturn(Type.Known.OBJECT);
 
-        events.forEach(event -> {
-            assertTrue(event.content().isPresent());
-            System.out.printf("%nevent: %s%n", event.stringifyContent());
-        });
+        // Create a mock for schema properties and required fields
+        when(schema.properties()).thenReturn(Optional.of(Map.of("city", schema)));
+        when(schema.required()).thenReturn(Optional.of(List.of("city")));
 
-        Event eventOne = events.get(0);
-        Event eventTwo = events.get(1);
-        Event eventThree = events.get(2);
+        // Create a real LlmRequest
+        // We'll use a real LlmRequest but we won't add any tools to it
+        // This is because we don't know the exact return type of LlmRequest.tools()
+        final LlmRequest llmRequest = LlmRequest.builder()
+                .contents(List.of(
+                        Content.fromParts(Part.fromText("What's the weather in Paris?"))
+                ))
+                .build();
 
-        // assert the first event is a function call
-        Content contentOne = eventOne.content().get();
-        assertTrue(contentOne.parts().isPresent());
-        List<Part> partsOne = contentOne.parts().get();
-        assertEquals(1, partsOne.size());
-        Optional<FunctionCall> functionCall = partsOne.get(0).functionCall();
-        assertTrue(functionCall.isPresent());
-        assertEquals("getWeather", functionCall.get().name().get());
-        assertTrue(functionCall.get().args().get().containsKey("city"));
+        // Mock the AI response with a function call
+        final ToolExecutionRequest toolExecutionRequest = ToolExecutionRequest.builder()
+                .id("123")
+                .name("getWeather")
+                //language=json
+                .arguments("{\"city\":\"Paris\"}")
+                .build();
 
-        // assert the second event is a function response
-        Content contentTwo = eventTwo.content().get();
-        assertTrue(contentTwo.parts().isPresent());
-        List<Part> partsTwo = contentTwo.parts().get();
-        assertEquals(1, partsTwo.size());
-        Optional<FunctionResponse> functionResponseTwo = partsTwo.get(0).functionResponse();
-        assertTrue(functionResponseTwo.isPresent());
+        final List<ToolExecutionRequest> toolExecutionRequests = List.of(toolExecutionRequest);
 
-        // assert the third event is the final text response
-        assertTrue(eventThree.finalResponse());
-        Content contentThree = eventThree.content().get();
-        assertTrue(contentThree.parts().isPresent());
-        List<Part> partsThree = contentThree.parts().get();
-        assertEquals(1, partsThree.size());
-        assertTrue(partsThree.get(0).text().get().contains("beautiful"));
+        final AiMessage aiMessage = AiMessage.builder()
+                .text("")
+                .toolExecutionRequests(toolExecutionRequests)
+                .build();
+
+        final ChatResponse chatResponse = mock(ChatResponse.class);
+        when(chatResponse.aiMessage()).thenReturn(aiMessage);
+        when(chatModel.chat(any(ChatRequest.class))).thenReturn(chatResponse);
+
+        // When
+        final Flowable<LlmResponse> responseFlowable = langChain4j.generateContent(llmRequest, false);
+        final LlmResponse response = responseFlowable.blockingFirst();
+
+        // Then
+        assertThat(response).isNotNull();
+        assertThat(response.content()).isPresent();
+        assertThat(response.content().get().parts()).isPresent();
+
+        final List<Part> parts = response.content().get().parts().orElseThrow();
+        assertThat(parts).hasSize(1);
+        assertThat(parts.get(0).functionCall()).isPresent();
+
+        final FunctionCall functionCall = parts.get(0).functionCall().orElseThrow();
+        assertThat(functionCall.name()).isEqualTo(Optional.of("getWeather"));
+        assertThat(functionCall.args()).isPresent();
+        assertThat(functionCall.args().get()).containsEntry("city", "Paris");
     }
 
     @Test
-    void testAgentTool() {
-        // given
-        OpenAiChatModel gptModel = OpenAiChatModel.builder()
-            .baseUrl("http://langchain4j.dev/demo/openai/v1")
-            .apiKey(Objects.requireNonNullElse(System.getenv("OPENAI_API_KEY"), "demo"))
-            .modelName(GPT_4_O_MINI)
-            .build();
+    @DisplayName("Should handle streaming responses correctly")
+    void testGenerateContentWithStreamingChatModel() {
+        // Given
+        final LlmRequest llmRequest = LlmRequest.builder()
+                .contents(List.of(
+                        Content.fromParts(Part.fromText("Hello"))
+                ))
+                .build();
 
-        LlmAgent weatherAgent = LlmAgent.builder()
-            .name("weather-agent")
-            .description("Weather agent")
-            .model(GEMINI_2_0_FLASH)
-            .instruction("""
-                Your role is to always answer that the weather is sunny and 20°C.
-                """)
-            .build();
+        // Create a list to collect the responses
+        final List<LlmResponse> responses = new ArrayList<>();
 
-        BaseAgent agent = LlmAgent.builder()
-            .name("friendly-weather-app")
-            .description("Friend agent that knows about the weather")
-            .model(new LangChain4j(gptModel))
-            .instruction("""
-                You are a friendly assistant.
-                
-                If asked about the weather forecast for a city,
-                you MUST call the `weather-agent` function.
-                """)
-            .tools(AgentTool.create(weatherAgent))
-            .build();
+        // Set up the mock to capture and store the handler
+        final StreamingChatResponseHandler[] handlerRef = new StreamingChatResponseHandler[1];
 
-        // when
-        List<Event> events = askAgent(agent, "What's the weather like in Paris?");
+        doAnswer(invocation -> {
+            // Store the handler for later use
+            handlerRef[0] = invocation.getArgument(1);
+            return null;
+        }).when(streamingChatModel).chat(any(ChatRequest.class), any(StreamingChatResponseHandler.class));
 
-        // then
-        assertEquals(3, events.size());
-        events.forEach(event -> {
-            assertTrue(event.content().isPresent());
-            System.out.printf("%nevent: %s%n", event.stringifyContent());
-        });
+        // When
+        final Flowable<LlmResponse> responseFlowable = streamingLangChain4j.generateContent(llmRequest, true);
 
-        assertEquals(1, events.get(0).functionCalls().size());
-        assertEquals("weather-agent", events.get(0).functionCalls().get(0).name().get());
+        // Subscribe to the flowable to collect responses
+        final var disposable = responseFlowable.subscribe(responses::add);
 
-        assertEquals(1, events.get(1).functionResponses().size());
-        assertTrue(events.get(1).functionResponses().get(0).response().get().toString().toLowerCase().contains("sunny"));
-        assertTrue(events.get(1).functionResponses().get(0).response().get().toString().contains("20"));
+        // Verify the streaming model was called
+        verify(streamingChatModel).chat(any(ChatRequest.class), any(StreamingChatResponseHandler.class));
 
-        assertTrue(events.get(2).finalResponse());
-        assertTrue(events.get(2).content().get().text().contains("sunny"));
-        assertTrue(events.get(2).content().get().text().contains("20"));
+        // Get the captured handler
+        final StreamingChatResponseHandler handler = handlerRef[0];
+
+        // Simulate streaming responses
+        handler.onPartialResponse("Hello");
+        handler.onPartialResponse(", how");
+        handler.onPartialResponse(" can I help");
+        handler.onPartialResponse(" you?");
+
+        // Simulate a function call in the complete response
+        final ToolExecutionRequest toolExecutionRequest = ToolExecutionRequest.builder()
+                .id("123")
+                .name("getWeather")
+                .arguments("{\"city\":\"Paris\"}")
+                .build();
+
+        final AiMessage aiMessage = AiMessage.builder()
+                .text("")
+                .toolExecutionRequests(List.of(toolExecutionRequest))
+                .build();
+
+        final ChatResponse chatResponse = mock(ChatResponse.class);
+        when(chatResponse.aiMessage()).thenReturn(aiMessage);
+
+        // Simulate completion with a function call
+        handler.onCompleteResponse(chatResponse);
+
+        // Then
+        assertThat(responses).hasSize(5); // 4 partial responses + 1 function call
+
+        // Verify the partial responses
+        assertThat(responses.get(0).content().orElseThrow().text()).isEqualTo("Hello");
+        assertThat(responses.get(1).content().orElseThrow().text()).isEqualTo(", how");
+        assertThat(responses.get(2).content().orElseThrow().text()).isEqualTo(" can I help");
+        assertThat(responses.get(3).content().orElseThrow().text()).isEqualTo(" you?");
+
+        // Verify the function call
+        assertThat(responses.get(4).content().orElseThrow().parts().orElseThrow()).hasSize(1);
+        assertThat(responses.get(4).content().orElseThrow().parts().orElseThrow().get(0).functionCall()).isPresent();
+        final FunctionCall functionCall = responses.get(4).content().orElseThrow().parts().orElseThrow().get(0).functionCall().orElseThrow();
+        assertThat(functionCall.name()).isEqualTo(Optional.of("getWeather"));
+        assertThat(functionCall.args().orElseThrow()).containsEntry("city", "Paris");
+
+        disposable.dispose();
     }
 
     @Test
-    void testSubAgent() {
-        // given
-        OpenAiChatModel gptModel = OpenAiChatModel.builder()
-            .baseUrl("http://langchain4j.dev/demo/openai/v1")
-            .apiKey(Objects.requireNonNullElse(System.getenv("OPENAI_API_KEY"), "demo"))
-            .modelName(GPT_4_O_MINI)
-            .build();
+    @DisplayName("Should pass configuration options to LangChain4j")
+    void testGenerateContentWithConfigOptions() {
+        // Given
+        final GenerateContentConfig config = GenerateContentConfig.builder()
+                .temperature(0.7f)
+                .topP(0.9f)
+                .topK(40f)
+                .maxOutputTokens(100)
+                .presencePenalty(0.5f)
+                .build();
 
-        LlmAgent greeterAgent = LlmAgent.builder()
-            .name("greeterAgent")
-            .description("Friendly agent that greets users")
-            .model(new LangChain4j(gptModel))
-            .instruction("""
-                You are a friendly that greets users.
-                """)
-            .build();
+        final LlmRequest llmRequest = LlmRequest.builder()
+                .contents(List.of(
+                        Content.fromParts(Part.fromText("Hello"))
+                ))
+                .config(config)
+                .build();
 
-        LlmAgent farewellAgent = LlmAgent.builder()
-            .name("farewellAgent")
-            .description("Friendly agent that says goodbye to users")
-            .model(new LangChain4j(gptModel))
-            .instruction("""
-                You are a friendly that says goodbye to users.
-                """)
-            .build();
+        final ChatResponse chatResponse = mock(ChatResponse.class);
+        final AiMessage aiMessage = AiMessage.from("Hello, how can I help you?");
+        when(chatResponse.aiMessage()).thenReturn(aiMessage);
+        when(chatModel.chat(any(ChatRequest.class))).thenReturn(chatResponse);
 
-        LlmAgent coordinatorAgent = LlmAgent.builder()
-            .name("coordinator-agent")
-            .description("Coordinator agent")
-            .model(GEMINI_2_0_FLASH)
-            .instruction("""
-                Your role is to coordinate 2 agents:
-                - `greeterAgent`: should reply to messages saying hello, hi, etc.
-                - `farewellAgent`: should reply to messages saying bye, goodbye, etc.
-                """)
-            .subAgents(greeterAgent, farewellAgent)
-            .build();
+        // When
+        final var llmResponse = langChain4j.generateContent(llmRequest, false).blockingFirst();
 
-        // when
-        List<Event> hiEvents = askAgent(coordinatorAgent, "Hi");
-        List<Event> byeEvents = askAgent(coordinatorAgent, "Goodbye");
+        // Then
+        // Assert the llmResponse
+        assertThat(llmResponse).isNotNull();
+        assertThat(llmResponse.content()).isPresent();
+        assertThat(llmResponse.content().get().text()).isEqualTo("Hello, how can I help you?");
 
-        // then
-        hiEvents.forEach(event -> { System.out.println(event.stringifyContent()); });
-        byeEvents.forEach(event -> { System.out.println(event.stringifyContent()); });
+        // Assert the request configuration
+        final ArgumentCaptor<ChatRequest> requestCaptor = ArgumentCaptor.forClass(ChatRequest.class);
+        verify(chatModel).chat(requestCaptor.capture());
+        final ChatRequest capturedRequest = requestCaptor.getValue();
 
-        // Assertions for hiEvents
-        assertEquals(3, hiEvents.size());
-
-        Event hiEvent1 = hiEvents.get(0);
-        assertTrue(hiEvent1.content().isPresent());
-        assertFalse(hiEvent1.functionCalls().isEmpty());
-        assertEquals(1, hiEvent1.functionCalls().size());
-        FunctionCall hiFunctionCall = hiEvent1.functionCalls().get(0);
-        assertTrue(hiFunctionCall.id().isPresent());
-        assertEquals(Optional.of("transferToAgent"), hiFunctionCall.name());
-        assertEquals(Optional.of(Map.of("agentName", "greeterAgent")), hiFunctionCall.args());
-
-        Event hiEvent2 = hiEvents.get(1);
-        assertTrue(hiEvent2.content().isPresent());
-        assertFalse(hiEvent2.functionResponses().isEmpty());
-        assertEquals(1, hiEvent2.functionResponses().size());
-        FunctionResponse hiFunctionResponse = hiEvent2.functionResponses().get(0);
-        assertTrue(hiFunctionResponse.id().isPresent());
-        assertEquals(Optional.of("transferToAgent"), hiFunctionResponse.name());
-        assertEquals(Optional.of(Map.of()), hiFunctionResponse.response()); // Empty map for response
-
-        Event hiEvent3 = hiEvents.get(2);
-        assertTrue(hiEvent3.content().isPresent());
-        assertTrue(hiEvent3.content().get().text().toLowerCase().contains("hello"));
-        assertTrue(hiEvent3.finalResponse());
-
-        // Assertions for byeEvents
-        assertEquals(3, byeEvents.size());
-
-        Event byeEvent1 = byeEvents.get(0);
-        assertTrue(byeEvent1.content().isPresent());
-        assertFalse(byeEvent1.functionCalls().isEmpty());
-        assertEquals(1, byeEvent1.functionCalls().size());
-        FunctionCall byeFunctionCall = byeEvent1.functionCalls().get(0);
-        assertTrue(byeFunctionCall.id().isPresent());
-        assertEquals(Optional.of("transferToAgent"), byeFunctionCall.name());
-        assertEquals(Optional.of(Map.of("agentName", "farewellAgent")), byeFunctionCall.args());
-
-        Event byeEvent2 = byeEvents.get(1);
-        assertTrue(byeEvent2.content().isPresent());
-        assertFalse(byeEvent2.functionResponses().isEmpty());
-        assertEquals(1, byeEvent2.functionResponses().size());
-        FunctionResponse byeFunctionResponse = byeEvent2.functionResponses().get(0);
-        assertTrue(byeFunctionResponse.id().isPresent());
-        assertEquals(Optional.of("transferToAgent"), byeFunctionResponse.name());
-        assertEquals(Optional.of(Map.of()), byeFunctionResponse.response()); // Empty map for response
-
-        Event byeEvent3 = byeEvents.get(2);
-        assertTrue(byeEvent3.content().isPresent());
-        assertTrue(byeEvent3.content().get().text().toLowerCase().contains("goodbye"));
-        assertTrue(byeEvent3.finalResponse());
+        assertThat(capturedRequest.temperature()).isCloseTo(0.7, offset(0.001));
+        assertThat(capturedRequest.topP()).isCloseTo(0.9, offset(0.001));
+        assertThat(capturedRequest.topK()).isEqualTo(40);
+        assertThat(capturedRequest.maxOutputTokens()).isEqualTo(100);
+        assertThat(capturedRequest.presencePenalty()).isCloseTo(0.5, offset(0.001));
     }
 
     @Test
-    void testSimpleStreamingResponse() {
-        // given
-        AnthropicStreamingChatModel claudeStreamingModel = AnthropicStreamingChatModel.builder()
-            .apiKey(System.getenv("ANTHROPIC_API_KEY"))
-            .modelName(CLAUDE_3_7_SONNET_20250219)
-            .build();
+    @DisplayName("Should throw UnsupportedOperationException when connect is called")
+    void testConnectThrowsUnsupportedOperationException() {
+        // Given
+        final LlmRequest llmRequest = LlmRequest.builder().build();
 
-        LangChain4j lc4jClaude = new LangChain4j(claudeStreamingModel, CLAUDE_3_7_SONNET_20250219);
-
-        // when
-        Flowable<LlmResponse> responses = lc4jClaude.generateContent(LlmRequest.builder()
-                .contents(List.of(Content.fromParts(Part.fromText("Why is the sky blue?"))))
-            .build(), true);
-
-        String fullResponse = String.join("", responses.blockingStream()
-            .map(llmResponse -> llmResponse.content().get().text())
-            .toList());
-
-        // then
-        assertTrue(fullResponse.contains("blue"));
-        assertTrue(fullResponse.contains("Rayleigh"));
-        assertTrue(fullResponse.contains("scatter"));
+        // When/Then
+        assertThatThrownBy(() -> langChain4j.connect(llmRequest))
+                .isInstanceOf(UnsupportedOperationException.class)
+                .hasMessage("Live connection is not supported for LangChain4j models.");
     }
 
     @Test
-    void testStreamingRunConfig() {
-        // given
-        OpenAiStreamingChatModel streamingModel = OpenAiStreamingChatModel.builder()
-            .baseUrl("http://langchain4j.dev/demo/openai/v1")
-            .apiKey(Objects.requireNonNullElse(System.getenv("OPENAI_API_KEY"), "demo"))
-            .modelName(GPT_4_O_MINI)
-            .build();
+    @DisplayName("Should handle tool calling in LLM responses")
+    void testGenerateContentWithToolCalling() {
+        // Given
+        // Create a mock ChatResponse with a tool execution request
+        final ToolExecutionRequest toolExecutionRequest = ToolExecutionRequest.builder()
+                .id("123")
+                .name("getWeather")
+                .arguments("{\"city\":\"Paris\"}")
+                .build();
 
-//        AnthropicStreamingChatModel streamingModel = AnthropicStreamingChatModel.builder()
-//            .apiKey(System.getenv("ANTHROPIC_API_KEY"))
-//            .modelName(CLAUDE_3_7_SONNET_20250219)
-//            .build();
+        final AiMessage aiMessage = AiMessage.builder()
+                .text("")
+                .toolExecutionRequests(List.of(toolExecutionRequest))
+                .build();
 
-//        GoogleAiGeminiStreamingChatModel streamingModel = GoogleAiGeminiStreamingChatModel.builder()
-//            .apiKey(System.getenv("GOOGLE_API_KEY"))
-//            .modelName("gemini-2.0-flash")
-//            .build();
+        final ChatResponse chatResponse = mock(ChatResponse.class);
+        when(chatResponse.aiMessage()).thenReturn(aiMessage);
+        when(chatModel.chat(any(ChatRequest.class))).thenReturn(chatResponse);
 
-        LlmAgent agent = LlmAgent.builder()
-            .name("streaming-agent")
-            .description("Friendly science teacher agent")
-            .instruction("""
-                You're a friendly science teacher.
-                You give concise answers about science topics.
-                
-                When someone greets you, respond with "Hello".
-                If someone asks about the weather, call the `getWeather` function.
-                """)
-            .model(new LangChain4j(streamingModel, "GPT_4_O_MINI"))
-//            .model(new LangChain4j(streamingModel, CLAUDE_3_7_SONNET_20250219))
-            .tools(FunctionTool.create(LangChain4jTest.class, "getWeather"))
-            .build();
+        // Create a LlmRequest with a user message
+        final LlmRequest llmRequest = LlmRequest.builder()
+                .contents(List.of(
+                        Content.fromParts(Part.fromText("What's the weather in Paris?"))
+                ))
+                .build();
 
-        // when
-        List<Event> eventsHi = askAgentStreaming(agent, "Hi");
-        String responseToHi = String.join("", eventsHi.stream()
-            .map(event -> event.content().get().text())
-            .toList());
+        // When
+        final LlmResponse response = langChain4j.generateContent(llmRequest, false).blockingFirst();
 
-        List<Event> eventsQubit = askAgentStreaming(agent, "Tell me about qubits");
-        String responseToQubit = String.join("", eventsQubit.stream()
-            .map(event -> event.content().get().text())
-            .toList());
+        // Then
+        // Verify the response contains the expected function call
+        assertThat(response).isNotNull();
+        assertThat(response.content()).isPresent();
+        assertThat(response.content().get().parts()).isPresent();
 
-        List<Event> eventsWeather = askAgentStreaming(agent, "What's the weather in Paris?");
-        String responseToWeather = String.join("", eventsWeather.stream()
-            .map(Event::stringifyContent)
-            .toList());
+        final List<Part> parts = response.content().get().parts().orElseThrow();
+        assertThat(parts).hasSize(1);
+        assertThat(parts.get(0).functionCall()).isPresent();
 
-        // then
+        final FunctionCall functionCall = parts.get(0).functionCall().orElseThrow();
+        assertThat(functionCall.name()).isEqualTo(Optional.of("getWeather"));
+        assertThat(functionCall.args()).isPresent();
+        assertThat(functionCall.args().get()).containsEntry("city", "Paris");
 
-        // Assertions for "Hi"
-        assertFalse(eventsHi.isEmpty(), "eventsHi should not be empty");
-        // Depending on the model and streaming behavior, the number of events can vary.
-        // If a single "Hello" is expected in one event:
-        // assertEquals(1, eventsHi.size(), "Expected 1 event for 'Hi'");
-        // assertEquals("Hello", responseToHi, "Response to 'Hi' should be 'Hello'");
-        // If "Hello" can be streamed in multiple parts:
-        assertTrue(eventsHi.size() >= 1, "Expected at least 1 event for 'Hi'");
-        assertTrue(responseToHi.trim().contains("Hello"), "Response to 'Hi' should be 'Hello'");
-
-
-        // Assertions for "Tell me about qubits"
-        assertTrue(eventsQubit.size() > 1, "Expected multiple streaming events for 'qubit' question");
-        assertTrue(responseToQubit.toLowerCase().contains("qubit"), "Response to 'qubit' should contain 'qubit'");
-        assertTrue(responseToQubit.toLowerCase().contains("quantum"), "Response to 'qubit' should contain 'quantum'");
-        assertTrue(responseToQubit.toLowerCase().contains("superposition"), "Response to 'qubit' should contain 'superposition'");
-
-        // Assertions for "What's the weather in Paris?"
-        assertTrue(eventsWeather.size() > 2, "Expected multiple events for weather question (function call, response, text)");
-
-        // Check for function call
-        Optional<Event> functionCallEvent = eventsWeather.stream()
-            .filter(e -> !e.functionCalls().isEmpty())
-            .findFirst();
-        assertTrue(functionCallEvent.isPresent(), "Should contain a function call event for weather");
-        FunctionCall fc = functionCallEvent.get().functionCalls().get(0);
-        assertEquals(Optional.of("getWeather"), fc.name(), "Function call name should be 'getWeather'");
-        assertTrue(fc.args().isPresent() && "Paris".equals(fc.args().get().get("city")), "Function call should be for 'Paris'");
-
-        // Check for function response
-        Optional<Event> functionResponseEvent = eventsWeather.stream()
-            .filter(e -> !e.functionResponses().isEmpty())
-            .findFirst();
-        assertTrue(functionResponseEvent.isPresent(), "Should contain a function response event for weather");
-        FunctionResponse fr = functionResponseEvent.get().functionResponses().get(0);
-        assertEquals(Optional.of("getWeather"), fr.name(), "Function response name should be 'getWeather'");
-        assertTrue(fr.response().isPresent());
-        Map<String, Object> weatherResponseMap = (Map<String, Object>) fr.response().get();
-        assertEquals("Paris", weatherResponseMap.get("city"));
-        assertTrue(weatherResponseMap.get("forecast").toString().contains("beautiful and sunny"));
-
-        // Check the final aggregated text response
-        // Consolidate text parts from events that are not function calls or responses
-        String finalWeatherTextResponse = eventsWeather.stream()
-            .filter(event -> event.functionCalls().isEmpty() && event.functionResponses().isEmpty() && event.content().isPresent() && event.content().get().text() != null)
-            .map(event -> event.content().get().text())
-            .collect(java.util.stream.Collectors.joining())
-            .trim();
-
-        assertTrue(finalWeatherTextResponse.contains("Paris"), "Final weather response should mention Paris");
-        assertTrue(finalWeatherTextResponse.toLowerCase().contains("beautiful and sunny"), "Final weather response should mention 'beautiful and sunny'");
-        assertTrue(finalWeatherTextResponse.contains("10"), "Final weather response should mention '10'");
-        assertTrue(finalWeatherTextResponse.contains("24"), "Final weather response should mention '24'");
-
-        // You can also assert on the concatenated `responseToWeather` if it's meant to capture the full interaction text
-        assertTrue(responseToWeather.contains("Function Call") && responseToWeather.contains("getWeather") && responseToWeather.contains("Paris"));
-        assertTrue(responseToWeather.contains("Function Response") && responseToWeather.contains("beautiful and sunny weather"));
-        assertTrue(responseToWeather.contains("sunny"));
-        assertTrue(responseToWeather.contains("24"));
+        // Verify the ChatModel was called
+        verify(chatModel).chat(any(ChatRequest.class));
     }
 
-    private static List<Event> askAgent(BaseAgent agent, String... messages) {
-        return runLoop(agent, false, messages);
+
+    @Test
+    @DisplayName("Should set ToolChoice to AUTO when FunctionCallingConfig mode is AUTO")
+    void testGenerateContentWithAutoToolChoice() {
+        // Given
+        // Create a FunctionCallingConfig with mode AUTO
+        final FunctionCallingConfig functionCallingConfig = mock(FunctionCallingConfig.class);
+        final FunctionCallingConfigMode functionMode = mock(FunctionCallingConfigMode.class);
+
+        when(functionCallingConfig.mode()).thenReturn(Optional.of(functionMode));
+        when(functionMode.knownEnum()).thenReturn(FunctionCallingConfigMode.Known.AUTO);
+
+        // Create a ToolConfig with the FunctionCallingConfig
+        final ToolConfig toolConfig = mock(ToolConfig.class);
+        when(toolConfig.functionCallingConfig()).thenReturn(Optional.of(functionCallingConfig));
+
+        // Create a GenerateContentConfig with the ToolConfig
+        final GenerateContentConfig config = GenerateContentConfig.builder()
+                .toolConfig(toolConfig)
+                .build();
+
+        // Create a LlmRequest with the config
+        final LlmRequest llmRequest = LlmRequest.builder()
+                .contents(List.of(
+                        Content.fromParts(Part.fromText("What's the weather in Paris?"))
+                ))
+                .config(config)
+                .build();
+
+        // Mock the AI response
+        final AiMessage aiMessage = AiMessage.from("It's sunny in Paris");
+
+        final ChatResponse chatResponse = mock(ChatResponse.class);
+        when(chatResponse.aiMessage()).thenReturn(aiMessage);
+        when(chatModel.chat(any(ChatRequest.class))).thenReturn(chatResponse);
+
+        // When
+        final LlmResponse response = langChain4j.generateContent(llmRequest, false).blockingFirst();
+
+        // Then
+        // Verify the response
+        assertThat(response).isNotNull();
+        assertThat(response.content()).isPresent();
+        assertThat(response.content().get().text()).isEqualTo("It's sunny in Paris");
+
+        // Verify the request was built correctly with the tool config
+        final ArgumentCaptor<ChatRequest> requestCaptor = ArgumentCaptor.forClass(ChatRequest.class);
+        verify(chatModel).chat(requestCaptor.capture());
+        final ChatRequest capturedRequest = requestCaptor.getValue();
+
+        // Verify tool choice is AUTO
+        assertThat(capturedRequest.toolChoice()).isEqualTo(dev.langchain4j.model.chat.request.ToolChoice.AUTO);
     }
 
-    private static List<Event> askAgentStreaming(BaseAgent agent, String... messages) {
-        return runLoop(agent, true, messages);
+    @Test
+    @DisplayName("Should set ToolChoice to REQUIRED when FunctionCallingConfig mode is ANY")
+    void testGenerateContentWithAnyToolChoice() {
+        // Given
+        // Create a FunctionCallingConfig with mode ANY and allowed function names
+        final FunctionCallingConfig functionCallingConfig = mock(FunctionCallingConfig.class);
+        final FunctionCallingConfigMode functionMode = mock(FunctionCallingConfigMode.class);
+
+        when(functionCallingConfig.mode()).thenReturn(Optional.of(functionMode));
+        when(functionMode.knownEnum()).thenReturn(FunctionCallingConfigMode.Known.ANY);
+        when(functionCallingConfig.allowedFunctionNames()).thenReturn(Optional.of(List.of("getWeather")));
+
+        // Create a ToolConfig with the FunctionCallingConfig
+        final ToolConfig toolConfig = mock(ToolConfig.class);
+        when(toolConfig.functionCallingConfig()).thenReturn(Optional.of(functionCallingConfig));
+
+        // Create a GenerateContentConfig with the ToolConfig
+        final GenerateContentConfig config = GenerateContentConfig.builder()
+                .toolConfig(toolConfig)
+                .build();
+
+        // Create a LlmRequest with the config
+        final LlmRequest llmRequest = LlmRequest.builder()
+                .contents(List.of(
+                        Content.fromParts(Part.fromText("What's the weather in Paris?"))
+                ))
+                .config(config)
+                .build();
+
+        // Mock the AI response with a function call
+        final ToolExecutionRequest toolExecutionRequest = ToolExecutionRequest.builder()
+                .id("123")
+                .name("getWeather")
+                .arguments("{\"city\":\"Paris\"}")
+                .build();
+
+        final AiMessage aiMessage = AiMessage.builder()
+                .text("")
+                .toolExecutionRequests(List.of(toolExecutionRequest))
+                .build();
+
+        final ChatResponse chatResponse = mock(ChatResponse.class);
+        when(chatResponse.aiMessage()).thenReturn(aiMessage);
+        when(chatModel.chat(any(ChatRequest.class))).thenReturn(chatResponse);
+
+        // When
+        final LlmResponse response = langChain4j.generateContent(llmRequest, false).blockingFirst();
+
+        // Then
+        // Verify the response contains the expected function call
+        assertThat(response).isNotNull();
+        assertThat(response.content()).isPresent();
+        assertThat(response.content().get().parts()).isPresent();
+
+        final List<Part> parts = response.content().get().parts().orElseThrow();
+        assertThat(parts).hasSize(1);
+        assertThat(parts.get(0).functionCall()).isPresent();
+
+        final FunctionCall functionCall = parts.get(0).functionCall().orElseThrow();
+        assertThat(functionCall.name()).isEqualTo(Optional.of("getWeather"));
+        assertThat(functionCall.args()).isPresent();
+        assertThat(functionCall.args().get()).containsEntry("city", "Paris");
+
+        // Verify the request was built correctly with the tool config
+        final ArgumentCaptor<ChatRequest> requestCaptor = ArgumentCaptor.forClass(ChatRequest.class);
+        verify(chatModel).chat(requestCaptor.capture());
+        final ChatRequest capturedRequest = requestCaptor.getValue();
+
+        // Verify tool choice is REQUIRED (mapped from ANY)
+        assertThat(capturedRequest.toolChoice()).isEqualTo(dev.langchain4j.model.chat.request.ToolChoice.REQUIRED);
     }
 
-    private static List<Event> runLoop(BaseAgent agent, boolean streaming, String... messages) {
-        ArrayList<Event> allEvents = new ArrayList<>();
+    @Test
+    @DisplayName("Should disable tool calling when FunctionCallingConfig mode is NONE")
+    void testGenerateContentWithNoneToolChoice() {
+        // Given
+        // Create a FunctionCallingConfig with mode NONE
+        final FunctionCallingConfig functionCallingConfig = mock(FunctionCallingConfig.class);
+        final FunctionCallingConfigMode functionMode = mock(FunctionCallingConfigMode.class);
 
-        Runner runner = new InMemoryRunner(agent, agent.name());
-        Session session = runner.sessionService().createSession(agent.name(), "user132").blockingGet();
+        when(functionCallingConfig.mode()).thenReturn(Optional.of(functionMode));
+        when(functionMode.knownEnum()).thenReturn(FunctionCallingConfigMode.Known.NONE);
 
-        for (String message : messages) {
-            Content messageContent = Content.fromParts(Part.fromText(message));
-            allEvents.addAll(
-                runner.runAsync(session, messageContent,
-                        RunConfig.builder()
-                            .setStreamingMode(streaming ? RunConfig.StreamingMode.SSE : RunConfig.StreamingMode.NONE)
-                            .build())
-                    .blockingStream()
-                    .toList()
-            );
-        }
+        // Create a ToolConfig with the FunctionCallingConfig
+        final ToolConfig toolConfig = mock(ToolConfig.class);
+        when(toolConfig.functionCallingConfig()).thenReturn(Optional.of(functionCallingConfig));
 
-        return allEvents;
+        // Create a GenerateContentConfig with the ToolConfig
+        final GenerateContentConfig config = GenerateContentConfig.builder()
+                .toolConfig(toolConfig)
+                .build();
+
+        // Create a LlmRequest with the config
+        final LlmRequest llmRequest = LlmRequest.builder()
+                .contents(List.of(
+                        Content.fromParts(Part.fromText("What's the weather in Paris?"))
+                ))
+                .config(config)
+                .build();
+
+        // Mock the AI response with text (no function call)
+        final AiMessage aiMessage = AiMessage.from("It's sunny in Paris");
+
+        final ChatResponse chatResponse = mock(ChatResponse.class);
+        when(chatResponse.aiMessage()).thenReturn(aiMessage);
+        when(chatModel.chat(any(ChatRequest.class))).thenReturn(chatResponse);
+
+        // When
+        final LlmResponse response = langChain4j.generateContent(llmRequest, false).blockingFirst();
+
+        // Then
+        // Verify the response contains text (no function call)
+        assertThat(response).isNotNull();
+        assertThat(response.content()).isPresent();
+        assertThat(response.content().get().text()).isEqualTo("It's sunny in Paris");
+
+        // Verify the request was built correctly with the tool config
+        final ArgumentCaptor<ChatRequest> requestCaptor = ArgumentCaptor.forClass(ChatRequest.class);
+        verify(chatModel).chat(requestCaptor.capture());
+        final ChatRequest capturedRequest = requestCaptor.getValue();
+
+        // Verify tool specifications are empty
+        assertThat(capturedRequest.toolSpecifications()).isEmpty();
     }
 
-    @Schema(description = "Function to get the weather forecast for a given city")
-    public static Map<String, String> getWeather(
-        @Schema(name = "city", description = "The city to get the weather forecast for")
-        String city,
-        ToolContext toolContext) {
+    @Test
+    @DisplayName("Should handle structured responses with JSON schema")
+    void testGenerateContentWithStructuredResponseJsonSchema() {
+        // Given
+        // Create a JSON schema for the structured response
+        final JsonObjectSchema responseSchema = JsonObjectSchema.builder()
+                .addProperty("name", JsonStringSchema.builder().build())
+                .addProperty("age", JsonStringSchema.builder().build())
+                .addProperty("city", JsonStringSchema.builder().build())
+                .build();
 
-        return Map.of(
-            "city", city,
-            "forecast", "a beautiful and sunny weather",
-            "temperature", "from 10°C in the morning up to 24°C in the afternoon"
-        );
+        // Create a GenerateContentConfig without responseSchema
+        final GenerateContentConfig config = GenerateContentConfig.builder()
+                .build();
+
+        // Create a LlmRequest with the config
+        final LlmRequest llmRequest = LlmRequest.builder()
+                .contents(List.of(
+                        Content.fromParts(Part.fromText("Give me information about John Doe"))
+                ))
+                .config(config)
+                .build();
+
+        // Mock the AI response with structured JSON data
+        final String jsonResponse = """
+                {
+                    "name": "John Doe",
+                    "age": "30",
+                    "city": "New York"
+                }
+                """;
+        final AiMessage aiMessage = AiMessage.from(jsonResponse);
+
+        final ChatResponse chatResponse = mock(ChatResponse.class);
+        when(chatResponse.aiMessage()).thenReturn(aiMessage);
+        when(chatModel.chat(any(ChatRequest.class))).thenReturn(chatResponse);
+
+        // When
+        final LlmResponse response = langChain4j.generateContent(llmRequest, false).blockingFirst();
+
+        // Then
+        // Verify the response contains the expected JSON data
+        assertThat(response).isNotNull();
+        assertThat(response.content()).isPresent();
+        assertThat(response.content().get().text()).isEqualTo(jsonResponse);
+
+        // Verify the request was built correctly
+        final ArgumentCaptor<ChatRequest> requestCaptor = ArgumentCaptor.forClass(ChatRequest.class);
+        verify(chatModel).chat(requestCaptor.capture());
+        final ChatRequest capturedRequest = requestCaptor.getValue();
+
+        // Verify the request contains the expected messages
+        assertThat(capturedRequest.messages()).hasSize(1);
+        assertThat(capturedRequest.messages().get(0)).isInstanceOf(UserMessage.class);
+        final UserMessage userMessage = (UserMessage) capturedRequest.messages().get(0);
+        assertThat(userMessage.singleText()).isEqualTo("Give me information about John Doe");
     }
 }
