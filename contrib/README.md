@@ -1,7 +1,7 @@
 # Contribution Guidelines
 
 **Before You Start:**
-Please take a look at [ADK Contribution Guidelines] (https://google.github.io/adk-docs/contributing-guide/)
+Please take a look at [ADK Contribution Guidelines](https://google.github.io/adk-docs/contributing-guide/).
 
 **Coding Guidelines For PR Approval:**
 
@@ -16,6 +16,12 @@ components.
 fixes.
 *   **Error Handling:** Handle errors gracefully with informative messages.
 *   **Documentation:** Document your code and its usage.
+
+**Compatibility Guarantees:**
+
+* All code in `contrib/` is explictly not covered by any sort of backwards API Compatibility Guarantees, even across minor (patch) releases.
+* The maintainers (committers) of this project are going to merge any changes in both implementations and interfaces without API stability concerns.
+* Contributors are welcome to raise their PRs based on this policy, and incrementally improve code without worrying about API breakage.
 
 **Contrib Graduation:**
 

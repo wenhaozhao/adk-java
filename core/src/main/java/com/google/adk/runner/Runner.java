@@ -92,7 +92,7 @@ public class Runner {
       // placeholder.
       for (int i = 0; i < newMessage.parts().get().size(); i++) {
         Part part = newMessage.parts().get().get(i);
-        if (part.inlineData() == null) {
+        if (part.inlineData().isEmpty()) {
           continue;
         }
         String fileName = "artifact_" + invocationContext.invocationId() + "_" + i;

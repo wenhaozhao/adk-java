@@ -52,7 +52,7 @@ public final class SessionUtils {
         encodedParts.add(part);
       }
     }
-    return Content.builder().parts(encodedParts).build();
+    return toContent(encodedParts, content.role());
   }
 
   public static Content decodeContent(Content content) {
@@ -77,6 +77,12 @@ public final class SessionUtils {
         decodedParts.add(part);
       }
     }
-    return Content.builder().parts(decodedParts).build();
+    return toContent(decodedParts, content.role());
+  }
+
+  private static Content toContent(List<Part> parts, Optional<String> role) {
+    Content.Builder contentBuilder = Content.builder().parts(parts);
+    role.ifPresent(contentBuilder::role);
+    return contentBuilder.build();
   }
 }
