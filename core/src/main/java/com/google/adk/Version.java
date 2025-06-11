@@ -20,10 +20,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class Version {
-  private static final Logger logger = Logger.getLogger(Version.class.getName());
+  private static final Logger logger = LoggerFactory.getLogger(Version.class);
   
   public static final String JAVA_ADK_VERSION;
   
@@ -35,10 +36,10 @@ public final class Version {
         properties.load(input);
         version = properties.getProperty("version", "unknown");
       } else {
-        logger.log(Level.WARNING, "version.properties file not found in classpath");
+        logger.warn("version.properties file not found in classpath");
       }
     } catch (IOException e) {
-      logger.log(Level.WARNING, "Failed to load version from properties file", e);
+      logger.warn("Failed to load version from properties file", e);
     }
     JAVA_ADK_VERSION = version;
   }
