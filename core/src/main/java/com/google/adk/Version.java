@@ -16,9 +16,32 @@
 
 package com.google.adk;
 
-/** Holding class for the version of the Java ADK. */
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Properties;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 public final class Version {
-  public static final String JAVA_ADK_VERSION = "0.1.0";
+  private static final Logger logger = Logger.getLogger(Version.class.getName());
+  
+  public static final String JAVA_ADK_VERSION;
+  
+  static {
+    String version = "unknown";
+    try (InputStream input = Version.class.getClassLoader().getResourceAsStream("version.properties")) {
+      if (input != null) {
+        Properties properties = new Properties();
+        properties.load(input);
+        version = properties.getProperty("version", "unknown");
+      } else {
+        logger.log(Level.WARNING, "version.properties file not found in classpath");
+      }
+    } catch (IOException e) {
+      logger.log(Level.WARNING, "Failed to load version from properties file", e);
+    }
+    JAVA_ADK_VERSION = version;
+  }
 
   private Version() {}
 }
