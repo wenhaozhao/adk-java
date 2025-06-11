@@ -87,6 +87,7 @@ public class VertexAiSessionServiceTest {
           "author" : "user",
           "timestamp" : "2024-12-12T12:12:12.123456Z",
           "content" : {
+            "role" : "user",
             "parts" : [
               { "text" : "testContent" }
             ]
@@ -131,10 +132,7 @@ public class VertexAiSessionServiceTest {
                     .invocationId("123")
                     .author("user")
                     .timestamp(Instant.parse((String) eventJson.get("timestamp")).toEpochMilli())
-                    .content(
-                        Content.builder()
-                            .parts(Arrays.asList(Part.fromText("testContent")))
-                            .build())
+                    .content(Content.fromParts(Part.fromText("testContent")))
                     .actions(
                         EventActions.builder()
                             .transferToAgent("agent")
@@ -162,7 +160,11 @@ public class VertexAiSessionServiceTest {
   private static final Pattern SESSION_REGEX =
       Pattern.compile("^reasoningEngines/([^/]+)/sessions/([^/]+)$");
   private static final Pattern SESSIONS_REGEX =
+      Pattern.compile("^reasoningEngines/([^/]+)/sessions$");
+  private static final Pattern SESSIONS_FILTER_REGEX =
       Pattern.compile("^reasoningEngines/([^/]+)/sessions\\?filter=user_id=([^/]+)$");
+  private static final Pattern APPEND_EVENT_REGEX =
+      Pattern.compile("^reasoningEngines/([^/]+)/sessions/([^/]+):appendEvent$");
   private static final Pattern EVENTS_REGEX =
       Pattern.compile("^reasoningEngines/([^/]+)/sessions/([^/]+)/events$");
 
@@ -182,12 +184,14 @@ public class VertexAiSessionServiceTest {
     public ApiResponse answer(InvocationOnMock invocation) throws Throwable {
       String httpMethod = invocation.getArgument(0);
       String path = invocation.getArgument(1);
-      if (httpMethod.equals("POST")) {
-        return handlePost(invocation);
+      if (httpMethod.equals("POST") && SESSIONS_REGEX.matcher(path).matches()) {
+        return handleCreateSession(path, invocation);
       } else if (httpMethod.equals("GET") && SESSION_REGEX.matcher(path).matches()) {
         return handleGetSession(path);
-      } else if (httpMethod.equals("GET") && SESSIONS_REGEX.matcher(path).matches()) {
+      } else if (httpMethod.equals("GET") && SESSIONS_FILTER_REGEX.matcher(path).matches()) {
         return handleGetSessions(path);
+      } else if (httpMethod.equals("POST") && APPEND_EVENT_REGEX.matcher(path).matches()) {
+        return handleAppendEvent(path, invocation);
       } else if (httpMethod.equals("GET") && EVENTS_REGEX.matcher(path).matches()) {
         return handleGetEvents(path);
       } else if (httpMethod.equals("GET") && LRO_REGEX.matcher(path).matches()) {
@@ -195,7 +199,8 @@ public class VertexAiSessionServiceTest {
       } else if (httpMethod.equals("DELETE")) {
         return handleDeleteSession(path);
       }
-      return null; // Handle other cases or return null for unmocked calls
+      throw new RuntimeException(
+          String.format("Unsupported HTTP method: %s, path: %s", httpMethod, path));
     }
 
     private ApiResponse mockApiResponseWithBody(String body) {
@@ -205,17 +210,14 @@ public class VertexAiSessionServiceTest {
       return mockApiResponse;
     }
 
-    private ApiResponse handlePost(InvocationOnMock invocation) throws Exception {
+    private ApiResponse handleCreateSession(String path, InvocationOnMock invocation)
+        throws Exception {
       String newSessionId = "4";
       Map<String, Object> requestDict =
           mapper.readValue(
               (String) invocation.getArgument(2), new TypeReference<Map<String, Object>>() {});
       Map<String, Object> newSessionData = new HashMap<>();
-      newSessionData.put(
-          "name",
-          String.format(
-              "projects/test-project/locations/test-location/reasoningEngines/123/sessions/%s",
-              newSessionId));
+      newSessionData.put("name", path + "/" + newSessionId);
       newSessionData.put("userId", requestDict.get("userId"));
       newSessionData.put("sessionState", requestDict.get("sessionState"));
       newSessionData.put("updateTime", "2024-12-12T12:12:12.123456Z");
@@ -226,75 +228,107 @@ public class VertexAiSessionServiceTest {
           String.format(
               """
               {
-                "name": "projects/test_project/locations/test_location/reasoningEngines/123/sessions/%s/operations/111",
+                "name": "%s/%s/operations/111",
                 "done": false
               }
               """,
-              newSessionId));
+              path, newSessionId));
     }
 
     private ApiResponse handleGetSession(String path) throws Exception {
       String sessionId = path.substring(path.lastIndexOf('/') + 1);
-      if (!sessionId.contains("/")) { // Ensure it's a direct session ID
-        String sessionData = sessionMap.get(sessionId);
-        if (sessionData != null) {
-          return mockApiResponseWithBody(sessionData);
-        } else {
-          throw new RuntimeException("Session not found: " + sessionId);
-        }
+      if (sessionId.contains("/")) { // Ensure it's a direct session ID
+        return null;
       }
-      return null;
+      String sessionData = sessionMap.get(sessionId);
+      if (sessionData != null) {
+        return mockApiResponseWithBody(sessionData);
+      } else {
+        throw new RuntimeException("Session not found: " + sessionId);
+      }
     }
 
     private ApiResponse handleGetSessions(String path) throws Exception {
-      Matcher sessionsMatcher = SESSIONS_REGEX.matcher(path);
-      if (sessionsMatcher.matches()) {
-        String userId = sessionsMatcher.group(2);
-        List<String> userSessionsJson = new ArrayList<>();
-        for (String sessionJson : sessionMap.values()) {
-          Map<String, Object> session =
-              mapper.readValue(sessionJson, new TypeReference<Map<String, Object>>() {});
-          if (session.containsKey("userId") && session.get("userId").equals(userId)) {
-            userSessionsJson.add(sessionJson);
-          }
-        }
-        return mockApiResponseWithBody(
-            String.format(
-                """
-                {
-                  "sessions": [%s]
-                }
-                """,
-                String.join(",", userSessionsJson)));
+      Matcher sessionsMatcher = SESSIONS_FILTER_REGEX.matcher(path);
+      if (!sessionsMatcher.matches()) {
+        return null;
       }
-      return null;
+      String userId = sessionsMatcher.group(2);
+      List<String> userSessionsJson = new ArrayList<>();
+      for (String sessionJson : sessionMap.values()) {
+        Map<String, Object> session =
+            mapper.readValue(sessionJson, new TypeReference<Map<String, Object>>() {});
+        if (session.containsKey("userId") && session.get("userId").equals(userId)) {
+          userSessionsJson.add(sessionJson);
+        }
+      }
+      return mockApiResponseWithBody(
+          String.format(
+              """
+              {
+                "sessions": [%s]
+              }
+              """,
+              String.join(",", userSessionsJson)));
+    }
+
+    private ApiResponse handleAppendEvent(String path, InvocationOnMock invocation) {
+      Matcher appendEventMatcher = APPEND_EVENT_REGEX.matcher(path);
+      if (!appendEventMatcher.matches()) {
+        return null;
+      }
+      String sessionId = appendEventMatcher.group(2);
+      String eventDataString = eventMap.get(sessionId);
+      String newEventDataString = (String) invocation.getArgument(2);
+      try {
+        ConcurrentMap<String, Object> newEventData =
+            mapper.readValue(
+                newEventDataString, new TypeReference<ConcurrentMap<String, Object>>() {});
+
+        List<ConcurrentMap<String, Object>> eventsData = new ArrayList<>();
+        if (eventDataString != null) {
+          eventsData.addAll(
+              mapper.readValue(
+                  eventDataString, new TypeReference<List<ConcurrentMap<String, Object>>>() {}));
+        }
+
+        newEventData.put(
+            "name", path.replaceFirst(":appendEvent$", "/events/" + Event.generateEventId()));
+
+        eventsData.add(newEventData);
+
+        eventMap.put(sessionId, mapper.writeValueAsString(eventsData));
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+      return mockApiResponseWithBody(newEventDataString);
     }
 
     private ApiResponse handleGetEvents(String path) throws Exception {
       Matcher matcher = EVENTS_REGEX.matcher(path);
-      if (matcher.matches()) {
-        String sessionId = matcher.group(2);
-        String eventData = eventMap.get(sessionId);
-        if (eventData != null) {
-          return mockApiResponseWithBody(
-              String.format(
-                  """
-                  {
-                    "sessionEvents": %s
-                  }
-                  """,
-                  eventData));
-        } else {
-          // Return an empty list if no events are found for the session
-          return mockApiResponseWithBody(
-              """
-              {
-                "sessionEvents": []
-              }
-              """);
-        }
+      if (!matcher.matches()) {
+        return null;
       }
-      return null;
+      String sessionId = matcher.group(2);
+      String eventData = eventMap.get(sessionId);
+      if (eventData != null) {
+        return mockApiResponseWithBody(
+            String.format(
+                """
+                {
+                  "sessionEvents": %s
+                }
+                """,
+                eventData));
+      } else {
+        // Return an empty list if no events are found for the session
+        return mockApiResponseWithBody(
+            """
+            {
+              "sessionEvents": []
+            }
+            """);
+      }
     }
 
     private ApiResponse handleGetLro(String path) {
@@ -311,12 +345,12 @@ public class VertexAiSessionServiceTest {
 
     private ApiResponse handleDeleteSession(String path) {
       Matcher sessionMatcher = SESSION_REGEX.matcher(path);
-      if (sessionMatcher.matches()) {
-        String sessionIdToDelete = sessionMatcher.group(2);
-        sessionMap.remove(sessionIdToDelete);
-        return mockApiResponseWithBody("");
+      if (!sessionMatcher.matches()) {
+        return null;
       }
-      return null;
+      String sessionIdToDelete = sessionMatcher.group(2);
+      sessionMap.remove(sessionIdToDelete);
+      return mockApiResponseWithBody("");
     }
   }
 
@@ -445,15 +479,13 @@ public class VertexAiSessionServiceTest {
   @Test
   public void appendEvent_success() {
     String userId = "userA";
-    Session session =
-        vertexAiSessionService.getSession("123", userId, "1", Optional.empty()).blockingGet();
+    Session session = vertexAiSessionService.createSession("987", userId, null, null).blockingGet();
     Event event =
         Event.builder()
-            .id("456")
             .invocationId("456")
             .author(userId)
             .timestamp(Instant.parse("2024-12-12T12:12:12.123456Z").toEpochMilli())
-            .content(Content.builder().parts(Arrays.asList(Part.fromText("testContent"))).build())
+            .content(Content.fromParts(Part.fromText("appendEvent_success")))
             .build();
     var unused = vertexAiSessionService.appendEvent(session, event).blockingGet();
     ImmutableList<Event> events =
@@ -463,12 +495,13 @@ public class VertexAiSessionServiceTest {
             .events();
     assertThat(events).hasSize(1);
 
-    // TODO: Fix MockApiAnswer to actually store the event that was created.
-    // Even though we set the userId to "userA", the event is actually created with the userId
-    // "user".  This is because the MockApiAnswer in this test doesn't actually create a new event.
-    // It just returns the event from MOCK_EVENT_STRING and doesn't actually store the event that
-    // was created above
-    assertThat(events.get(0).author()).isEqualTo("user");
+    Event retrievedEvent = events.get(0);
+    assertThat(retrievedEvent.author()).isEqualTo(userId);
+    assertThat(retrievedEvent.content().get().text()).isEqualTo("appendEvent_success");
+    assertThat(retrievedEvent.content().get().role()).hasValue("user");
+    assertThat(retrievedEvent.invocationId()).isEqualTo("456");
+    assertThat(retrievedEvent.timestamp())
+        .isEqualTo(Instant.parse("2024-12-12T12:12:12.123456Z").toEpochMilli());
   }
 
   @Test
