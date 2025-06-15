@@ -15,21 +15,17 @@
  */
 package com.google.adk.models.langchain4j;
 
+import static com.google.adk.models.langchain4j.RunLoop.askAgent;
+import static com.google.adk.models.langchain4j.RunLoop.askAgentStreaming;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.google.adk.agents.BaseAgent;
 import com.google.adk.agents.LlmAgent;
-import com.google.adk.agents.RunConfig;
 import com.google.adk.events.Event;
 import com.google.adk.models.LlmRequest;
 import com.google.adk.models.LlmResponse;
-import com.google.adk.runner.InMemoryRunner;
-import com.google.adk.runner.Runner;
-import com.google.adk.sessions.Session;
 import com.google.adk.tools.AgentTool;
-import com.google.adk.tools.Annotations.Schema;
 import com.google.adk.tools.FunctionTool;
-import com.google.adk.tools.ToolContext;
 import com.google.genai.types.Content;
 import com.google.genai.types.FunctionCall;
 import com.google.genai.types.FunctionResponse;
@@ -42,7 +38,6 @@ import io.reactivex.rxjava3.core.Flowable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -106,7 +101,7 @@ class LangChain4jIntegrationTest {
                 If asked about the weather forecast for a city,
                 you MUST call the `getWeather` function.
                 """)
-            .tools(FunctionTool.create(LangChain4jIntegrationTest.class, "getWeather"))
+            .tools(FunctionTool.create(ToolExample.class, "getWeather"))
             .build();
 
         // when
@@ -125,16 +120,20 @@ class LangChain4jIntegrationTest {
         Event eventThree = events.get(2);
 
         // assert the first event is a function call
+        assertTrue(eventOne.content().isPresent());
         Content contentOne = eventOne.content().get();
         assertTrue(contentOne.parts().isPresent());
         List<Part> partsOne = contentOne.parts().get();
         assertEquals(1, partsOne.size());
         Optional<FunctionCall> functionCall = partsOne.get(0).functionCall();
         assertTrue(functionCall.isPresent());
+        assertTrue(functionCall.get().name().isPresent());
         assertEquals("getWeather", functionCall.get().name().get());
+        assertTrue(functionCall.get().args().isPresent());
         assertTrue(functionCall.get().args().get().containsKey("city"));
 
         // assert the second event is a function response
+        assertTrue(eventTwo.content().isPresent());
         Content contentTwo = eventTwo.content().get();
         assertTrue(contentTwo.parts().isPresent());
         List<Part> partsTwo = contentTwo.parts().get();
@@ -144,10 +143,12 @@ class LangChain4jIntegrationTest {
 
         // assert the third event is the final text response
         assertTrue(eventThree.finalResponse());
+        assertTrue(eventThree.content().isPresent());
         Content contentThree = eventThree.content().get();
         assertTrue(contentThree.parts().isPresent());
         List<Part> partsThree = contentThree.parts().get();
         assertEquals(1, partsThree.size());
+        assertTrue(partsThree.get(0).text().isPresent());
         assertTrue(partsThree.get(0).text().get().contains("beautiful"));
     }
 
@@ -397,7 +398,6 @@ class LangChain4jIntegrationTest {
         // assertEquals(1, eventsHi.size(), "Expected 1 event for 'Hi'");
         // assertEquals("Hello", responseToHi, "Response to 'Hi' should be 'Hello'");
         // If "Hello" can be streamed in multiple parts:
-        assertTrue(eventsHi.size() >= 1, "Expected at least 1 event for 'Hi'");
         assertTrue(responseToHi.trim().contains("Hello"), "Response to 'Hi' should be 'Hello'");
 
 
@@ -449,47 +449,5 @@ class LangChain4jIntegrationTest {
         assertTrue(responseToWeather.contains("Function Response") && responseToWeather.contains("beautiful and sunny weather"));
         assertTrue(responseToWeather.contains("sunny"));
         assertTrue(responseToWeather.contains("24"));
-    }
-
-    private static List<Event> askAgent(BaseAgent agent, String... messages) {
-        return runLoop(agent, false, messages);
-    }
-
-    private static List<Event> askAgentStreaming(BaseAgent agent, String... messages) {
-        return runLoop(agent, true, messages);
-    }
-
-    private static List<Event> runLoop(BaseAgent agent, boolean streaming, String... messages) {
-        ArrayList<Event> allEvents = new ArrayList<>();
-
-        Runner runner = new InMemoryRunner(agent, agent.name());
-        Session session = runner.sessionService().createSession(agent.name(), "user132").blockingGet();
-
-        for (String message : messages) {
-            Content messageContent = Content.fromParts(Part.fromText(message));
-            allEvents.addAll(
-                runner.runAsync(session, messageContent,
-                        RunConfig.builder()
-                            .setStreamingMode(streaming ? RunConfig.StreamingMode.SSE : RunConfig.StreamingMode.NONE)
-                            .build())
-                    .blockingStream()
-                    .toList()
-            );
-        }
-
-        return allEvents;
-    }
-
-    @Schema(description = "Function to get the weather forecast for a given city")
-    public static Map<String, String> getWeather(
-        @Schema(name = "city", description = "The city to get the weather forecast for")
-        String city,
-        ToolContext toolContext) {
-
-        return Map.of(
-            "city", city,
-            "forecast", "a beautiful and sunny weather",
-            "temperature", "from 10°C in the morning up to 24°C in the afternoon"
-        );
     }
 }

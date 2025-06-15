@@ -22,6 +22,7 @@ import com.google.adk.models.BaseLlm;
 import com.google.adk.models.BaseLlmConnection;
 import com.google.adk.models.LlmRequest;
 import com.google.adk.models.LlmResponse;
+import com.google.genai.types.Blob;
 import com.google.genai.types.Content;
 import com.google.genai.types.FunctionCall;
 import com.google.genai.types.FunctionCallingConfigMode;
@@ -35,11 +36,20 @@ import com.google.genai.types.Type;
 import dev.langchain4j.Experimental;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
+import dev.langchain4j.data.audio.Audio;
+import dev.langchain4j.data.image.Image;
 import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.AudioContent;
 import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.ImageContent;
+import dev.langchain4j.data.message.PdfFileContent;
 import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.TextContent;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.data.message.VideoContent;
+import dev.langchain4j.data.pdf.PdfFile;
+import dev.langchain4j.data.video.Video;
 import dev.langchain4j.exception.UnsupportedFeatureException;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
@@ -54,10 +64,12 @@ import dev.langchain4j.model.chat.request.json.JsonSchemaElement;
 import dev.langchain4j.model.chat.request.json.JsonStringSchema;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
+import io.grpc.netty.shaded.io.netty.handler.codec.base64.Base64Encoder;
 import io.reactivex.rxjava3.core.BackpressureStrategy;
 import io.reactivex.rxjava3.core.Flowable;
 
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -74,7 +86,7 @@ public class LangChain4j extends BaseLlm {
     private final StreamingChatModel streamingChatModel;
     private final ObjectMapper objectMapper;
 
-    public LangChain4j(ChatModel chatModel) { // TODO
+    public LangChain4j(ChatModel chatModel) {
         super(Objects.requireNonNull(chatModel.defaultRequestParameters().modelName(),
             "chat model name cannot be null"));
         this.chatModel = Objects.requireNonNull(chatModel, "chatModel cannot be null");
@@ -82,7 +94,7 @@ public class LangChain4j extends BaseLlm {
         this.objectMapper = new ObjectMapper();
     }
 
-    public LangChain4j(ChatModel chatModel, String modelName) { // TODO
+    public LangChain4j(ChatModel chatModel, String modelName) {
         super(Objects.requireNonNull(modelName,
             "chat model name cannot be null"));
         this.chatModel = Objects.requireNonNull(chatModel, "chatModel cannot be null");
@@ -90,7 +102,7 @@ public class LangChain4j extends BaseLlm {
         this.objectMapper = new ObjectMapper();
     }
 
-    public LangChain4j(StreamingChatModel streamingChatModel) { // TODO
+    public LangChain4j(StreamingChatModel streamingChatModel) {
         super(Objects.requireNonNull(streamingChatModel.defaultRequestParameters().modelName(),
             "streaming chat model name cannot be null"));
         this.chatModel = null;
@@ -98,7 +110,7 @@ public class LangChain4j extends BaseLlm {
         this.objectMapper = new ObjectMapper();
     }
 
-    public LangChain4j(StreamingChatModel streamingChatModel, String modelName) { // TODO
+    public LangChain4j(StreamingChatModel streamingChatModel, String modelName) {
         super(Objects.requireNonNull(modelName, "streaming chat model name cannot be null"));
         this.chatModel = null;
         this.streamingChatModel = Objects.requireNonNull(streamingChatModel, "streamingChatModel cannot be null");
@@ -121,7 +133,6 @@ public class LangChain4j extends BaseLlm {
 
             ChatRequest chatRequest = toChatRequest(llmRequest);
 
-            // TODO is streaming properly implemented? What happens for function calls?
             return Flowable.create(emitter -> {
                 streamingChatModel.chat(chatRequest, new StreamingChatResponseHandler() {
                     @Override
@@ -164,12 +175,12 @@ public class LangChain4j extends BaseLlm {
             ChatRequest chatRequest = toChatRequest(llmRequest);
             ChatResponse chatResponse = chatModel.chat(chatRequest);
             LlmResponse llmResponse = toLlmResponse(chatResponse);
+
             return Flowable.just(llmResponse);
         }
     }
 
     private ChatRequest toChatRequest(LlmRequest llmRequest) {
-        // TODO llmRequest.model() ?
         ChatRequest.Builder requestBuilder = ChatRequest.builder();
 
         List<ToolSpecification> toolSpecifications = toToolSpecifications(llmRequest);
@@ -195,7 +206,6 @@ public class LangChain4j extends BaseLlm {
                 ToolConfig toolConfig = generateContentConfig.toolConfig().get();
                 toolConfig.functionCallingConfig().ifPresent(functionCallingConfig -> {
                     functionCallingConfig.mode().ifPresent(functionMode -> {
-                        // TODO
                         if (functionMode.knownEnum().equals(FunctionCallingConfigMode.Known.AUTO)) {
                             requestBuilder.toolChoice(ToolChoice.AUTO);
                         } else if (functionMode.knownEnum().equals(FunctionCallingConfigMode.Known.ANY)) {
@@ -221,7 +231,6 @@ public class LangChain4j extends BaseLlm {
 
         return requestBuilder
             .messages(toMessages(llmRequest))
-            // TODO?
             .build();
     }
 
@@ -233,7 +242,7 @@ public class LangChain4j extends BaseLlm {
     }
 
     private ChatMessage toChatMessage(Content content) {
-        String role = content.role().orElseThrow().toLowerCase(); // TODO
+        String role = content.role().orElseThrow().toLowerCase();
         return switch (role) {
             case "user" -> toUserOrToolResultMessage(content);
             case "model", "assistant" -> toAiMessage(content);
@@ -242,15 +251,15 @@ public class LangChain4j extends BaseLlm {
     }
 
     private ChatMessage toUserOrToolResultMessage(Content content) {
-        List<String> texts = new ArrayList<>();
         ToolExecutionResultMessage toolExecutionResultMessage = null;
         ToolExecutionRequest toolExecutionRequest = null;
 
+        List<dev.langchain4j.data.message.Content> lc4jContents = new ArrayList<>();
+
         for (Part part : content.parts().orElse(List.of())) {
             if (part.text().isPresent()) {
-                texts.add(part.text().get());
+                lc4jContents.add(TextContent.from(part.text().get()));
             } else if (part.functionResponse().isPresent()) {
-                // TODO multiple tool calls? should be 1 per part?
                 FunctionResponse functionResponse = part.functionResponse().get();
                 toolExecutionResultMessage = ToolExecutionResultMessage.from(
                     functionResponse.id().orElseThrow(),
@@ -264,8 +273,56 @@ public class LangChain4j extends BaseLlm {
                     .name(functionCall.name().orElseThrow())
                     .arguments(toJson(functionCall.args().orElse(Map.of())))
                     .build();
+            } else if (part.inlineData().isPresent()) {
+                Blob blob = part.inlineData().get();
+
+                if (blob.mimeType().isEmpty() || blob.data().isEmpty()) {
+                    throw new IllegalArgumentException("Mime type and data required");
+                }
+
+                byte[] bytes = blob.data().get();
+                String mimeType = blob.mimeType().get();
+
+                Base64.Encoder encoder = Base64.getEncoder();
+
+                dev.langchain4j.data.message.Content lc4jContent = null;
+
+                if (mimeType.startsWith("audio/")) {
+                    lc4jContent = AudioContent.from(Audio.builder()
+                        .base64Data(encoder.encodeToString(bytes))
+                        .mimeType(mimeType)
+                        .build());
+                } else if (mimeType.startsWith("video/")) {
+                    lc4jContent = VideoContent.from(Video.builder()
+                        .base64Data(encoder.encodeToString(bytes))
+                        .mimeType(mimeType)
+                        .build());
+                } else if (mimeType.startsWith("image/")) {
+                    lc4jContent = ImageContent.from(Image.builder()
+                        .base64Data(encoder.encodeToString(bytes))
+                        .mimeType(mimeType)
+                        .build());
+                } else if (mimeType.startsWith("application/pdf")) {
+                    lc4jContent = PdfFileContent.from(PdfFile.builder()
+                        .base64Data(encoder.encodeToString(bytes))
+                        .mimeType(mimeType)
+                        .build());
+                } else if (mimeType.startsWith("text/")
+                    || mimeType.equals("application/json")
+                    || mimeType.endsWith("+json")
+                    || mimeType.endsWith("+xml")) {
+                    // TODO are there missing text based mime types?
+                    // TODO should we assume UTF_8?
+                    lc4jContents.add(TextContent.from(new String(bytes, java.nio.charset.StandardCharsets.UTF_8)));
+                }
+
+                if (lc4jContent != null) {
+                    lc4jContents.add(lc4jContent);
+                } else {
+                    throw  new IllegalArgumentException("Unknown or unhandled mime type: " + mimeType);
+                }
             } else {
-                throw new IllegalStateException("Either text or functionCall is expected, but was: " + part);
+                throw new IllegalStateException("Text, media or functionCall is expected, but was: " + part);
             }
         }
 
@@ -274,7 +331,7 @@ public class LangChain4j extends BaseLlm {
         } else if (toolExecutionRequest != null){
             return AiMessage.aiMessage(toolExecutionRequest);
         } else {
-            return UserMessage.from(String.join("\n", texts));
+            return UserMessage.from(lc4jContents);
         }
     }
 
@@ -324,7 +381,7 @@ public class LangChain4j extends BaseLlm {
                         ToolSpecification toolSpecification = ToolSpecification.builder()
                             .name(baseTool.name())
                             .description(baseTool.description())
-                            .parameters(toParameters(schema)) // TODO
+                            .parameters(toParameters(schema))
                             .build();
                         toolSpecifications.add(toolSpecification);
                     } else {
@@ -337,7 +394,7 @@ public class LangChain4j extends BaseLlm {
                 }
             });
 
-        return toolSpecifications; // TODO
+        return toolSpecifications;
     }
 
     private JsonObjectSchema toParameters(Schema schema) {
@@ -345,7 +402,7 @@ public class LangChain4j extends BaseLlm {
             return JsonObjectSchema.builder()
                 .addProperties(toProperties(schema))
                 .required(schema.required().orElse(List.of()))
-                .build(); // TODO
+                .build();
         } else {
             throw new UnsupportedOperationException("LangChain4jLlm does not support schema of type: " + schema.type());
         }
@@ -359,28 +416,32 @@ public class LangChain4j extends BaseLlm {
     }
 
     private JsonSchemaElement toJsonSchemaElement(Schema schema) {
-        Type type = schema.type().get(); // TODO
-        return switch (type.knownEnum()) {
-            case STRING -> JsonStringSchema.builder()
-                .description(schema.description().orElse(null))
-                .build();
-            case NUMBER -> JsonNumberSchema.builder()
-                .description(schema.description().orElse(null))
-                .build();
-            case INTEGER -> JsonIntegerSchema.builder()
-                .description(schema.description().orElse(null))
-                .build();
-            case BOOLEAN -> JsonBooleanSchema.builder()
-                .description(schema.description().orElse(null))
-                .build();
-            case ARRAY -> JsonArraySchema.builder()
-                .description(schema.description().orElse(null))
-                .items(toJsonSchemaElement(schema.items().orElseThrow()))
-                .build();
-            case OBJECT -> toParameters(schema);
-            case TYPE_UNSPECIFIED ->
-                throw new UnsupportedFeatureException("LangChain4jLlm does not support schema of type: " + type);
-        };
+        if (schema != null && schema.type().isPresent()) {
+            Type type = schema.type().get();
+            return switch (type.knownEnum()) {
+                case STRING -> JsonStringSchema.builder()
+                    .description(schema.description().orElse(null))
+                    .build();
+                case NUMBER -> JsonNumberSchema.builder()
+                    .description(schema.description().orElse(null))
+                    .build();
+                case INTEGER -> JsonIntegerSchema.builder()
+                    .description(schema.description().orElse(null))
+                    .build();
+                case BOOLEAN -> JsonBooleanSchema.builder()
+                    .description(schema.description().orElse(null))
+                    .build();
+                case ARRAY -> JsonArraySchema.builder()
+                    .description(schema.description().orElse(null))
+                    .items(toJsonSchemaElement(schema.items().orElseThrow()))
+                    .build();
+                case OBJECT -> toParameters(schema);
+                case TYPE_UNSPECIFIED ->
+                    throw new UnsupportedFeatureException("LangChain4jLlm does not support schema of type: " + type);
+            };
+        } else {
+            throw new IllegalArgumentException("Schema type cannot be null or absent");
+        }
     }
 
     private LlmResponse toLlmResponse(ChatResponse chatResponse) {
