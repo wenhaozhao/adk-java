@@ -20,6 +20,7 @@ import com.google.genai.Client;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+/** Registry for LLM models. */
 public final class LlmRegistry {
 
   // A thread-safe cache mapping model names to LLM instances.
@@ -42,7 +43,9 @@ public final class LlmRegistry {
   }
 
   static {
-    registerLlm("gemini-.*", modelName -> new Gemini(modelName, getGeminiApiClient()));
+    registerLlm(
+        "gemini-.*",
+        modelName -> Gemini.builder().modelName(modelName).apiClient(getGeminiApiClient()).build());
   }
 
   public static void registerLlm(String modelNamePattern, LlmFactory factory) {
