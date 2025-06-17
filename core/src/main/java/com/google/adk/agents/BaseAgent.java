@@ -266,9 +266,7 @@ public abstract class BaseAgent {
         .switchIfEmpty(
             Single.defer(
                 () -> {
-                  boolean hasStateDelta = !callbackContext.eventActions().stateDelta().isEmpty();
-
-                  if (hasStateDelta) {
+                  if (callbackContext.state().hasDelta()) {
                     Event.Builder eventBuilder =
                         Event.builder()
                             .id(Event.generateEventId())
