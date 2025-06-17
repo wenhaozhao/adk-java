@@ -88,7 +88,7 @@ public final class VertexAiSessionService implements BaseSessionService {
         new HttpApiClient(Optional.of(project), Optional.of(location), credentials, httpOptions);
   }
 
-  public JsonNode getJsonResponse(ApiResponse apiResponse) {
+  private static JsonNode getJsonResponse(ApiResponse apiResponse) {
     try {
       ResponseBody responseBody = apiResponse.getResponseBody();
       return objectMapper.readTree(responseBody.string());
@@ -152,18 +152,13 @@ public final class VertexAiSessionService implements BaseSessionService {
     JsonNode getSessionResponseMap = getJsonResponse(getSessionApiResponse);
     Instant updateTimestamp = Instant.parse(getSessionResponseMap.get("updateTime").asText());
     ConcurrentMap<String, Object> sessionState = null;
-    try {
       if (getSessionResponseMap != null && getSessionResponseMap.has("sessionState")) {
         JsonNode sessionStateNode = getSessionResponseMap.get("sessionState");
         if (sessionStateNode != null) {
-          sessionState =
-              objectMapper.readValue(
-                  sessionStateNode.toString(),
-                  new TypeReference<ConcurrentMap<String, Object>>() {});
+        sessionState =
+            objectMapper.convertValue(
+                sessionStateNode, new TypeReference<ConcurrentMap<String, Object>>() {});
         }
-      }
-    } catch (JsonProcessingException e) {
-      logger.warn("Error while parsing session state: {}", e.getMessage());
     }
     return Single.just(
         Session.builder(sessId)
@@ -190,22 +185,15 @@ public final class VertexAiSessionService implements BaseSessionService {
     }
 
     JsonNode listSessionsResponseMap = getJsonResponse(apiResponse);
-    List<Map<String, Object>> apiSessions;
-    try {
-      apiSessions =
-          objectMapper.readValue(
-              listSessionsResponseMap.get("sessions").toString(),
-              new TypeReference<List<Map<String, Object>>>() {});
-    } catch (JsonProcessingException e) {
-      logger.warn("Error while parsing list sessions response: {}", e.getMessage());
-      apiSessions = new ArrayList<>();
-    }
+    List<Map<String, Object>> apiSessions =
+        objectMapper.convertValue(
+            listSessionsResponseMap.get("sessions"),
+            new TypeReference<List<Map<String, Object>>>() {});
 
     List<Session> sessions = new ArrayList<>();
     for (Map<String, Object> apiSession : apiSessions) {
-      String name = (String) apiSession.get("name");
-      List<String> parts = Splitter.on('/').splitToList(name);
-      String sessionId = Iterables.getLast(parts);
+      String sessionId =
+          Iterables.getLast(Splitter.on('/').splitToList((String) apiSession.get("name")));
       Instant updateTimestamp = Instant.parse((String) apiSession.get("updateTime"));
       Session session =
           Session.builder(sessionId)
@@ -234,23 +222,21 @@ public final class VertexAiSessionService implements BaseSessionService {
       return Single.just(ListEventsResponse.builder().build());
     }
 
-    JsonNode getEventsResponseMap = getJsonResponse(apiResponse);
-    List<ConcurrentMap<String, Object>> listEventsResponse;
-    try {
-      listEventsResponse =
-          objectMapper.readValue(
-              getEventsResponseMap.get("sessionEvents").toString(),
-              new TypeReference<List<ConcurrentMap<String, Object>>>() {});
-    } catch (JsonProcessingException e) {
-      logger.warn("Error while parsing list events response: {}", e.getMessage());
-      listEventsResponse = new ArrayList<>();
+    JsonNode sessionEventsNode = getJsonResponse(apiResponse).get("sessionEvents");
+    if (sessionEventsNode == null || sessionEventsNode.isEmpty()) {
+      return Single.just(ListEventsResponse.builder().events(new ArrayList<>()).build());
     }
-
-    List<Event> events = new ArrayList<>();
-    for (Map<String, Object> event : listEventsResponse) {
-      events.add(fromApiEvent(event));
-    }
-    return Single.just(ListEventsResponse.builder().events(events).build());
+    return Single.just(
+        ListEventsResponse.builder()
+            .events(
+                objectMapper
+                    .convertValue(
+                        sessionEventsNode,
+                        new TypeReference<List<ConcurrentMap<String, Object>>>() {})
+                    .stream()
+                    .map(event -> fromApiEvent(event))
+                    .collect(toCollection(ArrayList::new)))
+            .build());
   }
 
   @Override
@@ -262,6 +248,10 @@ public final class VertexAiSessionService implements BaseSessionService {
             "GET", "reasoningEngines/" + reasoningEngineId + "/sessions/" + sessionId, "");
     JsonNode getSessionResponseMap = getJsonResponse(apiResponse);
 
+    if (getSessionResponseMap == null) {
+      return Maybe.empty();
+    }
+
     String sessId =
         Optional.ofNullable(getSessionResponseMap.get("name"))
             .map(name -> Iterables.getLast(Splitter.on('/').splitToList(name.asText())))
@@ -272,80 +262,59 @@ public final class VertexAiSessionService implements BaseSessionService {
             .orElse(null);
 
     ConcurrentMap<String, Object> sessionState = new ConcurrentHashMap<>();
-    try {
-      if (getSessionResponseMap != null && getSessionResponseMap.has("sessionState")) {
-        sessionState =
-            objectMapper.readValue(
-                getSessionResponseMap.get("sessionState").toString(),
-                new TypeReference<ConcurrentMap<String, Object>>() {});
-      }
-    } catch (JsonProcessingException e) {
-      logger.warn("Error while parsing session state: {}", e.getMessage());
-    }
-    Session.Builder sessionBuilder =
-        Session.builder(sessId)
-            .appName(appName)
-            .userId(userId)
-            .lastUpdateTime(updateTimestamp)
-            .state(sessionState);
-
-    ApiResponse listEventsApiResponse =
-        apiClient.request(
-            "GET",
-            "reasoningEngines/" + reasoningEngineId + "/sessions/" + sessionId + "/events",
-            "");
-
-    if (listEventsApiResponse.getResponseBody() == null) {
-      return Maybe.just(sessionBuilder.build());
+    if (getSessionResponseMap != null && getSessionResponseMap.has("sessionState")) {
+      sessionState.putAll(
+          objectMapper.convertValue(
+              getSessionResponseMap.get("sessionState"),
+              new TypeReference<ConcurrentMap<String, Object>>() {}));
     }
 
-    JsonNode getEventsResponseMap = getJsonResponse(listEventsApiResponse);
-    List<Map<String, Object>> listEventsResponse = new ArrayList<>();
-    try {
-      if (getEventsResponseMap != null && getEventsResponseMap.has("sessionEvents")) {
-        JsonNode sessionEventsNode = getEventsResponseMap.get("sessionEvents");
-        if (sessionEventsNode != null && !sessionEventsNode.isNull()) {
-          listEventsResponse =
-              objectMapper.readValue(
-                  sessionEventsNode.toString(), new TypeReference<List<Map<String, Object>>>() {});
-        }
-      }
-    } catch (JsonProcessingException e) {
-      logger.warn("Error while parsing session events: {}", e.getMessage());
-    }
+    return listEvents(appName, userId, sessionId)
+        .map(
+            response -> {
+              Session.Builder sessionBuilder =
+                  Session.builder(sessId)
+                      .appName(appName)
+                      .userId(userId)
+                      .lastUpdateTime(updateTimestamp)
+                      .state(sessionState);
+              List<Event> events = response.events();
+              if (events.isEmpty()) {
+                return sessionBuilder.build();
+              }
+              events =
+                  events.stream()
+                      .filter(
+                          event ->
+                              updateTimestamp == null
+                                  || Instant.ofEpochMilli(event.timestamp())
+                                      .isBefore(updateTimestamp))
+                      .sorted(Comparator.comparing(Event::timestamp))
+                      .collect(toCollection(ArrayList::new));
 
-    List<Event> events =
-        listEventsResponse.stream()
-            .map(this::fromApiEvent)
-            .filter(
-                event ->
-                    updateTimestamp == null
-                        || Instant.ofEpochMilli(event.timestamp()).isBefore(updateTimestamp))
-            .sorted(Comparator.comparing(Event::timestamp))
-            .collect(toCollection(ArrayList::new));
-
-    if (config.isPresent()) {
-      if (config.get().numRecentEvents().isPresent()) {
-        int numRecentEvents = config.get().numRecentEvents().get();
-        if (events.size() > numRecentEvents) {
-          events = events.subList(events.size() - numRecentEvents, events.size());
-        }
-      } else if (config.get().afterTimestamp().isPresent()) {
-        Instant afterTimestamp = config.get().afterTimestamp().get();
-        int i = events.size() - 1;
-        while (i >= 0) {
-          if (Instant.ofEpochMilli(events.get(i).timestamp()).isBefore(afterTimestamp)) {
-            break;
-          }
-          i -= 1;
-        }
-        if (i >= 0) {
-          events = events.subList(i, events.size());
-        }
-      }
-    }
-
-    return Maybe.just(sessionBuilder.events(events).build());
+              if (config.isPresent()) {
+                if (config.get().numRecentEvents().isPresent()) {
+                  int numRecentEvents = config.get().numRecentEvents().get();
+                  if (events.size() > numRecentEvents) {
+                    events = events.subList(events.size() - numRecentEvents, events.size());
+                  }
+                } else if (config.get().afterTimestamp().isPresent()) {
+                  Instant afterTimestamp = config.get().afterTimestamp().get();
+                  int i = events.size() - 1;
+                  while (i >= 0) {
+                    if (Instant.ofEpochMilli(events.get(i).timestamp()).isBefore(afterTimestamp)) {
+                      break;
+                    }
+                    i -= 1;
+                  }
+                  if (i >= 0) {
+                    events = events.subList(i, events.size());
+                  }
+                }
+              }
+              return sessionBuilder.events(events).build();
+            })
+        .toMaybe();
   }
 
   @Override
@@ -370,7 +339,7 @@ public final class VertexAiSessionService implements BaseSessionService {
     // TODO(b/414263934)): Improve error handling for appendEvent.
     try {
       if (response.getResponseBody().string().contains("com.google.genai.errors.ClientException")) {
-        System.err.println("Failed to append event: " + event);
+        logger.warn("Failed to append event: ", event);
       }
     } catch (IOException e) {
       throw new UncheckedIOException(e);
@@ -380,7 +349,7 @@ public final class VertexAiSessionService implements BaseSessionService {
     return Single.just(event);
   }
 
-  public String convertEventToJson(Event event) {
+  static String convertEventToJson(Event event) {
     Map<String, Object> metadataJson = new HashMap<>();
     metadataJson.put("partial", event.partial());
     metadataJson.put("turnComplete", event.turnComplete());
@@ -404,8 +373,12 @@ public final class VertexAiSessionService implements BaseSessionService {
                 event.timestamp() / 1000,
                 "nanos",
                 (event.timestamp() % 1000) * 1000000)));
-    eventJson.put("errorCode", event.errorCode());
-    eventJson.put("errorMessage", event.errorMessage());
+    if (event.errorCode().isPresent()) {
+      eventJson.put("errorCode", event.errorCode());
+    }
+    if (event.errorMessage().isPresent()) {
+      eventJson.put("errorMessage", event.errorMessage());
+    }
     eventJson.put("eventMetadata", metadataJson);
 
     if (event.actions() != null) {
@@ -436,7 +409,7 @@ public final class VertexAiSessionService implements BaseSessionService {
 
   @Nullable
   @SuppressWarnings("unchecked")
-  private Content convertMapToContent(Object rawContentValue) {
+  private static Content convertMapToContent(Object rawContentValue) {
     if (rawContentValue == null) {
       return null;
     }
@@ -446,17 +419,17 @@ public final class VertexAiSessionService implements BaseSessionService {
       try {
         return objectMapper.convertValue(contentMap, Content.class);
       } catch (IllegalArgumentException e) {
-        System.err.println("Error converting Map to Content: " + e.getMessage());
+        logger.warn("Error converting Map to Content", e);
         return null;
       }
     } else {
-      System.err.println(
-          "Unexpected type for 'content' in apiEvent: " + rawContentValue.getClass().getName());
+      logger.warn(
+          "Unexpected type for 'content' in apiEvent: {}", rawContentValue.getClass().getName());
       return null;
     }
   }
 
-  public static String parseReasoningEngineId(String appName) {
+  static String parseReasoningEngineId(String appName) {
     if (appName.matches("\\d+")) {
       return appName;
     }
@@ -475,7 +448,7 @@ public final class VertexAiSessionService implements BaseSessionService {
   }
 
   @SuppressWarnings("unchecked")
-  public Event fromApiEvent(Map<String, Object> apiEvent) {
+  static Event fromApiEvent(Map<String, Object> apiEvent) {
     EventActions eventActions = new EventActions();
     if (apiEvent.get("actions") != null) {
       Map<String, Object> actionsMap = (Map<String, Object>) apiEvent.get("actions");
@@ -496,28 +469,23 @@ public final class VertexAiSessionService implements BaseSessionService {
       eventActions.setEscalate(
           Optional.ofNullable(actionsMap.get("escalate")).map(value -> (Boolean) value));
       eventActions.setRequestedAuthConfigs(
-          actionsMap.get("requestedAuthConfigs") != null
-              ? (ConcurrentMap<String, ConcurrentMap<String, Object>>)
-                  actionsMap.get("requestedAuthConfigs")
-              : new ConcurrentHashMap<>());
+          Optional.ofNullable(actionsMap.get("requestedAuthConfigs"))
+              .map(VertexAiSessionService::asConcurrentMapOfConcurrentMaps)
+              .orElse(new ConcurrentHashMap<>()));
     }
 
     Event event =
         Event.builder()
-            .id(
-                (String)
-                    Iterables.get(
-                        Splitter.on('/').split(apiEvent.get("name").toString()),
-                        apiEvent.get("name").toString().split("/").length - 1))
+            .id((String) Iterables.getLast(Splitter.on('/').split(apiEvent.get("name").toString())))
             .invocationId((String) apiEvent.get("invocationId"))
             .author((String) apiEvent.get("author"))
             .actions(eventActions)
             .content(
                 Optional.ofNullable(apiEvent.get("content"))
-                    .map(this::convertMapToContent)
+                    .map(VertexAiSessionService::convertMapToContent)
                     .map(SessionUtils::decodeContent)
                     .orElse(null))
-            .timestamp(Instant.parse((String) apiEvent.get("timestamp")).toEpochMilli())
+            .timestamp(convertToInstant(apiEvent.get("timestamp")).toEpochMilli())
             .errorCode(
                 Optional.ofNullable(apiEvent.get("errorCode"))
                     .map(value -> new FinishReason((String) value)))
@@ -551,6 +519,29 @@ public final class VertexAiSessionService implements BaseSessionService {
               .build();
     }
     return event;
+  }
+
+  private static Instant convertToInstant(Object timestampObj) {
+    if (timestampObj instanceof Map<?, ?> timestampMap) {
+      return Instant.ofEpochSecond(
+          ((Number) timestampMap.get("seconds")).longValue(),
+          ((Number) timestampMap.get("nanos")).longValue());
+    } else if (timestampObj != null) {
+      return Instant.parse(timestampObj.toString());
+    } else {
+      throw new IllegalArgumentException("Timestamp not found in apiEvent");
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static ConcurrentMap<String, ConcurrentMap<String, Object>>
+      asConcurrentMapOfConcurrentMaps(Object value) {
+    return ((Map<String, Map<String, Object>>) value)
+        .entrySet().stream()
+            .collect(
+                ConcurrentHashMap::new,
+                (map, entry) -> map.put(entry.getKey(), new ConcurrentHashMap<>(entry.getValue())),
+                ConcurrentHashMap::putAll);
   }
 
   private static final Pattern APP_NAME_PATTERN =
