@@ -6,8 +6,8 @@ on:
     branches:
       - main
     paths:
-      - 'core/**'
-      - 'dev/**'
+      - "core/**"
+      - "dev/**"
       # Add other module paths here
 
 jobs:
@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java-version: ['17', '21']
+        java-version: ["17", "21"]
 
     steps:
       - name: Checkout code
@@ -37,5 +37,4 @@ jobs:
             ${{ runner.os }}-maven-
 
       - name: Compile and test (all) modules with Java ${{ matrix.java-version }}
-        # TODO After https://github.com/google/adk-java/pull/151: run: ./mvnw clean test
-        run: mvn clean test
+        run: ./mvnw clean test
