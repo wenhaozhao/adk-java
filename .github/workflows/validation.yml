@@ -36,10 +36,5 @@ jobs:
             ${{ runner.os }}-maven-${{ matrix.java-version }}-
             ${{ runner.os }}-maven-
 
-      - name: Compile and install core module with Java ${{ matrix.java-version }}
-        working-directory: ./core
-        run: ./mvnw clean compile install
-
-      - name: Compile dev module with Java ${{ matrix.java-version }}
-        working-directory: ./dev
-        run: ./mvnw clean compile
+      - name: Compile and test (all) modules with Java ${{ matrix.java-version }}
+        run: ./mvnw clean test
