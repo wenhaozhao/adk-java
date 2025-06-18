@@ -97,12 +97,12 @@
         <dependency>
             <groupId>com.google.adk</groupId>
             <artifactId>google-adk</artifactId>
-            <version>0.1.1-SNAPSHOT</version><!-- {x-version-update:google-adk:current} -->
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.google.adk</groupId>
             <artifactId>google-adk-dev</artifactId>
-            <version>0.1.1-SNAPSHOT</version><!-- {x-version-update:google-adk:current} -->
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.google.genai</groupId>
