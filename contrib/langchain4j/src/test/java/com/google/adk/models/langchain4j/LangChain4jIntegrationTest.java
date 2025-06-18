@@ -370,7 +370,7 @@ class LangChain4jIntegrationTest {
                 """)
             .model(new LangChain4j(streamingModel, "GPT_4_O_MINI"))
 //            .model(new LangChain4j(streamingModel, CLAUDE_3_7_SONNET_20250219))
-            .tools(FunctionTool.create(LangChain4jIntegrationTest.class, "getWeather"))
+            .tools(FunctionTool.create(ToolExample.class, "getWeather"))
             .build();
 
         // when

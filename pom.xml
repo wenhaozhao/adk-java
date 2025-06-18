@@ -28,6 +28,7 @@
   <modules>
     <module>core</module>
     <module>dev</module>
+    <module>contrib/langchain4j</module>
   </modules>
 
   <properties>
