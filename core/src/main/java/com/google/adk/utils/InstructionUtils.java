@@ -42,7 +42,7 @@ public final class InstructionUtils {
    * Populates placeholders in an instruction template string with values from the session state or
    * loaded artifacts.
    *
-   * <h3>Placeholder Syntax:</h3>
+   * <p><b>Placeholder Syntax:</b>
    *
    * <p>Placeholders are enclosed by one or more curly braces at the start and end, e.g., {@code
    * {key}} or {@code {{key}}}. The core {@code key} is extracted from whatever is between the
@@ -77,7 +77,7 @@ public final class InstructionUtils {
    *       </ul>
    * </ul>
    *
-   * <h3>Example Usage:</h3>
+   * <b>Example Usage:</b>
    *
    * <pre>{@code
    * InvocationContext context = ...; // Assume this is initialized with session and artifact service

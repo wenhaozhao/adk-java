@@ -54,6 +54,9 @@ If you're using Maven, add the following to your dependencies:
 
 <!-- {x-version-end} -->
 
+To instead use an unreleased version, you could use <https://jitpack.io/#google/adk-java/>;
+see <https://github.com/enola-dev/LearningADK#jitpack> for an example illustrating this.
+
 ## 📚 Documentation
 
 For building, evaluating, and deploying agents by follow the Java
