@@ -322,12 +322,7 @@ public class VertexAiSessionServiceTest {
                 eventData));
       } else {
         // Return an empty list if no events are found for the session
-        return mockApiResponseWithBody(
-            """
-            {
-              "sessionEvents": []
-            }
-            """);
+        return mockApiResponseWithBody("{}");
       }
     }
 
@@ -392,6 +387,24 @@ public class VertexAiSessionServiceTest {
         mapper.readValue(newSessionJson, new TypeReference<Map<String, Object>>() {});
     assertThat(newSessionMap.get("userId")).isEqualTo("test_user");
     assertThat(newSessionMap.get("sessionState")).isEqualTo(sessionStateMap);
+  }
+
+  @Test
+  public void createSession_getSession_success() throws Exception {
+    ConcurrentMap<String, Object> sessionStateMap =
+        new ConcurrentHashMap<>(ImmutableMap.of("new_key", "new_value"));
+    Single<Session> sessionSingle =
+        vertexAiSessionService.createSession("789", "test_user", sessionStateMap, null);
+    Session createdSession = sessionSingle.blockingGet();
+    Session session =
+        vertexAiSessionService
+            .getSession("456", "test_user", createdSession.id(), Optional.empty())
+            .blockingGet();
+
+    // Verify that the session is now in the sessionMap
+    assertThat(sessionMap).containsKey("4");
+    assertThat(session.userId()).isEqualTo("test_user");
+    assertThat(session.events()).isEmpty();
   }
 
   @Test
@@ -513,6 +526,16 @@ public class VertexAiSessionServiceTest {
   @Test
   public void listEvents_empty() {
     assertThat(vertexAiSessionService.listEvents("789", "user1", "3").blockingGet().events())
+        .isEmpty();
+  }
+
+  @Test
+  public void listEmptySession_success() {
+    assertThat(
+            vertexAiSessionService
+                .getSession("789", "user1", "3", Optional.empty())
+                .blockingGet()
+                .events())
         .isEmpty();
   }
 }

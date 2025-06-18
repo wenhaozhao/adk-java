@@ -63,7 +63,9 @@ public final class LlmRegistry {
    * Registers a factory for Gemini models using the "gemini-.*" pattern.
    */
   static {
-    registerLlm("gemini-.*", modelName -> new Gemini(modelName, getGeminiApiClient()));
+    registerLlm(
+        "gemini-.*",
+        modelName -> Gemini.builder().modelName(modelName).apiClient(getGeminiApiClient()).build());
   }
 
   /**
