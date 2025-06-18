@@ -157,8 +157,7 @@ class LangChain4jIntegrationTest {
     void testAgentTool() {
         // given
         OpenAiChatModel gptModel = OpenAiChatModel.builder()
-            .baseUrl("http://langchain4j.dev/demo/openai/v1")
-            .apiKey(Objects.requireNonNullElse(System.getenv("OPENAI_API_KEY"), "demo"))
+            .apiKey(System.getenv("OPENAI_API_KEY"))
             .modelName(GPT_4_O_MINI)
             .build();
 
