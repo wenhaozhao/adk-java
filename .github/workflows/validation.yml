@@ -5,17 +5,18 @@ on:
   pull_request:
     branches:
       - main
-    paths:
-      - 'core/**'
-      - 'dev/**'
-      # Add other module paths here
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-modules:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       matrix:
-        java-version: ['17', '21']
+        java-version: ["17", "21"]
 
     steps:
       - name: Checkout code
@@ -36,10 +37,5 @@ jobs:
             ${{ runner.os }}-maven-${{ matrix.java-version }}-
             ${{ runner.os }}-maven-
 
-      - name: Compile and install core module with Java ${{ matrix.java-version }}
-        working-directory: ./core
-        run: mvn clean compile install
-
-      - name: Compile dev module with Java ${{ matrix.java-version }}
-        working-directory: ./dev
-        run: mvn clean compile
+      - name: Compile and test (all) modules with Java ${{ matrix.java-version }}
+        run: ./mvnw clean test

@@ -110,24 +110,9 @@ public class Gemini extends BaseLlm {
     Objects.requireNonNull(vertexCredentials, "vertexCredentials cannot be null");
     Client.Builder apiClientBuilder =
         Client.builder().httpOptions(HttpOptions.builder().headers(TRACKING_HEADERS).build());
-    vertexCredentials
-        .project()
-        .ifPresent(
-            project -> {
-              var unused = apiClientBuilder.project(project);
-            });
-    vertexCredentials
-        .location()
-        .ifPresent(
-            location -> {
-              var unused = apiClientBuilder.location(location);
-            });
-    vertexCredentials
-        .credentials()
-        .ifPresent(
-            credentials -> {
-              var unused = apiClientBuilder.credentials(credentials);
-            });
+    vertexCredentials.project().ifPresent(apiClientBuilder::project);
+    vertexCredentials.location().ifPresent(apiClientBuilder::location);
+    vertexCredentials.credentials().ifPresent(apiClientBuilder::credentials);
     this.apiClient = apiClientBuilder.build();
   }
 

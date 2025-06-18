@@ -154,4 +154,8 @@ public final class State implements ConcurrentMap<String, Object> {
   public Collection<Object> values() {
     return state.values();
   }
+
+  public boolean hasDelta() {
+    return !delta.isEmpty();
+  }
 }

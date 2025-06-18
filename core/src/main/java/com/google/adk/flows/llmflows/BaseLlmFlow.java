@@ -81,23 +81,21 @@ public abstract class BaseLlmFlow implements BaseFlow {
     List<Iterable<Event>> eventIterables = new ArrayList<>();
     LlmAgent agent = (LlmAgent) context.agent();
 
-    Single<LlmRequest> processedRequestSingle =
-        Flowable.fromIterable(requestProcessors)
-            .reduce(
-                llmRequest,
-                (currentRequest, processor) ->
-                    processor
-                        .processRequest(context, currentRequest)
-                        .doOnSuccess(
-                            result -> {
-                              if (result.events() != null) {
-                                eventIterables.add(result.events());
-                              }
-                            })
-                        .map(RequestProcessingResult::updatedRequest)
-                        .blockingGet());
+    Single<LlmRequest> currentLlmRequest = Single.just(llmRequest);
+    for (RequestProcessor processor : requestProcessors) {
+      currentLlmRequest =
+          currentLlmRequest
+              .flatMap(request -> processor.processRequest(context, request))
+              .doOnSuccess(
+                  result -> {
+                    if (result.events() != null) {
+                      eventIterables.add(result.events());
+                    }
+                  })
+              .map(RequestProcessingResult::updatedRequest);
+    }
 
-    return processedRequestSingle.flatMap(
+    return currentLlmRequest.flatMap(
         processedRequest -> {
           LlmRequest.Builder updatedRequestBuilder = processedRequest.toBuilder();
 
@@ -129,53 +127,59 @@ public abstract class BaseLlmFlow implements BaseFlow {
       LlmResponse llmResponse) {
 
     List<Iterable<Event>> eventIterables = new ArrayList<>();
-    LlmResponse currentLlmResponse = llmResponse;
+    Single<LlmResponse> currentLlmResponse = Single.just(llmResponse);
     for (ResponseProcessor processor : responseProcessors) {
-      ResponseProcessingResult result =
-          processor.processResponse(context, currentLlmResponse).blockingGet();
-      if (result.events() != null) {
-        eventIterables.add(result.events());
-      }
-      currentLlmResponse = result.updatedResponse();
-    }
-    LlmResponse updatedResponse = currentLlmResponse;
-
-    if (updatedResponse.content().isEmpty()
-        && updatedResponse.errorCode().isEmpty()
-        && !updatedResponse.interrupted().orElse(false)
-        && !updatedResponse.turnComplete().orElse(false)) {
-      return Single.just(
-          ResponseProcessingResult.create(
-              updatedResponse, Iterables.concat(eventIterables), Optional.empty()));
+      currentLlmResponse =
+          currentLlmResponse
+              .flatMap(response -> processor.processResponse(context, response))
+              .doOnSuccess(
+                  result -> {
+                    if (result.events() != null) {
+                      eventIterables.add(result.events());
+                    }
+                  })
+              .map(ResponseProcessingResult::updatedResponse);
     }
 
-    logger.debug("Response after processors: {}", updatedResponse);
-    Event modelResponseEvent =
-        buildModelResponseEvent(baseEventForLlmResponse, llmRequest, updatedResponse);
-    eventIterables.add(Collections.singleton(modelResponseEvent));
-    logger.debug("Model response event: {}", modelResponseEvent.toJson());
+    return currentLlmResponse.flatMap(
+        updatedResponse -> {
+          if (updatedResponse.content().isEmpty()
+              && updatedResponse.errorCode().isEmpty()
+              && !updatedResponse.interrupted().orElse(false)
+              && !updatedResponse.turnComplete().orElse(false)) {
+            return Single.just(
+                ResponseProcessingResult.create(
+                    updatedResponse, Iterables.concat(eventIterables), Optional.empty()));
+          }
 
-    Maybe<Event> maybeFunctionCallEvent =
-        modelResponseEvent.functionCalls().isEmpty()
-            ? Maybe.empty()
-            : Functions.handleFunctionCalls(context, modelResponseEvent, llmRequest.tools());
+          logger.debug("Response after processors: {}", updatedResponse);
+          Event modelResponseEvent =
+              buildModelResponseEvent(baseEventForLlmResponse, llmRequest, updatedResponse);
+          eventIterables.add(Collections.singleton(modelResponseEvent));
+          logger.debug("Model response event: {}", modelResponseEvent.toJson());
 
-    return maybeFunctionCallEvent
-        .map(Optional::of)
-        .defaultIfEmpty(Optional.empty())
-        .map(
-            functionCallEventOpt -> {
-              Optional<String> transferToAgent = Optional.empty();
-              if (functionCallEventOpt.isPresent()) {
-                Event functionCallEvent = functionCallEventOpt.get();
-                logger.debug("Function call event generated: {}", functionCallEvent);
-                eventIterables.add(Collections.singleton(functionCallEvent));
-                transferToAgent = functionCallEvent.actions().transferToAgent();
-              }
-              Iterable<Event> combinedEvents = Iterables.concat(eventIterables);
-              return ResponseProcessingResult.create(
-                  updatedResponse, combinedEvents, transferToAgent);
-            });
+          Maybe<Event> maybeFunctionCallEvent =
+              modelResponseEvent.functionCalls().isEmpty()
+                  ? Maybe.empty()
+                  : Functions.handleFunctionCalls(context, modelResponseEvent, llmRequest.tools());
+
+          return maybeFunctionCallEvent
+              .map(Optional::of)
+              .defaultIfEmpty(Optional.empty())
+              .map(
+                  functionCallEventOpt -> {
+                    Optional<String> transferToAgent = Optional.empty();
+                    if (functionCallEventOpt.isPresent()) {
+                      Event functionCallEvent = functionCallEventOpt.get();
+                      logger.debug("Function call event generated: {}", functionCallEvent);
+                      eventIterables.add(Collections.singleton(functionCallEvent));
+                      transferToAgent = functionCallEvent.actions().transferToAgent();
+                    }
+                    Iterable<Event> combinedEvents = Iterables.concat(eventIterables);
+                    return ResponseProcessingResult.create(
+                        updatedResponse, combinedEvents, transferToAgent);
+                  });
+        });
   }
 
   /**
