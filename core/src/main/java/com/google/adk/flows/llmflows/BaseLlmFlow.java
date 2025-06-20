@@ -383,9 +383,12 @@ public abstract class BaseLlmFlow implements BaseFlow {
             .toList()
             .flatMapPublisher(
                 eventList -> {
-                  if (eventList.isEmpty() || Iterables.getLast(eventList).finalResponse()) {
+                  if (eventList.isEmpty()
+                      || Iterables.getLast(eventList).finalResponse()
+                      || Iterables.getLast(eventList).actions().endInvocation().orElse(false)) {
                     logger.debug(
-                        "Ending flow execution based on final response or empty event list.");
+                        "Ending flow execution based on final response, endInvocation action or"
+                            + " empty event list.");
                     return Flowable.empty();
                   } else {
                     logger.debug("Continuing to next step of the flow.");
@@ -524,18 +527,21 @@ public abstract class BaseLlmFlow implements BaseFlow {
                                   .content(event.content().get());
                             }
                             if (functionResponses.stream()
-                                .anyMatch(
-                                    functionResponse ->
-                                        functionResponse
-                                            .name()
-                                            .orElse("")
-                                            .equals("transferToAgent"))) {
+                                    .anyMatch(
+                                        functionResponse ->
+                                            functionResponse
+                                                .name()
+                                                .orElse("")
+                                                .equals("transferToAgent"))
+                                || event.actions().endInvocation().orElse(false)) {
                               sendTask.dispose();
                               connection.close();
                             }
                           });
 
-              return receiveFlow.startWithIterable(preResult.events());
+              return receiveFlow
+                  .takeWhile(event -> !event.actions().endInvocation().orElse(false))
+                  .startWithIterable(preResult.events());
             });
   }
 

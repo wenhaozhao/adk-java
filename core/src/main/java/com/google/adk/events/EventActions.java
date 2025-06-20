@@ -37,6 +37,7 @@ public class EventActions {
   private Optional<Boolean> escalate = Optional.empty();
   private ConcurrentMap<String, ConcurrentMap<String, Object>> requestedAuthConfigs =
       new ConcurrentHashMap<>();
+  private Optional<Boolean> endInvocation = Optional.empty();
 
   /** Default constructor for Jackson. */
   public EventActions() {}
@@ -112,6 +113,19 @@ public class EventActions {
     this.requestedAuthConfigs = requestedAuthConfigs;
   }
 
+  @JsonProperty("endInvocation")
+  public Optional<Boolean> endInvocation() {
+    return endInvocation;
+  }
+
+  public void setEndInvocation(Optional<Boolean> endInvocation) {
+    this.endInvocation = endInvocation;
+  }
+
+  public void setEndInvocation(boolean endInvocation) {
+    this.endInvocation = Optional.of(endInvocation);
+  }
+
   public static Builder builder() {
     return new Builder();
   }
@@ -133,7 +147,8 @@ public class EventActions {
         && Objects.equals(artifactDelta, that.artifactDelta)
         && Objects.equals(transferToAgent, that.transferToAgent)
         && Objects.equals(escalate, that.escalate)
-        && Objects.equals(requestedAuthConfigs, that.requestedAuthConfigs);
+        && Objects.equals(requestedAuthConfigs, that.requestedAuthConfigs)
+        && Objects.equals(endInvocation, that.endInvocation);
   }
 
   @Override
@@ -144,7 +159,8 @@ public class EventActions {
         artifactDelta,
         transferToAgent,
         escalate,
-        requestedAuthConfigs);
+        requestedAuthConfigs,
+        endInvocation);
   }
 
   /** Builder for {@link EventActions}. */
@@ -156,6 +172,7 @@ public class EventActions {
     private Optional<Boolean> escalate = Optional.empty();
     private ConcurrentMap<String, ConcurrentMap<String, Object>> requestedAuthConfigs =
         new ConcurrentHashMap<>();
+    private Optional<Boolean> endInvocation = Optional.empty();
 
     public Builder() {}
 
@@ -166,6 +183,7 @@ public class EventActions {
       this.transferToAgent = eventActions.transferToAgent();
       this.escalate = eventActions.escalate();
       this.requestedAuthConfigs = new ConcurrentHashMap<>(eventActions.requestedAuthConfigs());
+      this.endInvocation = eventActions.endInvocation();
     }
 
     @CanIgnoreReturnValue
@@ -212,6 +230,13 @@ public class EventActions {
     }
 
     @CanIgnoreReturnValue
+    @JsonProperty("endInvocation")
+    public Builder endInvocation(boolean endInvocation) {
+      this.endInvocation = Optional.of(endInvocation);
+      return this;
+    }
+
+    @CanIgnoreReturnValue
     public Builder merge(EventActions other) {
       if (other.skipSummarization().isPresent()) {
         this.skipSummarization = other.skipSummarization();
@@ -231,6 +256,9 @@ public class EventActions {
       if (other.requestedAuthConfigs() != null) {
         this.requestedAuthConfigs.putAll(other.requestedAuthConfigs());
       }
+      if (other.endInvocation().isPresent()) {
+        this.endInvocation = other.endInvocation();
+      }
       return this;
     }
 
@@ -242,6 +270,7 @@ public class EventActions {
       eventActions.setTransferToAgent(this.transferToAgent);
       eventActions.setEscalate(this.escalate);
       eventActions.setRequestedAuthConfigs(this.requestedAuthConfigs);
+      eventActions.setEndInvocation(this.endInvocation);
       return eventActions;
     }
   }
