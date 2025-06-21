@@ -183,16 +183,7 @@ public abstract class BaseLlmFlow implements BaseFlow {
   }
 
   /**
-   * Calls the underlying Language Model (LLM) to generate a response based on the provided request.
-   * This method orchestrates the LLM invocation, including:
-   * <ul>
-   * <li>Handling pre-model callbacks via {@code handleBeforeModelCallback}. If a callback
-   * provides a response, it's used directly, bypassing the LLM call.</li>
-   * <li>Selecting the appropriate LLM instance from the agent's resolved model or {@link LlmRegistry}.</li>
-   * <li>Initiating the content generation from the LLM, potentially in streaming mode.</li>
-   * <li>Integrating with telemetry for tracing the LLM call (e.g., using OpenTelemetry spans).</li>
-   * <li>Handling post-model callbacks via {@code handleAfterModelCallback} after receiving the LLM response.</li>
-   * </ul>
+   * Sends a request to the LLM and returns its response.
    * 
    * @param context The invocation context.
    * @param llmRequest The LLM request.
@@ -245,20 +236,9 @@ public abstract class BaseLlmFlow implements BaseFlow {
   }
 
   /**
-   * Handles registered {@link BeforeModelCallback}s before an LLM call is made.
-   * This method iterates through all {@link BeforeModelCallback}s associated with the agent.
-   * If any callback returns a non-empty {@link Optional} {@link LlmResponse},
-   * that response is immediately returned, effectively short-circuiting the LLM call.
+   * Invokes {@link BeforeModelCallback}s. If any returns a response, it's used instead of calling the LLM.
    *
-   * @param context The {@link InvocationContext} of the current operation.
-   * @param llmRequest The {@link LlmRequest} that is about to be sent to the LLM.
-   * @param modelResponseEvent An {@link Event} object providing context (like actions) for the
-   * callbacks. Callbacks should primarily use its actions and should not rely on its ID
-   * if they create their own separate events, as this event's ID might represent a
-   * higher-level operation.
-   * @return A {@link Single} emitting an {@link Optional} {@link LlmResponse}.
-   * If a callback provides a response, it's wrapped in {@link Optional#of(LlmResponse)}.
-   * Otherwise, an {@link Optional#empty()} is emitted, indicating that the LLM call should proceed.
+   * @return A {@link Single} with the callback result or {@link Optional#empty()}.
    */
   private Single<Optional<LlmResponse>> handleBeforeModelCallback(
       InvocationContext context, LlmRequest llmRequest, Event modelResponseEvent) {
@@ -288,19 +268,10 @@ public abstract class BaseLlmFlow implements BaseFlow {
   }
 
   /**
-   * Handles registered {@link AfterModelCallback}s after an LLM response is received.
-   * This method iterates through all {@link AfterModelCallback}s associated with the agent.
-   * If any callback returns a non-empty {@link Optional} {@link LlmResponse},
-   * that response replaces the original LLM response. If multiple callbacks return a response,
-   * the first one that does so will be used.
+   * Invokes {@link AfterModelCallback}s after an LLM response.
+   * If any returns a response, it replaces the original.
    *
-   * @param context The {@link InvocationContext} of the current operation.
-   * @param llmResponse The {@link LlmResponse} received from the LLM.
-   * @param modelResponseEvent An {@link Event} object providing context (like actions) for the
-   * callbacks. The content of this event is updated with the {@code llmResponse.content()}
-   * before being passed to callbacks.
-   * @return A {@link Single} emitting the final {@link LlmResponse} after all callbacks have been processed.
-   * This may be the original response or a modified one from a callback.
+   * @return A {@link Single} with the final {@link LlmResponse}.
    */
   private Single<LlmResponse> handleAfterModelCallback(
       InvocationContext context, LlmResponse llmResponse, Event modelResponseEvent) {
@@ -331,18 +302,13 @@ public abstract class BaseLlmFlow implements BaseFlow {
   }
 
   /**
-   * Executes a single step of the LLM flow, which typically involves pre-processing,
-   * calling the LLM, and then post-processing the LLM's response.
-   * This method handles the lifecycle of an LLM call within a flow, including
-   * incrementing the LLM call count, handling `LlmCallsLimitExceededException`,
-   * generating a unique event ID for the LLM response, and managing agent transfers.
+   * Executes a single iteration of the LLM flow:
+   * preprocessing → LLM call → postprocessing.
    *
-   * @param context The {@link InvocationContext} for the current execution step.
-   * @return A {@link Flowable} emitting {@link Event} objects representing the
-   * results of the current processing step, including pre-processing events,
-   * and post-processing events, potentially leading to events from a transferred agent.
-   * @throws LlmCallsLimitExceededException if the maximum number of allowed LLM calls is exceeded
-   * during this step.
+   * Handles early termination, LLM call limits, and agent transfer if needed.
+   *
+   * @return A {@link Flowable} of {@link Event} objects from this step.
+   * @throws LlmCallsLimitExceededException if the agent exceeds allowed LLM invocations.
    * @throws IllegalStateException if a transfer agent is specified but not found.
    */
   private Flowable<Event> runOneStep(InvocationContext context) {
@@ -433,14 +399,10 @@ public abstract class BaseLlmFlow implements BaseFlow {
   }
 
   /**
-   * Executes the LLM flow for the current invocation.
-   * This method repeatedly calls {@link #runOneStep(InvocationContext)} until
-   * the flow produces a final response or the event list is empty.
-   * The events from each step are emitted as a {@link Flowable}.
+   * Executes the full LLM flow by repeatedly calling {@link #runOneStep}
+   * until a final response is produced.
    *
-   * @param invocationContext The {@link InvocationContext} for the entire flow execution.
-   * @return A {@link Flowable} emitting all {@link Event} objects generated throughout
-   * the complete flow execution.
+   * @return A {@link Flowable} of all {@link Event}s generated during the flow.
    */
   @Override
   public Flowable<Event> run(InvocationContext invocationContext) {
@@ -462,16 +424,12 @@ public abstract class BaseLlmFlow implements BaseFlow {
   }
 
   /**
-   * Executes the LLM flow in a live (streaming) mode.
-   * This method sets up a connection to the LLM, sends the initial history,
-   * and then continuously sends and receives data in real-time.
-   * It handles pre-processing, sending content/blobs from the live request queue,
-   * receiving LLM responses, and post-processing them.
-   * It also manages agent transfers within the live flow.
+   * Executes the LLM flow in streaming mode.
+   * 
+   * Handles sending history and live requests to the LLM, receiving responses,
+   * processing them, and managing agent transfers.
    *
-   * @param invocationContext The {@link InvocationContext} for the live flow execution.
-   * @return A {@link Flowable} emitting {@link Event} objects as they are generated
-   * during the live interaction with the LLM.
+   * @return A {@link Flowable} of {@link Event}s streamed in real-time.
    */
   @Override
   public Flowable<Event> runLive(InvocationContext invocationContext) {
@@ -619,18 +577,11 @@ public abstract class BaseLlmFlow implements BaseFlow {
   }
 
   /**
-   * Builds an {@link Event} object from a base event, LLM request, and LLM response.
-   * This method populates the event with content, partial status, error details,
-   * and grounding metadata from the LLM response. It also handles the processing
-   * of function calls, including populating client-side function call IDs and
-   * identifying long-running tool IDs.
+   * Builds an {@link Event} from LLM response, request, and base event data.
    *
-   * @param baseEventForLlmResponse The base {@link Event} template to build upon,
-   * containing common event properties like invocation ID, author, and branch.
-   * @param llmRequest The original {@link LlmRequest} that led to the {@code llmResponse}.
-   * @param llmResponse The {@link LlmResponse} received from the LLM.
-   * @return A new {@link Event} instance fully populated with data from the LLM response
-   * and processed function call information.
+   * Populates the event with LLM output and tool function call metadata.
+   *
+   * @return A fully constructed {@link Event} representing the LLM response.
    */
   private Event buildModelResponseEvent(
       Event baseEventForLlmResponse, LlmRequest llmRequest, LlmResponse llmResponse) {

@@ -18,41 +18,19 @@ package com.google.adk.flows.llmflows;
 
 import com.google.common.collect.ImmutableList;
 
-/**
- * Represents an automatic flow in the Large Language Model (LLM) system,
- * extending the capabilities of a {@link SingleFlow}.
- * This flow is designed to automatically handle agent transfers, indicating
- * a more sophisticated or automated processing sequence compared to a basic single flow.
- * It primarily reuses request processors from {@link SingleFlow} and adds an
- * {@link AgentTransfer} processor.
- */
+/** LLM flow with automatic agent transfer support. */
 public class AutoFlow extends SingleFlow {
 
-  /**
-   * An immutable list of {@link RequestProcessor} instances defining the processing pipeline
-   * for incoming requests in this AutoFlow.
-   * This list extends the processors from {@link SingleFlow} by adding an {@link AgentTransfer}
-   * processor, enabling automated agent-to-agent transitions or handling.
-   */
+  /** Adds {@link AgentTransfer} to base request processors. */
   private static final ImmutableList<RequestProcessor> REQUEST_PROCESSORS =
       ImmutableList.<RequestProcessor>builder()
           .addAll(SingleFlow.REQUEST_PROCESSORS)
           .add(new AgentTransfer())
           .build();
 
-  /**
-   * An immutable list of {@link ResponseProcessor} instances for this AutoFlow.
-   * In this specific implementation, no custom response processors are defined,
-   * meaning response handling might rely on default behaviors or inherited processors
-   * from {@link SingleFlow} if any.
-   */
+  /** No additional response processors. */
   private static final ImmutableList<ResponseProcessor> RESPONSE_PROCESSORS = ImmutableList.of();
 
-  /**
-   * Constructs a new {@code AutoFlow} instance.
-   * Initializes the flow by passing its predefined {@link #REQUEST_PROCESSORS} and
-   * {@link #RESPONSE_PROCESSORS} to the superclass constructor.
-   */
   public AutoFlow() {
     super(REQUEST_PROCESSORS, RESPONSE_PROCESSORS);
   }

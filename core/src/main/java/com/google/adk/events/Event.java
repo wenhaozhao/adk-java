@@ -184,9 +184,11 @@ public class Event extends JsonBaseModel {
   }
 
   /**
-   * Sets the branch of the event. The format is like agent_1.agent_2.agent_3, where agent_1 is the
-   * parent of agent_2, and agent_2 is the parent of agent_3. Branch is used when multiple sub-agent
-   * shouldn't see their peer agents' conversation history.
+   * Sets the branch for this event.
+   *
+   * <p>Format: agentA.agentB.agentC — shows hierarchy of nested agents.
+   *
+   * @param branch Branch identifier.
    */
   public void branch(@Nullable String branch) {
     this.branch = Optional.ofNullable(branch);
@@ -216,11 +218,7 @@ public class Event extends JsonBaseModel {
     this.timestamp = timestamp;
   }
 
-  /**
-   * Returns the list of actions associated with this event.
-   *
-   * @return The list of actions.
-   */
+  /** Returns all function calls from this event. */
   @JsonIgnore
   public final ImmutableList<FunctionCall> functionCalls() {
     return content().flatMap(Content::parts).orElse(ImmutableList.of()).stream()
@@ -229,11 +227,7 @@ public class Event extends JsonBaseModel {
         .collect(toImmutableList());
   }
 
-  /**
-   * Returns the list of function responses associated with this event.
-   *
-   * @return The list of function responses.
-   */
+  /** Returns all function responses from this event. */
   @JsonIgnore
   public final ImmutableList<FunctionResponse> functionResponses() {
     return content().flatMap(Content::parts).orElse(ImmutableList.of()).stream()
@@ -242,12 +236,7 @@ public class Event extends JsonBaseModel {
         .collect(toImmutableList());
   }
 
-  /**
-   * Returns true if the event is a final response, meaning it does not contain any function calls or
-   * function responses, and is not a partial response.
-   *
-   * @return true if the event is a final response, false otherwise.
-   */
+  /** Returns true if this is a final response. */
   @JsonIgnore
   public final boolean finalResponse() {
     if (actions().skipSummarization().orElse(false)
@@ -258,10 +247,11 @@ public class Event extends JsonBaseModel {
   }
 
   /**
-   * Returns a string representation of the event's content, including text, function calls, and
-   * function responses.
+   * Converts the event content into a readable string.
    *
-   * @return A string representation of the event's content.
+   * <p>Includes text, function calls, and responses.
+   *
+   * @return Stringified content.
    */
   public final String stringifyContent() {
     StringBuilder sb = new StringBuilder();
@@ -511,28 +501,12 @@ public class Event extends JsonBaseModel {
     return new Builder();
   }
 
-  /**
-   * Converts a JSON string to an {@link Event} instance.
-   *
-   * <p>This method uses the {@link JsonBaseModel#fromJsonString(String, Class)} method to parse the
-   * JSON string and create an instance of {@link Event}.
-   *
-   * @param json The JSON string representing an event.
-   * @return An {@link Event} instance created from the provided JSON string.
-   */
+  /** Parses an event from a JSON string. */
   public static Event fromJson(String json) {
     return fromJsonString(json, Event.class);
   }
 
-  /**
-   * Creates a new {@link Builder} instance initialized with the properties of this {@link Event} instance.
-   *
-   * <p>This method is useful for creating a mutable copy of an event, allowing modifications to be made
-   * without affecting the original immutable instance. It populates the builder with all existing
-   * properties of this event, including {@code timestamp} if it's set.
-   *
-   * @return A new {@link Event.Builder} instance pre-populated with the current event's properties.
-   */
+  /** Creates a builder pre-filled with this event's values. */
   public Builder toBuilder() {
     Builder builder =
         new Builder()
@@ -555,11 +529,6 @@ public class Event extends JsonBaseModel {
     return builder;
   }
 
-  /**
-   * Converts this event to a JSON string representation.
-   *
-   * @return A JSON string representing this event.
-   */
   @Override
   public boolean equals(Object obj) {
     if (this == obj) {
@@ -584,21 +553,11 @@ public class Event extends JsonBaseModel {
         && Objects.equals(groundingMetadata, other.groundingMetadata);
   }
 
-  /**
-   * Converts this event to a JSON string representation.
-   *
-   * @return A JSON string representing this event.
-   */
   @Override
   public String toString() {
     return toJson();
   }
 
-  /**
-   * Returns a hash code value for this event.
-   *
-   * @return A hash code value for this event.
-   */
   @Override
   public int hashCode() {
     return Objects.hash(

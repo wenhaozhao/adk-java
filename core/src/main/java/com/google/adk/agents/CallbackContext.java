@@ -30,10 +30,10 @@ public class CallbackContext extends ReadonlyContext {
   private final State state;
 
   /**
-   * Constructs a new CallbackContext with the given invocation context and event actions.
+   * Initializes callback context.
    *
-   * @param invocationContext The context of the current invocation, containing session and user information.
-   * @param eventActions The actions to be performed during the callback, can be null.
+   * @param invocationContext Current invocation context.
+   * @param eventActions Callback event actions.
    */
   public CallbackContext(InvocationContext invocationContext, EventActions eventActions) {
     super(invocationContext);
@@ -60,9 +60,9 @@ public class CallbackContext extends ReadonlyContext {
   /** 
    * Loads an artifact from the artifact service associated with the current session.
    * 
-   * @param filename The name of the artifact file to load.
-   * @param version Optional version of the artifact to load. If not provided, the latest version is loaded.
-   * @return A {@link Maybe} containing the loaded {@link Part} if successful, or empty if the artifact does not exist.
+   * @param filename Artifact file name.
+   * @param version Artifact version (optional).
+   * @return loaded part, or empty if not found.
    * @throws IllegalStateException if the artifact service is not initialized.
    */
   public Maybe<Part> loadArtifact(String filename, Optional<Integer> version) {
@@ -82,8 +82,8 @@ public class CallbackContext extends ReadonlyContext {
   /**
    * Saves an artifact and records it as a delta for the current session.
    * 
-   * @param filename The name of the file to save.
-   * @param artifact The {@link Part} representing the artifact to save.
+   * @param filename Artifact file name.
+   * @param artifact Artifact content to save.
    * @throws IllegalStateException if the artifact service is not initialized.
    */
   public void saveArtifact(String filename, Part artifact) {

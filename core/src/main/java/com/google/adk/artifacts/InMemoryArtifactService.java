@@ -40,9 +40,9 @@ public final class InMemoryArtifactService implements BaseArtifactService {
   }
 
   /**
-   * Creates a new instance of {@link InMemoryArtifactService} with an empty artifact store.
-   * 
-   * @return A new instance of {@link InMemoryArtifactService}.
+   * Saves an artifact in memory and assigns a new version.
+   *
+   * @return Single with assigned version number.
    */
   @Override
   public Single<Integer> saveArtifact(
@@ -58,14 +58,9 @@ public final class InMemoryArtifactService implements BaseArtifactService {
   }
 
   /**
-   * Loads an artifact from the in-memory store.
+   * Loads an artifact by version or latest.
    *
-   * @param appName The name of the application.
-   * @param userId The ID of the user.
-   * @param sessionId The ID of the session.
-   * @param filename The name of the file to load.
-   * @param version Optional version number to load; if not provided, the latest version is returned.
-   * @return A {@link Maybe} containing the requested artifact, or empty if not found.
+   * @return Maybe with the artifact, or empty if not found.
    */
   @Override
   public Maybe<Part> loadArtifact(
@@ -93,12 +88,9 @@ public final class InMemoryArtifactService implements BaseArtifactService {
   }
 
   /**
-   * Lists the keys (filenames) of all artifacts stored for a given application, user, and session.
+   * Lists filenames of stored artifacts for the session.
    *
-   * @param appName The name of the application.
-   * @param userId The ID of the user.
-   * @param sessionId The ID of the session.
-   * @return A {@link Single} containing a response with a list of artifact filenames.
+   * @return Single with list of artifact filenames.
    */
   @Override
   public Single<ListArtifactsResponse> listArtifactKeys(
@@ -116,13 +108,9 @@ public final class InMemoryArtifactService implements BaseArtifactService {
   }
 
   /**
-   * Deletes an artifact from the in-memory store.
+   * Deletes all versions of the given artifact.
    *
-   * @param appName The name of the application.
-   * @param userId The ID of the user.
-   * @param sessionId The ID of the session.
-   * @param filename The name of the file to delete.
-   * @return A {@link Completable} indicating the completion of the delete operation.
+   * @return Completable indicating completion.
    */
   @Override
   public Completable deleteArtifact(
@@ -136,13 +124,9 @@ public final class InMemoryArtifactService implements BaseArtifactService {
   }
 
   /**
-   * Lists all versions of a specific artifact file for a given application, user, and session.
+   * Lists all versions of the specified artifact.
    *
-   * @param appName The name of the application.
-   * @param userId The ID of the user.
-   * @param sessionId The ID of the session.
-   * @param filename The name of the file to list versions for.
-   * @return A {@link Single} containing a list of version numbers for the specified artifact file.
+   * @return Single with list of version numbers.
    */
   @Override
   public Single<ImmutableList<Integer>> listVersions(

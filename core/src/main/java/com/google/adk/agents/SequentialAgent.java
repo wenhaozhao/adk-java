@@ -113,10 +113,10 @@ public class SequentialAgent extends BaseAgent {
   }
 
   /**
-   * Runs the sub-agents sequentially.
+   * Runs sub-agents sequentially.
    *
-   * @param invocationContext The context of the current invocation.
-   * @return A Flowable that emits events from the sub-agents.
+   * @param invocationContext Invocation context.
+   * @return Flowable emitting events from sub-agents.
    */
   @Override
   protected Flowable<Event> runAsyncImpl(InvocationContext invocationContext) {
@@ -125,10 +125,10 @@ public class SequentialAgent extends BaseAgent {
   }
 
   /**
-   * Runs the sub-agents sequentially in live mode.
+   * Runs sub-agents sequentially in live mode.
    *
-   * @param invocationContext The context of the current invocation.
-   * @return A Flowable that emits events from the sub-agents in live mode.
+   * @param invocationContext Invocation context.
+   * @return Flowable emitting events from sub-agents in live mode.
    */
   @Override
   protected Flowable<Event> runLiveImpl(InvocationContext invocationContext) {

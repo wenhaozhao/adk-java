@@ -123,11 +123,10 @@ public class ParallelAgent extends BaseAgent {
   /**
    * Sets the branch for the current agent in the invocation context.
    *
-   * <p>This method appends the current agent's name to the existing branch, or sets it as the
-   * branch if none exists.
+   * <p>Appends the agent name to the current branch, or sets it if undefined.
    *
-   * @param currentAgent The current agent whose name will be used to set the branch.
-   * @param invocationContext The context of the invocation where the branch will be set.
+   * @param currentAgent Current agent.
+   * @param invocationContext Invocation context to update.
    */
   private static void setBranchForCurrentAgent(
       BaseAgent currentAgent, InvocationContext invocationContext) {
@@ -140,13 +139,12 @@ public class ParallelAgent extends BaseAgent {
   }
 
   /**
-   * Runs the sub-agents in parallel and returns a Flowable of events.
+   * Runs sub-agents in parallel and emits their events.
    *
-   * <p>This method sets the branch for the current agent in the invocation context and then
-   * collects events from all sub-agents running in parallel.
+   * <p>Sets the branch and merges event streams from all sub-agents.
    *
-   * @param invocationContext The context of the invocation.
-   * @return A Flowable that emits events from all sub-agents.
+   * @param invocationContext Invocation context.
+   * @return Flowable emitting events from all sub-agents.
    */
   @Override
   protected Flowable<Event> runAsyncImpl(InvocationContext invocationContext) {
@@ -165,12 +163,10 @@ public class ParallelAgent extends BaseAgent {
   }
 
   /**
-   * Runs the sub-agents in parallel and returns a Flowable of events in live mode.
+   * Not supported for ParallelAgent.
    *
-   * <p>This method is not defined for ParallelAgent, as it does not support live execution.
-   *
-   * @param invocationContext The context of the invocation.
-   * @return A Flowable that emits events, but throws an UnsupportedOperationException.
+   * @param invocationContext Invocation context.
+   * @return Flowable that always throws UnsupportedOperationException.
    */
   @Override
   protected Flowable<Event> runLiveImpl(InvocationContext invocationContext) {

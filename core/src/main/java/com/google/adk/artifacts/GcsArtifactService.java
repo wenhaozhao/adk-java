@@ -54,25 +54,23 @@ public final class GcsArtifactService implements BaseArtifactService {
   }
 
   /**
-   * Checks if the filename indicates a user namespace.
-   * User namespace files are prefixed with "user:".
+   * Checks if a filename uses the user namespace.
    *
-   * @param filename The filename to check.
-   * @return true if the file is in the user namespace, false otherwise.
+   * @param filename Filename to check.
+   * @return true if prefixed with "user:", false otherwise.
    */
   private boolean fileHasUserNamespace(String filename) {
     return filename != null && filename.startsWith("user:");
   }
 
   /**
-   * Constructs the blob prefix for a given artifact.
-   * The prefix is the path through the filename but without the version.
+   * Constructs the blob prefix for an artifact (excluding version).
    *
-   * @param appName The application name.
-   * @param userId The user ID.
-   * @param sessionId The session ID.
-   * @param filename The filename of the artifact.
-   * @return The blob prefix as a string, i.e. the path through the filename but without the version.
+   * @param appName Application name.
+   * @param userId User ID.
+   * @param sessionId Session ID.
+   * @param filename Artifact filename.
+   * @return prefix string for blob location.
    */
   private String getBlobPrefix(String appName, String userId, String sessionId, String filename) {
     if (fileHasUserNamespace(filename)) {
@@ -83,14 +81,14 @@ public final class GcsArtifactService implements BaseArtifactService {
   }
 
   /**
-   * Constructs the full blob name for a given artifact, including the version.
+   * Constructs the full blob name for an artifact, including version.
    *
-   * @param appName The application name.
-   * @param userId The user ID.
-   * @param sessionId The session ID.
-   * @param filename The filename of the artifact.
-   * @param version The version number of the artifact.
-   * @return The full blob name as a string.
+   * @param appName Application name.
+   * @param userId User ID.
+   * @param sessionId Session ID.
+   * @param filename Artifact filename.
+   * @param version Artifact version.
+   * @return full blob name.
    */
   private String getBlobName(
       String appName, String userId, String sessionId, String filename, int version) {
@@ -98,14 +96,14 @@ public final class GcsArtifactService implements BaseArtifactService {
   }
 
   /**
-   * Saves an artifact to GCS, assigning it a version based on existing versions.
+   * Saves an artifact to GCS and assigns a new version.
    *
-   * @param appName The application name.
-   * @param userId The user ID.
-   * @param sessionId The session ID.
-   * @param filename The filename of the artifact.
-   * @param artifact The Part representing the artifact to save.
-   * @return A Single containing the version number assigned to the saved artifact.
+   * @param appName Application name.
+   * @param userId User ID.
+   * @param sessionId Session ID.
+   * @param filename Artifact filename.
+   * @param artifact Artifact content to save.
+   * @return Single with assigned version number.
    */
   @Override
   public Single<Integer> saveArtifact(
@@ -138,15 +136,14 @@ public final class GcsArtifactService implements BaseArtifactService {
   }
 
   /**
-   * Loads an artifact from GCS, optionally specifying a version.
-   * If no version is specified, the latest version is loaded.
+   * Loads an artifact from GCS.
    *
-   * @param appName The application name.
-   * @param userId The user ID.
-   * @param sessionId The session ID.
-   * @param filename The filename of the artifact.
-   * @param version Optional version number of the artifact to load.
-   * @return A Maybe containing the Part representing the loaded artifact, or empty if not found.
+   * @param appName Application name.
+   * @param userId User ID.
+   * @param sessionId Session ID.
+   * @param filename Artifact filename.
+   * @param version Optional version to load. Loads latest if empty.
+   * @return Maybe with loaded artifact, or empty if not found.
    */
   @Override
   public Maybe<Part> loadArtifact(
@@ -180,13 +177,12 @@ public final class GcsArtifactService implements BaseArtifactService {
   }
 
   /**
-   * Lists all artifact keys for a given app, user, and session.
-   * This includes both session-specific files and user-namespace files.
+   * Lists artifact filenames for a user and session.
    *
-   * @param appName The application name.
-   * @param userId The user ID.
-   * @param sessionId The session ID.
-   * @return A Single containing a ListArtifactsResponse with sorted filenames.
+   * @param appName Application name.
+   * @param userId User ID.
+   * @param sessionId Session ID.
+   * @return Single with sorted list of artifact filenames.
    */
   @Override
   public Single<ListArtifactsResponse> listArtifactKeys(
@@ -222,13 +218,13 @@ public final class GcsArtifactService implements BaseArtifactService {
   }
 
   /**
-   * Deletes all versions of a specified artifact from GCS.
+   * Deletes all versions of the specified artifact from GCS.
    *
-   * @param appName The application name.
-   * @param userId The user ID.
-   * @param sessionId The session ID.
-   * @param filename The filename of the artifact to delete.
-   * @return A Completable indicating the completion of the delete operation.
+   * @param appName Application name.
+   * @param userId User ID.
+   * @param sessionId Session ID.
+   * @param filename Artifact filename.
+   * @return Completable indicating operation completion.
    */
   @Override
   public Completable deleteArtifact(
@@ -252,14 +248,13 @@ public final class GcsArtifactService implements BaseArtifactService {
   }
 
   /**
-   * Lists all versions of a specified artifact.
-   * This method retrieves all versions of the artifact based on the filename and returns them as a sorted list.
+   * Lists all available versions for a given artifact.
    *
-   * @param appName The application name.
-   * @param userId The user ID.
-   * @param sessionId The session ID.
-   * @param filename The filename of the artifact.
-   * @return A Single containing a sorted list of version numbers for the specified artifact.
+   * @param appName Application name.
+   * @param userId User ID.
+   * @param sessionId Session ID.
+   * @param filename Artifact filename.
+   * @return Single with sorted list of version numbers.
    */
   @Override
   public Single<ImmutableList<Integer>> listVersions(
