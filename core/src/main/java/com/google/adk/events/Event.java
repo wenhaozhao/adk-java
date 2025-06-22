@@ -31,6 +31,7 @@ import com.google.genai.types.FunctionCall;
 import com.google.genai.types.FunctionResponse;
 import com.google.genai.types.GroundingMetadata;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -213,17 +214,17 @@ public class Event extends JsonBaseModel {
 
   @JsonIgnore
   public final ImmutableList<FunctionCall> functionCalls() {
-    return content().flatMap(Content::parts).orElse(ImmutableList.of()).stream()
-        .filter(part -> part.functionCall().isPresent())
-        .map(part -> part.functionCall().get())
+    return content().flatMap(Content::parts).stream()
+        .flatMap(List::stream)
+        .flatMap(part -> part.functionCall().stream())
         .collect(toImmutableList());
   }
 
   @JsonIgnore
   public final ImmutableList<FunctionResponse> functionResponses() {
-    return content().flatMap(Content::parts).orElse(ImmutableList.of()).stream()
-        .filter(part -> part.functionResponse().isPresent())
-        .map(part -> part.functionResponse().get())
+    return content().flatMap(Content::parts).stream()
+        .flatMap(List::stream)
+        .flatMap(part -> part.functionResponse().stream())
         .collect(toImmutableList());
   }
 
@@ -238,25 +239,18 @@ public class Event extends JsonBaseModel {
 
   public final String stringifyContent() {
     StringBuilder sb = new StringBuilder();
-    content()
-        .ifPresent(
-            c ->
-                c.parts()
-                    .ifPresent(
-                        parts ->
-                            parts.forEach(
-                                part -> {
-                                  part.text().ifPresent(sb::append);
-                                  part.functionCall()
-                                      .ifPresent(
-                                          functionCall ->
-                                              sb.append("Function Call: ").append(functionCall));
-                                  part.functionResponse()
-                                      .ifPresent(
-                                          functionResponse ->
-                                              sb.append("Function Response: ")
-                                                  .append(functionResponse));
-                                })));
+    content().flatMap(Content::parts).stream()
+        .flatMap(List::stream)
+        .forEach(
+            part -> {
+              part.text().ifPresent(sb::append);
+              part.functionCall()
+                  .ifPresent(functionCall -> sb.append("Function Call: ").append(functionCall));
+              part.functionResponse()
+                  .ifPresent(
+                      functionResponse ->
+                          sb.append("Function Response: ").append(functionResponse));
+            });
     return sb.toString();
   }
 
