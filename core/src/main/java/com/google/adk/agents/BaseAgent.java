@@ -61,11 +61,11 @@ public abstract class BaseAgent {
   /**
    * Creates a new BaseAgent.
    *
-   * @param name Unique agent name.
+   * @param name Unique agent name. Cannot be "user" (reserved).
    * @param description Agent purpose.
    * @param subAgents Agents managed by this agent.
-   * @param beforeAgentCallback Callbacks before agent execution.
-   * @param afterAgentCallback Callbacks after agent execution.
+   * @param beforeAgentCallback Callbacks before agent execution. Invoked in order until one doesn't return null.
+   * @param afterAgentCallback Callbacks after agent execution. Invoked in order until one doesn't return null.
    */
   public BaseAgent(
       String name,
@@ -174,7 +174,7 @@ public abstract class BaseAgent {
   }
 
   /**
-   * Creates a context based on the parent.
+   * Creates a shallow copy of the parent context with the agent properly being set to this instance.
    *
    * @param parentContext Parent context to copy.
    * @return new context with updated branch name.
