@@ -61,7 +61,8 @@ public final class LlmRegistry {
   }
 
   /**
-   * Returns an LLM instance for the given model name, using a cached or new factory-created instance.
+   * Returns an LLM instance for the given model name, using a cached or new factory-created
+   * instance.
    *
    * @param modelName Model name to look up.
    * @return Matching {@link BaseLlm} instance.
@@ -88,8 +89,8 @@ public final class LlmRegistry {
   }
 
   /**
-   * Registers an LLM factory for testing purposes.
-   * Clears cached instances matching the given pattern to ensure test isolation.
+   * Registers an LLM factory for testing purposes. Clears cached instances matching the given
+   * pattern to ensure test isolation.
    *
    * @param modelNamePattern Regex pattern for matching model names.
    * @param factory The {@link LlmFactory} to register.

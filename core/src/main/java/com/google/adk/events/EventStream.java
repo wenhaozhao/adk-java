@@ -36,9 +36,7 @@ public class EventStream implements Iterable<Event> {
     return new EventIterator();
   }
 
-  /**
-   * Iterator that returns events from the supplier until it returns {@code null}.
-   */
+  /** Iterator that returns events from the supplier until it returns {@code null}. */
   private class EventIterator implements Iterator<Event> {
     private Event nextEvent = null;
     private boolean finished = false;

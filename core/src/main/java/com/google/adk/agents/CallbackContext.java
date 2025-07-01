@@ -57,9 +57,9 @@ public class CallbackContext extends ReadonlyContext {
     return eventActions;
   }
 
-  /** 
+  /**
    * Loads an artifact from the artifact service associated with the current session.
-   * 
+   *
    * @param filename Artifact file name.
    * @param version Artifact version (optional).
    * @return loaded part, or empty if not found.
@@ -81,7 +81,7 @@ public class CallbackContext extends ReadonlyContext {
 
   /**
    * Saves an artifact and records it as a delta for the current session.
-   * 
+   *
    * @param filename Artifact file name.
    * @param artifact Artifact content to save.
    * @throws IllegalStateException if the artifact service is not initialized.

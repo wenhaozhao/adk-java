@@ -38,7 +38,7 @@ public class VertexSpeechClient implements SpeechClientInterface {
 
   /**
    * Performs synchronous speech recognition on the given audio input.
-   * 
+   *
    * @param config Recognition configuration (e.g., language, encoding).
    * @param audio Audio data to recognize.
    * @return The recognition result.

@@ -42,8 +42,9 @@ public final class Callbacks {
     Maybe<LlmResponse> call(CallbackContext callbackContext, LlmRequest llmRequest);
   }
 
-  /** Helper interface to allow for sync beforeModelCallback. 
-   * The function is wrapped into an async one before being processed further. 
+  /**
+   * Helper interface to allow for sync beforeModelCallback. The function is wrapped into an async
+   * one before being processed further.
    */
   @FunctionalInterface
   public interface BeforeModelCallbackSync extends BeforeModelCallbackBase {
@@ -65,8 +66,8 @@ public final class Callbacks {
   }
 
   /**
-   * Helper interface to allow for sync afterModelCallback.
-   * The function is wrapped into an async one before being processed further.
+   * Helper interface to allow for sync afterModelCallback. The function is wrapped into an async
+   * one before being processed further.
    */
   @FunctionalInterface
   public interface AfterModelCallbackSync extends AfterModelCallbackBase {
@@ -87,8 +88,8 @@ public final class Callbacks {
   }
 
   /**
-   * Helper interface to allow for sync beforeAgentCallback.
-   * The function is wrapped into an async one before being processed further.
+   * Helper interface to allow for sync beforeAgentCallback. The function is wrapped into an async
+   * one before being processed further.
    */
   @FunctionalInterface
   public interface BeforeAgentCallbackSync extends BeforeAgentCallbackBase {
@@ -109,8 +110,8 @@ public final class Callbacks {
   }
 
   /**
-   * Helper interface to allow for sync afterAgentCallback.
-   * The function is wrapped into an async one before being processed further.
+   * Helper interface to allow for sync afterAgentCallback. The function is wrapped into an async
+   * one before being processed further.
    */
   @FunctionalInterface
   public interface AfterAgentCallbackSync extends AfterAgentCallbackBase {
@@ -138,8 +139,8 @@ public final class Callbacks {
   }
 
   /**
-   * Helper interface to allow for sync beforeToolCallback.
-   * The function is wrapped into an async one before being processed further.
+   * Helper interface to allow for sync beforeToolCallback. The function is wrapped into an async
+   * one before being processed further.
    */
   @FunctionalInterface
   public interface BeforeToolCallbackSync extends BeforeToolCallbackBase {
@@ -173,8 +174,8 @@ public final class Callbacks {
   }
 
   /**
-   * Helper interface to allow for sync afterToolCallback.
-   * The function is wrapped into an async one before being processed further.
+   * Helper interface to allow for sync afterToolCallback. The function is wrapped into an async one
+   * before being processed further.
    */
   @FunctionalInterface
   public interface AfterToolCallbackSync extends AfterToolCallbackBase {

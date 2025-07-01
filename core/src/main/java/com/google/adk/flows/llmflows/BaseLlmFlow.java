@@ -184,7 +184,7 @@ public abstract class BaseLlmFlow implements BaseFlow {
 
   /**
    * Sends a request to the LLM and returns its response.
-   * 
+   *
    * @param context The invocation context.
    * @param llmRequest The LLM request.
    * @param eventForCallbackUsage An Event object primarily for providing context (like actions) to
@@ -236,7 +236,8 @@ public abstract class BaseLlmFlow implements BaseFlow {
   }
 
   /**
-   * Invokes {@link BeforeModelCallback}s. If any returns a response, it's used instead of calling the LLM.
+   * Invokes {@link BeforeModelCallback}s. If any returns a response, it's used instead of calling
+   * the LLM.
    *
    * @return A {@link Single} with the callback result or {@link Optional#empty()}.
    */
@@ -268,8 +269,8 @@ public abstract class BaseLlmFlow implements BaseFlow {
   }
 
   /**
-   * Invokes {@link AfterModelCallback}s after an LLM response.
-   * If any returns a response, it replaces the original.
+   * Invokes {@link AfterModelCallback}s after an LLM response. If any returns a response, it
+   * replaces the original.
    *
    * @return A {@link Single} with the final {@link LlmResponse}.
    */
@@ -302,10 +303,9 @@ public abstract class BaseLlmFlow implements BaseFlow {
   }
 
   /**
-   * Executes a single iteration of the LLM flow:
-   * preprocessing → LLM call → postprocessing.
+   * Executes a single iteration of the LLM flow: preprocessing → LLM call → postprocessing.
    *
-   * Handles early termination, LLM call limits, and agent transfer if needed.
+   * <p>Handles early termination, LLM call limits, and agent transfer if needed.
    *
    * @return A {@link Flowable} of {@link Event} objects from this step.
    * @throws LlmCallsLimitExceededException if the agent exceeds allowed LLM invocations.
@@ -399,8 +399,8 @@ public abstract class BaseLlmFlow implements BaseFlow {
   }
 
   /**
-   * Executes the full LLM flow by repeatedly calling {@link #runOneStep}
-   * until a final response is produced.
+   * Executes the full LLM flow by repeatedly calling {@link #runOneStep} until a final response is
+   * produced.
    *
    * @return A {@link Flowable} of all {@link Event}s generated during the flow.
    */
@@ -425,9 +425,9 @@ public abstract class BaseLlmFlow implements BaseFlow {
 
   /**
    * Executes the LLM flow in streaming mode.
-   * 
-   * Handles sending history and live requests to the LLM, receiving responses,
-   * processing them, and managing agent transfers.
+   *
+   * <p>Handles sending history and live requests to the LLM, receiving responses, processing them,
+   * and managing agent transfers.
    *
    * @return A {@link Flowable} of {@link Event}s streamed in real-time.
    */
@@ -579,7 +579,7 @@ public abstract class BaseLlmFlow implements BaseFlow {
   /**
    * Builds an {@link Event} from LLM response, request, and base event data.
    *
-   * Populates the event with LLM output and tool function call metadata.
+   * <p>Populates the event with LLM output and tool function call metadata.
    *
    * @return A fully constructed {@link Event} representing the LLM response.
    */
