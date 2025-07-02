@@ -703,6 +703,10 @@ public class LlmAgent extends BaseAgent {
     return planning;
   }
 
+  public Optional<Integer> maxSteps() {
+    return maxSteps;
+  }
+
   public Optional<GenerateContentConfig> generateContentConfig() {
     return generateContentConfig;
   }
