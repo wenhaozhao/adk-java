@@ -16,8 +16,11 @@
 
 package com.google.adk.agents;
 
+import com.google.adk.events.Event;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.genai.types.Content;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -48,6 +51,21 @@ public class ReadonlyContext {
   /** Returns the name of the agent currently running. */
   public String agentName() {
     return invocationContext.agent().name();
+  }
+
+  /** Returns the session ID. */
+  public String sessionId() {
+    return invocationContext.session().id();
+  }
+
+  /**
+   * Returns a read-only view of the events of the current session.
+   *
+   * <p>This is a shallow copy and if the underlying values of the list are modified, the read-only
+   * view will also be modified.
+   */
+  public ImmutableList<Event> events() {
+    return ImmutableList.copyOf(invocationContext.session().events());
   }
 
   /**
