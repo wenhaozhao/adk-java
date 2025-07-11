@@ -554,12 +554,12 @@ class LangChain4jTest {
     // Mock the AI response with structured JSON data
     final String jsonResponse =
         """
-                {
-                    "name": "John Doe",
-                    "age": "30",
-                    "city": "New York"
-                }
-                """;
+        {
+            "name": "John Doe",
+            "age": "30",
+            "city": "New York"
+        }
+        """;
     final AiMessage aiMessage = AiMessage.from(jsonResponse);
 
     final ChatResponse chatResponse = mock(ChatResponse.class);
