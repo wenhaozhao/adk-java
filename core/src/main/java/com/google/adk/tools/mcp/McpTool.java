@@ -117,65 +117,15 @@ public final class McpTool extends BaseTool {
             .build());
   }
 
+
+
   @Override
   public Single<Map<String, Object>> runAsync(Map<String, Object> args, ToolContext toolContext) {
     return Single.<Map<String, Object>>fromCallable(
             () -> {
               CallToolResult callResult =
                   mcpSession.callTool(new CallToolRequest(this.name(), ImmutableMap.copyOf(args)));
-
-              if (callResult == null) {
-                return ImmutableMap.of("error", "MCP framework error: CallToolResult was null");
-              }
-
-              List<Content> contents = callResult.content();
-              Boolean isToolError = callResult.isError();
-
-              if (isToolError != null && isToolError) {
-                String errorMessage = "Tool execution failed.";
-                if (contents != null
-                    && !contents.isEmpty()
-                    && contents.get(0) instanceof TextContent) {
-                  TextContent textContent = (TextContent) contents.get(0);
-                  if (textContent.text() != null && !textContent.text().isEmpty()) {
-                    errorMessage += " Details: " + textContent.text();
-                  }
-                }
-                return ImmutableMap.of("error", errorMessage);
-              }
-
-              if (contents == null || contents.isEmpty()) {
-                return ImmutableMap.of();
-              }
-
-              List<String> textOutputs = new ArrayList<>();
-              for (Content content : contents) {
-                if (content instanceof TextContent textContent) {
-                  if (textContent.text() != null) {
-                    textOutputs.add(textContent.text());
-                  }
-                }
-              }
-
-              if (textOutputs.isEmpty()) {
-                return ImmutableMap.of(
-                    "error",
-                    "Tool '" + this.name() + "' returned content that is not TextContent.",
-                    "content_details",
-                    contents.toString());
-              }
-
-              List<Map<String, Object>> resultMaps = new ArrayList<>();
-              for (String textOutput : textOutputs) {
-                try {
-                  resultMaps.add(
-                      objectMapper.readValue(
-                          textOutput, new TypeReference<Map<String, Object>>() {}));
-                } catch (JsonProcessingException e) {
-                  resultMaps.add(ImmutableMap.of("text", textOutput));
-                }
-              }
-              return ImmutableMap.of("text_output", resultMaps);
+                  return wrapCallResult(this.objectMapper, this.name(), callResult);
             })
         .retryWhen(
             errors ->
@@ -188,4 +138,59 @@ public final class McpTool extends BaseTool {
                           reintializeSession();
                         }));
   }
+
+    static Map<String, Object> wrapCallResult(ObjectMapper objectMapper, String mcpToolName, CallToolResult callResult) {
+        if (callResult == null) {
+            return ImmutableMap.of("error", "MCP framework error: CallToolResult was null");
+        }
+
+        List<Content> contents = callResult.content();
+        Boolean isToolError = callResult.isError();
+
+        if (isToolError != null && isToolError) {
+            String errorMessage = "Tool execution failed.";
+            if (contents != null
+                    && !contents.isEmpty()
+                    && contents.get(0) instanceof TextContent textContent) {
+                if (textContent.text() != null && !textContent.text().isEmpty()) {
+                    errorMessage += " Details: " + textContent.text();
+                }
+            }
+            return ImmutableMap.of("error", errorMessage);
+        }
+
+        if (contents == null || contents.isEmpty()) {
+            return ImmutableMap.of();
+        }
+
+        List<String> textOutputs = new ArrayList<>();
+        for (Content content : contents) {
+            if (content instanceof TextContent textContent) {
+                if (textContent.text() != null) {
+                    textOutputs.add(textContent.text());
+                }
+            }
+        }
+
+        if (textOutputs.isEmpty()) {
+            return ImmutableMap.of(
+                    "error",
+                    "Tool '" + mcpToolName + "' returned content that is not TextContent.",
+                    "content_details",
+                    contents.toString());
+        }
+
+        List<Map<String, Object>> resultMaps = new ArrayList<>();
+        for (String textOutput : textOutputs) {
+            try {
+                resultMaps.add(
+                        objectMapper.readValue(
+                                textOutput, new TypeReference<Map<String, Object>>() {
+                                }));
+            } catch (JsonProcessingException e) {
+                resultMaps.add(ImmutableMap.of("text", textOutput));
+            }
+        }
+        return ImmutableMap.of("text_output", resultMaps);
+    }
 }
