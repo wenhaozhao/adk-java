@@ -46,7 +46,7 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 public final class McpAsyncTool extends BaseTool {
 
     Tool mcpTool;
-    Single<McpAsyncClient> mcpSession;
+    Single<McpAsyncSession> mcpSession;
     McpSessionManager mcpSessionManager;
     ObjectMapper objectMapper;
 
@@ -58,7 +58,7 @@ public final class McpAsyncTool extends BaseTool {
      * @param mcpSessionManager The MCP session manager to use to create new sessions.
      * @throws IllegalArgumentException If mcpTool or mcpSession are null.
      */
-    public McpAsyncTool(Tool mcpTool, Single<McpAsyncClient> mcpSession, McpSessionManager mcpSessionManager) {
+    public McpAsyncTool(Tool mcpTool, Single<McpAsyncSession> mcpSession, McpSessionManager mcpSessionManager) {
         this(mcpTool, mcpSession, mcpSessionManager, JsonBaseModel.getMapper());
     }
 
@@ -73,7 +73,7 @@ public final class McpAsyncTool extends BaseTool {
      */
     public McpAsyncTool(
             Tool mcpTool,
-            Single<McpAsyncClient> mcpSession,
+            Single<McpAsyncSession> mcpSession,
             McpSessionManager mcpSessionManager,
             ObjectMapper objectMapper) {
         super(
@@ -93,6 +93,10 @@ public final class McpAsyncTool extends BaseTool {
         this.mcpSession = mcpSession;
         this.mcpSessionManager = mcpSessionManager;
         this.objectMapper = objectMapper;
+    }
+
+    public Single<McpAsyncSession> mcpSession() {
+        return this.mcpSession;
     }
 
     public Schema toGeminiSchema(JsonSchema openApiSchema) {
@@ -116,9 +120,9 @@ public final class McpAsyncTool extends BaseTool {
     @Override
     public Single<Map<String, Object>> runAsync(Map<String, Object> args, ToolContext toolContext) {
         return Single.defer(() ->
-                        this.mcpSession.flatMapMaybe(client ->
+                        this.mcpSession.flatMapMaybe(session ->
                                 Maybe.fromCompletionStage(
-                                        client.callTool(new CallToolRequest(this.name(), ImmutableMap.copyOf(args)))
+                                        session.client().callTool(new CallToolRequest(this.name(), ImmutableMap.copyOf(args)))
                                                 .toFuture()
                                 )
                         ).map(callResult -> McpTool.wrapCallResult(

@@ -44,15 +44,15 @@ public class McpSessionManager {
     this.connectionParams = connectionParams;
   }
 
-  public McpSyncClient createSession() {
+  public McpSession createSession() {
     return initializeSession(this.connectionParams);
   }
 
-  public static McpSyncClient initializeSession(Object connectionParams) {
+  public static McpSession initializeSession(Object connectionParams) {
     return initializeSession(connectionParams, new DefaultMcpTransportBuilder());
   }
 
-  public static McpSyncClient initializeSession(
+  public static McpSession initializeSession(
       Object connectionParams, McpTransportBuilder transportBuilder) {
     Duration initializationTimeout = null;
     Duration requestTimeout = null;
@@ -69,18 +69,18 @@ public class McpSessionManager {
             .build();
     InitializeResult initResult = client.initialize();
     logger.debug("Initialize Client Result: {}", initResult);
-    return client;
+    return new McpSession(client, initResult);
   }
 
-  public Single<McpAsyncClient> createAsyncSession() {
+  public Single<McpAsyncSession> createAsyncSession() {
     return initializeAsyncSession(this.connectionParams);
   }
 
-  public static Single<McpAsyncClient> initializeAsyncSession(Object connectionParams) {
+  public static Single<McpAsyncSession> initializeAsyncSession(Object connectionParams) {
     return initializeAsyncSession(connectionParams, new DefaultMcpTransportBuilder());
   }
 
-  public static Single<McpAsyncClient> initializeAsyncSession(
+  public static Single<McpAsyncSession> initializeAsyncSession(
           Object connectionParams, McpTransportBuilder transportBuilder) {
     Duration initializationTimeout = null;
     Duration requestTimeout = null;
@@ -100,10 +100,10 @@ public class McpSessionManager {
                     .doOnSuccess(initResult -> {
                       logger.debug("Initialize McpAsyncClient Result: {}", initResult);
                     })
+                    .map(initResult-> new McpAsyncSession(client, initResult))
                     .doOnError(e -> {
                       logger.error("Initialize McpAsyncClient Failed: {}", e.getMessage(), e);
                     })
-                    .map(_initResult -> client)
                     .toFuture()
     );
   }

@@ -27,7 +27,6 @@ import com.google.adk.tools.ToolContext;
 import com.google.common.collect.ImmutableMap;
 import com.google.genai.types.FunctionDeclaration;
 import com.google.genai.types.Schema;
-import io.modelcontextprotocol.client.McpSyncClient;
 import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.Content;
@@ -50,7 +49,7 @@ import java.util.Optional;
 public final class McpTool extends BaseTool {
 
   Tool mcpTool;
-  McpSyncClient mcpSession;
+  McpSession mcpSession;
   McpSessionManager mcpSessionManager;
   ObjectMapper objectMapper;
 
@@ -62,7 +61,7 @@ public final class McpTool extends BaseTool {
    * @param mcpSessionManager The MCP session manager to use to create new sessions.
    * @throws IllegalArgumentException If mcpTool or mcpSession are null.
    */
-  public McpTool(Tool mcpTool, McpSyncClient mcpSession, McpSessionManager mcpSessionManager) {
+  public McpTool(Tool mcpTool, McpSession mcpSession, McpSessionManager mcpSessionManager) {
     this(mcpTool, mcpSession, mcpSessionManager, JsonBaseModel.getMapper());
   }
 
@@ -77,7 +76,7 @@ public final class McpTool extends BaseTool {
    */
   public McpTool(
       Tool mcpTool,
-      McpSyncClient mcpSession,
+      McpSession mcpSession,
       McpSessionManager mcpSessionManager,
       ObjectMapper objectMapper) {
     super(
@@ -97,6 +96,10 @@ public final class McpTool extends BaseTool {
     this.mcpSession = mcpSession;
     this.mcpSessionManager = mcpSessionManager;
     this.objectMapper = objectMapper;
+  }
+
+  public McpSession mcpSession() {
+      return this.mcpSession;
   }
 
   public Schema toGeminiSchema(JsonSchema openApiSchema) {
@@ -124,7 +127,7 @@ public final class McpTool extends BaseTool {
     return Single.<Map<String, Object>>fromCallable(
             () -> {
               CallToolResult callResult =
-                  mcpSession.callTool(new CallToolRequest(this.name(), ImmutableMap.copyOf(args)));
+                  mcpSession.client().callTool(new CallToolRequest(this.name(), ImmutableMap.copyOf(args)));
                   return wrapCallResult(this.objectMapper, this.name(), callResult);
             })
         .retryWhen(
