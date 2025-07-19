@@ -43,7 +43,7 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
  * <p>This wraps a MCP Tool interface and an active MCP Session. It invokes the MCP Tool through
  * executing the tool from remote MCP Session.
  */
-public final class AsyncMcpTool extends BaseTool {
+public final class McpAsyncTool extends BaseTool {
 
     Tool mcpTool;
     Single<McpAsyncClient> mcpSession;
@@ -58,7 +58,7 @@ public final class AsyncMcpTool extends BaseTool {
      * @param mcpSessionManager The MCP session manager to use to create new sessions.
      * @throws IllegalArgumentException If mcpTool or mcpSession are null.
      */
-    public AsyncMcpTool(Tool mcpTool, Single<McpAsyncClient> mcpSession, McpSessionManager mcpSessionManager) {
+    public McpAsyncTool(Tool mcpTool, Single<McpAsyncClient> mcpSession, McpSessionManager mcpSessionManager) {
         this(mcpTool, mcpSession, mcpSessionManager, JsonBaseModel.getMapper());
     }
 
@@ -71,7 +71,7 @@ public final class AsyncMcpTool extends BaseTool {
      * @param objectMapper      The ObjectMapper to use to convert JSON schemas.
      * @throws IllegalArgumentException If mcpTool or mcpSession are null.
      */
-    public AsyncMcpTool(
+    public McpAsyncTool(
             Tool mcpTool,
             Single<McpAsyncClient> mcpSession,
             McpSessionManager mcpSessionManager,
