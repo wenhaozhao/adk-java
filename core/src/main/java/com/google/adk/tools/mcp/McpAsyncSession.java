@@ -13,10 +13,10 @@ public class McpAsyncSession {
     }
 
     public McpAsyncClient client() {
-        return client;
+        return this.client;
     }
 
-    public McpSchema.InitializeResult result() {
-        return initResult;
+    public McpSchema.InitializeResult initResult() {
+        return this.initResult;
     }
 }
