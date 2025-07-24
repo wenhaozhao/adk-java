@@ -83,6 +83,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
@@ -117,6 +118,7 @@ import org.springframework.web.util.UriComponentsBuilder;
  * controller logic.
  */
 @SpringBootApplication
+@ConfigurationPropertiesScan
 @ComponentScan(basePackages = {"com.google.adk.web", "com.google.adk.web.config"})
 public class AdkWebServer implements WebMvcConfigurer {
 
