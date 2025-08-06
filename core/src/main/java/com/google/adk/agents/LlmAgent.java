@@ -16,6 +16,8 @@
 
 package com.google.adk.agents;
 
+import static com.google.common.base.Strings.isNullOrEmpty;
+import static com.google.common.base.Strings.nullToEmpty;
 import static java.util.stream.Collectors.joining;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -45,6 +47,7 @@ import com.google.adk.flows.llmflows.AutoFlow;
 import com.google.adk.flows.llmflows.BaseLlmFlow;
 import com.google.adk.flows.llmflows.SingleFlow;
 import com.google.adk.models.BaseLlm;
+import com.google.adk.models.Gemini;
 import com.google.adk.models.Model;
 import com.google.adk.tools.BaseTool;
 import com.google.adk.tools.BaseToolset;
@@ -844,5 +847,96 @@ public class LlmAgent extends BaseAgent {
       current = current.parentAgent();
     }
     throw new IllegalStateException("No model found for agent " + name() + " or its ancestors.");
+  }
+
+  /**
+   * Creates an LlmAgent from configuration.
+   *
+   * @param config the agent configuration
+   * @param configAbsPath The absolute path to the agent config file. This is needed for resolving
+   *     relative paths for e.g. tools.
+   * @return the configured LlmAgent
+   * @throws ConfigAgentUtils.ConfigurationException if the configuration is invalid
+   *     <p>TODO: Config agent features are not yet ready for public use.
+   */
+  public static LlmAgent fromConfig(LlmAgentConfig config, String configAbsPath)
+      throws ConfigAgentUtils.ConfigurationException {
+    logger.debug("Creating LlmAgent from config: {}", config.name());
+
+    // Validate required fields
+    if (config.name() == null || config.name().trim().isEmpty()) {
+      throw new ConfigAgentUtils.ConfigurationException("Agent name is required");
+    }
+
+    if (config.instruction() == null || config.instruction().trim().isEmpty()) {
+      throw new ConfigAgentUtils.ConfigurationException("Agent instruction is required");
+    }
+
+    // Create builder with required fields
+    Builder builder =
+        LlmAgent.builder()
+            .name(config.name())
+            .description(nullToEmpty(config.description()))
+            .instruction(config.instruction());
+
+    // Set optional model configuration
+    if (config.model() != null && !config.model().trim().isEmpty()) {
+      logger.info("Configuring model: {}", config.model());
+
+      // TODO: resolve model name
+      if (config.model().startsWith("gemini")) {
+        try {
+          // Check for API key in system properties (for testing) or environment variables
+          String apiKey = System.getProperty("GOOGLE_API_KEY");
+          if (isNullOrEmpty(apiKey)) {
+            apiKey = System.getProperty("GEMINI_API_KEY");
+          }
+          if (isNullOrEmpty(apiKey)) {
+            apiKey = System.getenv("GOOGLE_API_KEY");
+          }
+          if (isNullOrEmpty(apiKey)) {
+            apiKey = System.getenv("GEMINI_API_KEY");
+          }
+
+          Gemini.Builder geminiBuilder = Gemini.builder().modelName(config.model());
+          if (apiKey != null && !apiKey.isEmpty()) {
+            geminiBuilder.apiKey(apiKey);
+          }
+
+          BaseLlm model = geminiBuilder.build();
+          builder.model(model);
+          logger.debug("Successfully configured Gemini model: {}", config.model());
+        } catch (RuntimeException e) {
+          logger.warn(
+              "Failed to create Gemini model '{}'. The agent will use the default LLM. Error: {}",
+              config.model(),
+              e.getMessage());
+        }
+      } else {
+        logger.warn(
+            "Model '{}' is not a supported Gemini model. The agent will use the default LLM.",
+            config.model());
+      }
+    }
+
+    // Set optional transfer configuration
+    if (config.disallowTransferToParent() != null) {
+      builder.disallowTransferToParent(config.disallowTransferToParent());
+    }
+
+    if (config.disallowTransferToPeers() != null) {
+      builder.disallowTransferToPeers(config.disallowTransferToPeers());
+    }
+
+    // Set optional output key
+    if (config.outputKey() != null && !config.outputKey().trim().isEmpty()) {
+      builder.outputKey(config.outputKey());
+    }
+
+    // Build and return the agent
+    LlmAgent agent = builder.build();
+    logger.info("Successfully created LlmAgent: {}", agent.name());
+
+    return agent;
   }
 }
