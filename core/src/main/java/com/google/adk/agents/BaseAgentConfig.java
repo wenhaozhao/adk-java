@@ -26,9 +26,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public class BaseAgentConfig {
   private String name;
   private String description = "";
-  // TODO: Add agentClassType enum to the config and handle different values from user
-  // input.e.g.LLM_AGENT, LlmAgent
-  private String agentClass = null;
+  private String agentClass;
 
   @JsonProperty(value = "name", required = true)
   public String name() {

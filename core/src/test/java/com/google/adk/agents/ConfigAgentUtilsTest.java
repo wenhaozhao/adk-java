@@ -178,4 +178,69 @@ public final class ConfigAgentUtilsTest {
     assertThat(exception).hasMessageThat().contains("Failed to create agent from config");
     assertThat(exception.getCause()).isNotNull();
   }
+
+  @Test
+  public void fromConfig_withModel_setsModelOnAgent() throws IOException, ConfigurationException {
+    File configFile = tempFolder.newFile("with_model.yaml");
+    Files.writeString(
+        configFile.toPath(),
+        "name: modelAgent\n"
+            + "description: Agent with a model\n"
+            + "instruction: test instruction\n"
+            + "agent_class: LlmAgent\n"
+            + "model: \"gemini-pro\"\n");
+    String configPath = configFile.getAbsolutePath();
+
+    BaseAgent agent = ConfigAgentUtils.fromConfig(configPath);
+
+    assertThat(agent).isInstanceOf(LlmAgent.class);
+    LlmAgent llmAgent = (LlmAgent) agent;
+    assertThat(llmAgent.model()).isPresent();
+    assertThat(llmAgent.model().get().modelName()).hasValue("gemini-pro");
+  }
+
+  @Test
+  public void fromConfig_withEmptyModel_doesNotSetModelOnAgent()
+      throws IOException, ConfigurationException {
+    File configFile = tempFolder.newFile("empty_model.yaml");
+    Files.writeString(
+        configFile.toPath(),
+        "name: emptyModelAgent\n"
+            + "description: Agent with an empty model\n"
+            + "instruction: test instruction\n"
+            + "agent_class: LlmAgent\n"
+            + "model: \"\"\n");
+    String configPath = configFile.getAbsolutePath();
+
+    BaseAgent agent = ConfigAgentUtils.fromConfig(configPath);
+
+    assertThat(agent).isInstanceOf(LlmAgent.class);
+    LlmAgent llmAgent = (LlmAgent) agent;
+    assertThat(llmAgent.model()).isEmpty();
+  }
+
+  @Test
+  public void fromConfig_withInvalidModel_throwsExceptionOnModelResolution()
+      throws IOException, ConfigurationException {
+    File configFile = tempFolder.newFile("invalid_model.yaml");
+    Files.writeString(
+        configFile.toPath(),
+        """
+        name: invalidModelAgent
+        description: Agent with an invalid model
+        instruction: test instruction
+        agent_class: LlmAgent
+        model: "invalid-model-name"
+        """);
+    String configPath = configFile.getAbsolutePath();
+
+    BaseAgent agent = ConfigAgentUtils.fromConfig(configPath);
+
+    assertThat(agent).isInstanceOf(LlmAgent.class);
+    LlmAgent llmAgent = (LlmAgent) agent;
+
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class, llmAgent::resolvedModel);
+    assertThat(exception).hasMessageThat().contains("invalid-model-name");
+  }
 }

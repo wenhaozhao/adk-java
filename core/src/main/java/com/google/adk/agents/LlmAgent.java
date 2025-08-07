@@ -16,7 +16,6 @@
 
 package com.google.adk.agents;
 
-import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.base.Strings.nullToEmpty;
 import static java.util.stream.Collectors.joining;
 
@@ -47,7 +46,7 @@ import com.google.adk.flows.llmflows.AutoFlow;
 import com.google.adk.flows.llmflows.BaseLlmFlow;
 import com.google.adk.flows.llmflows.SingleFlow;
 import com.google.adk.models.BaseLlm;
-import com.google.adk.models.Gemini;
+import com.google.adk.models.LlmRegistry;
 import com.google.adk.models.Model;
 import com.google.adk.tools.BaseTool;
 import com.google.adk.tools.BaseToolset;
@@ -835,8 +834,17 @@ public class LlmAgent extends BaseAgent {
    */
   private Model resolveModelInternal() {
     if (this.model.isPresent()) {
-      if (this.model().isPresent()) {
-        return this.model.get();
+      Model currentModel = this.model.get();
+
+      if (currentModel.model().isPresent()) {
+        return currentModel;
+      }
+
+      if (currentModel.modelName().isPresent()) {
+        String modelName = currentModel.modelName().get();
+        BaseLlm resolvedLlm = LlmRegistry.getLlm(modelName);
+
+        return Model.builder().modelName(modelName).model(resolvedLlm).build();
       }
     }
     BaseAgent current = this.parentAgent();
@@ -879,44 +887,8 @@ public class LlmAgent extends BaseAgent {
             .description(nullToEmpty(config.description()))
             .instruction(config.instruction());
 
-    // Set optional model configuration
     if (config.model() != null && !config.model().trim().isEmpty()) {
-      logger.info("Configuring model: {}", config.model());
-
-      // TODO: resolve model name
-      if (config.model().startsWith("gemini")) {
-        try {
-          // Check for API key in system properties (for testing) or environment variables
-          String apiKey = System.getProperty("GOOGLE_API_KEY");
-          if (isNullOrEmpty(apiKey)) {
-            apiKey = System.getProperty("GEMINI_API_KEY");
-          }
-          if (isNullOrEmpty(apiKey)) {
-            apiKey = System.getenv("GOOGLE_API_KEY");
-          }
-          if (isNullOrEmpty(apiKey)) {
-            apiKey = System.getenv("GEMINI_API_KEY");
-          }
-
-          Gemini.Builder geminiBuilder = Gemini.builder().modelName(config.model());
-          if (apiKey != null && !apiKey.isEmpty()) {
-            geminiBuilder.apiKey(apiKey);
-          }
-
-          BaseLlm model = geminiBuilder.build();
-          builder.model(model);
-          logger.debug("Successfully configured Gemini model: {}", config.model());
-        } catch (RuntimeException e) {
-          logger.warn(
-              "Failed to create Gemini model '{}'. The agent will use the default LLM. Error: {}",
-              config.model(),
-              e.getMessage());
-        }
-      } else {
-        logger.warn(
-            "Model '{}' is not a supported Gemini model. The agent will use the default LLM.",
-            config.model());
-      }
+      builder.model(config.model());
     }
 
     // Set optional transfer configuration
