@@ -40,6 +40,7 @@ import com.google.adk.agents.Callbacks.BeforeToolCallback;
 import com.google.adk.agents.Callbacks.BeforeToolCallbackBase;
 import com.google.adk.agents.Callbacks.BeforeToolCallbackSync;
 import com.google.adk.agents.ConfigAgentUtils.ConfigurationException;
+import com.google.adk.codeexecutors.BaseCodeExecutor;
 import com.google.adk.events.Event;
 import com.google.adk.examples.BaseExampleProvider;
 import com.google.adk.examples.Example;
@@ -106,6 +107,7 @@ public class LlmAgent extends BaseAgent {
   private final Optional<Schema> outputSchema;
   private final Optional<Executor> executor;
   private final Optional<String> outputKey;
+  private final Optional<BaseCodeExecutor> codeExecutor;
 
   private volatile Model resolvedModel;
   private final BaseLlmFlow llmFlow;
@@ -139,6 +141,7 @@ public class LlmAgent extends BaseAgent {
     this.executor = Optional.ofNullable(builder.executor);
     this.outputKey = Optional.ofNullable(builder.outputKey);
     this.toolsUnion = builder.toolsUnion != null ? builder.toolsUnion : ImmutableList.of();
+    this.codeExecutor = Optional.ofNullable(builder.codeExecutor);
 
     this.llmFlow = determineLlmFlow();
 
@@ -179,6 +182,7 @@ public class LlmAgent extends BaseAgent {
     private Schema outputSchema;
     private Executor executor;
     private String outputKey;
+    private BaseCodeExecutor codeExecutor;
 
     @CanIgnoreReturnValue
     public Builder name(String name) {
@@ -563,6 +567,12 @@ public class LlmAgent extends BaseAgent {
       return this;
     }
 
+    @CanIgnoreReturnValue
+    public Builder codeExecutor(BaseCodeExecutor codeExecutor) {
+      this.codeExecutor = codeExecutor;
+      return this;
+    }
+
     protected void validate() {
       this.disallowTransferToParent =
           this.disallowTransferToParent != null && this.disallowTransferToParent;
@@ -814,6 +824,11 @@ public class LlmAgent extends BaseAgent {
 
   public Optional<String> outputKey() {
     return outputKey;
+  }
+
+  @Nullable
+  public BaseCodeExecutor codeExecutor() {
+    return codeExecutor.orElse(null);
   }
 
   public Model resolvedModel() {
