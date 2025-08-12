@@ -15,23 +15,34 @@
 package com.google.adk.maven;
 
 import com.google.adk.agents.BaseAgent;
-import java.util.Map;
+import com.google.common.collect.ImmutableList;
 import javax.annotation.Nonnull;
+import javax.annotation.concurrent.ThreadSafe;
 
 /**
  * Interface for providing agents to the ADK Web Server.
  *
- * <p>Users implement this interface to register their custom agents with the web server. The
- * implementation should return a map where keys are agent names (used as app names in the UI) and
- * values are the corresponding BaseAgent instances.
+ * <p>Users implement this interface to register their agents with ADK Web Server.
+ *
+ * <p><strong>Thread Safety:</strong> Implementation must be thread-safe as it will be used as
+ * Spring singleton beans and accessed concurrently by multiple HTTP requests.
  *
  * <p>Example usage:
  *
  * <pre>{@code
  * public class MyAgentProvider implements AgentProvider {
- *   public static final MyAgentProvider INSTANCE = new MyAgentProvider(); @Override
- *   public Map<String, BaseAgent> getAgents() {
- *     return Map.of("chat_bot", createChatBot(), "code_assistant", createCodeAssistant());
+ *   @Override
+ *   public ImmutableList<String> listAgents() {
+ *     return ImmutableList.of("chat_bot", "code_assistant");
+ *   }
+ *
+ *   @Override
+ *   public BaseAgent getAgent(String name) {
+ *     switch (name) {
+ *       case "chat_bot": return createChatBot();
+ *       case "code_assistant": return createCodeAssistant();
+ *       default: throw new java.util.NoSuchElementException("Agent not found: " + name);
+ *     }
  *   }
  * }
  * }</pre>
@@ -39,19 +50,30 @@ import javax.annotation.Nonnull;
  * <p>Then use with Maven plugin:
  *
  * <pre>{@code
- * mvn google-adk:web -Dagents=com.acme.MyAgentProvider.INSTANCE
+ * mvn google-adk:web -Dagents=com.acme.MyAgentProvider
  * }</pre>
  *
  * TODO: Add config-based agent registration in the future.
  */
+@ThreadSafe
 public interface AgentProvider {
 
   /**
-   * Returns a map of agent names to BaseAgent instances.
+   * Returns a list of available agent names.
    *
-   * @return Map where keys are agent names (app names) and values are BaseAgent instances. Must not
-   *     return null - return an empty map if no agents are available.
+   * @return ImmutableList of agent names. Must not return null - return an empty list if no agents
+   *     are available.
    */
   @Nonnull
-  Map<String, BaseAgent> getAgents();
+  ImmutableList<String> listAgents();
+
+  /**
+   * Returns the BaseAgent instance for the specified agent name.
+   *
+   * @param name the name of the agent to retrieve
+   * @return BaseAgent instance for the given name
+   * @throws java.util.NoSuchElementException if the agent doesn't exist
+   * @throws IllegalStateException if the agent exists but fails to load
+   */
+  BaseAgent getAgent(String name);
 }

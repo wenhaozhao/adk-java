@@ -20,20 +20,43 @@ import com.google.adk.agents.BaseAgent;
 import com.google.adk.agents.LlmAgent;
 import com.google.adk.maven.AgentProvider;
 import com.google.adk.tools.GoogleSearchTool;
-import java.util.Map;
+import com.google.common.base.Suppliers;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import java.util.NoSuchElementException;
+import java.util.function.Supplier;
+import javax.annotation.Nonnull;
+import javax.annotation.concurrent.ThreadSafe;
 
 /** Example AgentProvider that creates simple agents for demonstration. */
+@ThreadSafe
 public class SimpleAgentProvider implements AgentProvider {
 
-  // Static instance for easy access
   public static final SimpleAgentProvider INSTANCE = new SimpleAgentProvider();
 
+  private final ImmutableMap<String, Supplier<BaseAgent>> agentSuppliers;
+
+  public SimpleAgentProvider() {
+    this.agentSuppliers =
+        ImmutableMap.of(
+            "chat_assistant", Suppliers.memoize(this::createChatAssistant),
+            "search_agent", Suppliers.memoize(this::createSearchAgent),
+            "code_helper", Suppliers.memoize(this::createCodeHelper));
+  }
+
   @Override
-  public Map<String, BaseAgent> getAgents() {
-    return Map.of(
-        "chat_assistant", createChatAssistant(),
-        "search_agent", createSearchAgent(),
-        "code_helper", createCodeHelper());
+  @Nonnull
+  public ImmutableList<String> listAgents() {
+    return ImmutableList.copyOf(agentSuppliers.keySet());
+  }
+
+  @Override
+  public BaseAgent getAgent(String name) {
+    Supplier<BaseAgent> supplier = agentSuppliers.get(name);
+    if (supplier == null) {
+      throw new NoSuchElementException("Agent not found: " + name);
+    }
+    return supplier.get();
   }
 
   private BaseAgent createChatAssistant() {

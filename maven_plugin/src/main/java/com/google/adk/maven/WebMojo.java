@@ -16,7 +16,6 @@
 
 package com.google.adk.maven;
 
-import com.google.adk.agents.BaseAgent;
 import com.google.adk.maven.web.AdkWebServer;
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -25,8 +24,6 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import org.apache.maven.artifact.DependencyResolutionRequiredException;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -43,14 +40,14 @@ import org.springframework.context.ConfigurableApplicationContext;
 /**
  * Maven plugin goal that starts the Google ADK Web Server with user-provided agents.
  *
- * <p>This Mojo provides a convenient way for developers to test and interact with their Google ADK
- * agents through a web-based user interface. The plugin dynamically loads user-defined agents and
- * makes them available through a browser interface.
+ * <p>This Mojo provides a convenient way for developers to test and interact with their agents
+ * through ADK Web UI. The plugin dynamically loads user-defined agents and makes them available
+ * through a browser interface.
  *
  * <h3>Basic Usage</h3>
  *
  * <pre>{@code
- * mvn google-adk:web -Dagents=com.example.MyAgentProvider.INSTANCE
+ * mvn google-adk:web -Dagents=com.example.MyAgentProvider
  * }</pre>
  *
  * <h3>Configuration Parameters</h3>
@@ -59,7 +56,8 @@ import org.springframework.context.ConfigurableApplicationContext;
  *   <li><strong>agents</strong> (required) - Full class path to AgentProvider implementation
  *   <li><strong>port</strong> (optional, default: 8000) - Server port
  *   <li><strong>host</strong> (optional, default: localhost) - Server host address
- *   <li><strong>hotReloading</strong> (optional, default: true) - Enable hot reloading
+ *   <li><strong>hotReloading</strong> (optional, default: true) - Enable hot reloading for
+ *       config-based agents
  * </ul>
  *
  * <h3>AgentProvider Implementation</h3>
@@ -74,8 +72,8 @@ import org.springframework.context.ConfigurableApplicationContext;
  *
  * <h3>Web Interface</h3>
  *
- * <p>Once started, the web interface is available at {@code http://host:port} where users can
- * interact with available agents.
+ * <p>Once started, ADK Web UI is available at {@code http://host:port} where users can interact
+ * with available agents.
  *
  * @author Google ADK Team
  * @since 0.2.1
@@ -103,7 +101,7 @@ public class WebMojo extends AbstractMojo {
    * <p>Example:
    *
    * <pre>{@code
-   * mvn google-adk:web -Dagents=com.example.MyAgentProvider.INSTANCE
+   * mvn google-adk:web -Dagents=com.example.MyAgentProvider
    * }</pre>
    */
   @Parameter(property = "agents")
@@ -168,29 +166,16 @@ public class WebMojo extends AbstractMojo {
       getLog().info("Loading agent provider: " + agents);
       AgentProvider provider = loadAgentProvider();
 
-      getLog().info("Retrieving agents from provider...");
-      Map<String, BaseAgent> adkAgents = provider.getAgents();
-
-      if (adkAgents == null || adkAgents.isEmpty()) {
-        throw new MojoExecutionException(
-            "AgentProvider returned no agents. Please verify your provider implementation.");
-      }
-
-      getLog().info("Successfully loaded " + adkAgents.size() + " agents: " + adkAgents.keySet());
-
       // Set up system properties for Spring Boot
       setupSystemProperties();
 
-      // Create a registry that will be used by AdkWebServer
-      Map<String, BaseAgent> agentRegistry = new ConcurrentHashMap<>(adkAgents);
-
-      // Start the Spring Boot application with custom agent registry
+      // Start the Spring Boot application with custom agent provider
       SpringApplication app = new SpringApplication(AdkWebServer.class);
 
-      // Add the agent registry as a bean
+      // Add the agent provider as a bean
       app.addInitializers(
           ctx -> {
-            ctx.getBeanFactory().registerSingleton("userProvidedAgentRegistry", agentRegistry);
+            ctx.getBeanFactory().registerSingleton("agentProvider", provider);
           });
 
       getLog().info("Starting Spring Boot application...");
@@ -198,7 +183,6 @@ public class WebMojo extends AbstractMojo {
 
       getLog().info("🎉 ADK Web Server started successfully!");
       getLog().info("🌐 Web UI available at: http://" + host + ":" + port);
-      getLog().info("🛠️  Available agents: " + adkAgents.keySet());
       getLog().info("⏹️  Press Ctrl+C to stop the server...");
       getLog().info("");
 
@@ -361,7 +345,7 @@ public class WebMojo extends AbstractMojo {
     }
   }
 
-  /** Cleans up all resources including application context, classloader, and executor service. */
+  /** Cleans up all resources including application context, classloader. */
   private void cleanupResources() {
     getLog().debug("Cleaning up resources...");
 

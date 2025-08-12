@@ -43,26 +43,39 @@ Example modifications:
 ### Add a New Agent
 ```java
 private BaseAgent createMathTutor() {
-    return LlmAgent.builder()
-        .name("math_tutor")
-        .description("A mathematics tutoring agent")
-        .model("gemini-2.0-flash")
-        .instruction("You are a patient math tutor. " +
-                    "Help students understand mathematical concepts step by step.")
-        .build();
+  return LlmAgent.builder()
+      .name("math_tutor")
+      .description("A mathematics tutoring agent")
+      .model("gemini-2.0-flash")
+      .instruction(
+          "You are a patient math tutor. "
+              + "Help students understand mathematical concepts step by step.")
+      .build();
 }
 ```
 
-Then add it to the `getAgents()` map:
+Then add it to the `listAgents()` method and `getAgent()` switch statement:
 ```java
 @Override
-public Map<String, BaseAgent> getAgents() {
-    return Map.of(
-        "chat_assistant", createChatAssistant(),
-        "search_agent", createSearchAgent(),
-        "code_helper", createCodeHelper(),
-        "math_tutor", createMathTutor()  // Add the new agent
-    );
+@Nonnull
+public ImmutableList<String> listAgents() {
+  return ImmutableList.of("chat_assistant", "search_agent", "code_helper", "math_tutor");
+}
+
+@Override
+public BaseAgent getAgent(String name) {
+  switch (name) {
+    case "chat_assistant":
+      return createChatAssistant();
+    case "search_agent":
+      return createSearchAgent();
+    case "code_helper":
+      return createCodeHelper();
+    case "math_tutor":
+      return createMathTutor();  // Add the new agent
+    default:
+      throw new NoSuchElementException("Agent not found: " + name);
+  }
 }
 ```
 

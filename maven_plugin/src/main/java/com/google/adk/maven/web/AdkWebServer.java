@@ -16,6 +16,8 @@
 
 package com.google.adk.maven.web;
 
+import static java.util.stream.Collectors.toList;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -30,6 +32,7 @@ import com.google.adk.artifacts.BaseArtifactService;
 import com.google.adk.artifacts.InMemoryArtifactService;
 import com.google.adk.artifacts.ListArtifactsResponse;
 import com.google.adk.events.Event;
+import com.google.adk.maven.AgentProvider;
 import com.google.adk.runner.Runner;
 import com.google.adk.sessions.BaseSessionService;
 import com.google.adk.sessions.InMemorySessionService;
@@ -74,7 +77,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -85,7 +87,6 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -147,18 +148,6 @@ public class AdkWebServer implements WebMvcConfigurer {
     return new InMemoryArtifactService();
   }
 
-  // TODO: implement config-based agent loading logic and decided whether to inject this field
-  // directly.
-  @Bean("loadedAgentRegistry")
-  public Map<String, BaseAgent> loadedAgentRegistry(
-      @Qualifier("userProvidedAgentRegistry") Map<String, BaseAgent> userAgents) {
-    log.info(
-        "Using user-provided agent registry with {} agents: {}",
-        userAgents.size(),
-        userAgents.keySet());
-    return new ConcurrentHashMap<>(userAgents);
-  }
-
   @Bean
   public ObjectMapper objectMapper() {
     return JsonBaseModel.getMapper();
@@ -169,17 +158,17 @@ public class AdkWebServer implements WebMvcConfigurer {
   public static class RunnerService {
     private static final Logger log = LoggerFactory.getLogger(RunnerService.class);
 
-    private final Map<String, BaseAgent> agentRegistry;
+    private final AgentProvider agentProvider;
     private final BaseArtifactService artifactService;
     private final BaseSessionService sessionService;
     private final Map<String, Runner> runnerCache = new ConcurrentHashMap<>();
 
     @Autowired
     public RunnerService(
-        @Lazy @Qualifier("loadedAgentRegistry") Map<String, BaseAgent> agentRegistry,
+        @Qualifier("agentProvider") AgentProvider agentProvider,
         BaseArtifactService artifactService,
         BaseSessionService sessionService) {
-      this.agentRegistry = agentRegistry;
+      this.agentProvider = agentProvider;
       this.artifactService = artifactService;
       this.sessionService = sessionService;
     }
@@ -195,20 +184,25 @@ public class AdkWebServer implements WebMvcConfigurer {
       return runnerCache.computeIfAbsent(
           appName,
           key -> {
-            BaseAgent agent = agentRegistry.get(key);
-            if (agent == null) {
+            try {
+              BaseAgent agent = agentProvider.getAgent(key);
+              log.info(
+                  "RunnerService: Creating Runner for appName: {}, using agent" + " definition: {}",
+                  appName,
+                  agent.name());
+              return new Runner(agent, appName, this.artifactService, this.sessionService);
+            } catch (java.util.NoSuchElementException e) {
               log.error(
                   "Agent/App named '{}' not found in registry. Available apps: {}",
                   key,
-                  agentRegistry.keySet());
+                  agentProvider.listAgents());
               throw new ResponseStatusException(
                   HttpStatus.NOT_FOUND, "Agent/App not found: " + key);
+            } catch (IllegalStateException e) {
+              log.error("Agent '{}' exists but failed to load: {}", key, e.getMessage());
+              throw new ResponseStatusException(
+                  HttpStatus.INTERNAL_SERVER_ERROR, "Agent failed to load: " + key, e);
             }
-            log.info(
-                "RunnerService: Creating Runner for appName: {}, using agent" + " definition: {}",
-                appName,
-                agent.name());
-            return new Runner(agent, appName, this.artifactService, this.sessionService);
           });
     }
 
@@ -580,7 +574,7 @@ public class AdkWebServer implements WebMvcConfigurer {
 
     private final BaseSessionService sessionService;
     private final BaseArtifactService artifactService;
-    private final Map<String, BaseAgent> agentRegistry;
+    private final AgentProvider agentProvider;
     private final ApiServerSpanExporter apiServerSpanExporter;
     private final RunnerService runnerService;
     private final ExecutorService sseExecutor = Executors.newCachedThreadPool();
@@ -590,7 +584,7 @@ public class AdkWebServer implements WebMvcConfigurer {
      *
      * @param sessionService The service for managing sessions.
      * @param artifactService The service for managing artifacts.
-     * @param agentRegistry The registry of loaded agents.
+     * @param agentProvider The provider for loading agents.
      * @param apiServerSpanExporter The exporter holding all trace data.
      * @param runnerService The service for obtaining Runner instances.
      */
@@ -598,19 +592,18 @@ public class AdkWebServer implements WebMvcConfigurer {
     public AgentController(
         BaseSessionService sessionService,
         BaseArtifactService artifactService,
-        @Qualifier("loadedAgentRegistry") Map<String, BaseAgent> agentRegistry,
+        @Qualifier("agentProvider") AgentProvider agentProvider,
         ApiServerSpanExporter apiServerSpanExporter,
         RunnerService runnerService) {
       this.sessionService = sessionService;
       this.artifactService = artifactService;
-      this.agentRegistry = agentRegistry;
+      this.agentProvider = agentProvider;
       this.apiServerSpanExporter = apiServerSpanExporter;
       this.runnerService = runnerService;
+      ImmutableList<String> agentNames = agentProvider.listAgents();
       log.info(
-          "AgentController initialized with {} dynamic agents: {}",
-          agentRegistry.size(),
-          agentRegistry.keySet());
-      if (agentRegistry.isEmpty()) {
+          "AgentController initialized with {} dynamic agents: {}", agentNames.size(), agentNames);
+      if (agentNames.isEmpty()) {
         log.warn(
             "Agent registry is empty. Check 'adk.agents.source-dir' property and compilation"
                 + " logs.");
@@ -672,10 +665,9 @@ public class AdkWebServer implements WebMvcConfigurer {
      */
     @GetMapping("/list-apps")
     public List<String> listApps() {
-      log.info("Listing apps from dynamic registry. Found: {}", agentRegistry.keySet());
-      List<String> appNames = new ArrayList<>(agentRegistry.keySet());
-      Collections.sort(appNames);
-      return appNames;
+      ImmutableList<String> agentNames = agentProvider.listAgents();
+      log.info("Listing apps from dynamic registry. Found: {}", agentNames);
+      return agentNames.stream().sorted().collect(toList());
     }
 
     /**
@@ -800,7 +792,7 @@ public class AdkWebServer implements WebMvcConfigurer {
       List<Session> filteredSessions =
           response.sessions().stream()
               .filter(s -> !s.id().startsWith(EVAL_SESSION_ID_PREFIX))
-              .collect(Collectors.toList());
+              .collect(toList());
       log.info(
           "Found {} non-evaluation sessions for app={}, user={}",
           filteredSessions.size(),
@@ -1347,11 +1339,17 @@ public class AdkWebServer implements WebMvcConfigurer {
           sessionId,
           eventId);
 
-      BaseAgent currentAppAgent = agentRegistry.get(appName);
-      if (currentAppAgent == null) {
+      BaseAgent currentAppAgent;
+      try {
+        currentAppAgent = agentProvider.getAgent(appName);
+      } catch (java.util.NoSuchElementException e) {
         log.warn("Agent app '{}' not found for graph generation.", appName);
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
             .body(new GraphResponse("Agent app not found: " + appName));
+      } catch (IllegalStateException e) {
+        log.warn("Agent app '{}' failed to load for graph generation: {}", appName, e.getMessage());
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+            .body(new GraphResponse("Agent app failed to load: " + appName));
       }
 
       Session session = findSessionOrThrow(appName, userId, sessionId);
