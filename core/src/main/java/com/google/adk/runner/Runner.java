@@ -25,12 +25,14 @@ import com.google.adk.agents.LlmAgent;
 import com.google.adk.agents.RunConfig;
 import com.google.adk.artifacts.BaseArtifactService;
 import com.google.adk.events.Event;
+import com.google.adk.memory.BaseMemoryService;
 import com.google.adk.sessions.BaseSessionService;
 import com.google.adk.sessions.Session;
 import com.google.adk.tools.BaseTool;
 import com.google.adk.tools.FunctionTool;
 import com.google.adk.utils.CollectionUtils;
 import com.google.common.collect.ImmutableList;
+import com.google.errorprone.annotations.InlineMe;
 import com.google.genai.types.AudioTranscriptionConfig;
 import com.google.genai.types.Content;
 import com.google.genai.types.Modality;
@@ -53,17 +55,36 @@ public class Runner {
   private final String appName;
   private final BaseArtifactService artifactService;
   private final BaseSessionService sessionService;
+  private final BaseMemoryService memoryService;
 
   /** Creates a new {@code Runner}. */
   public Runner(
       BaseAgent agent,
       String appName,
       BaseArtifactService artifactService,
-      BaseSessionService sessionService) {
+      BaseSessionService sessionService,
+      BaseMemoryService memoryService) {
     this.agent = agent;
     this.appName = appName;
     this.artifactService = artifactService;
     this.sessionService = sessionService;
+    this.memoryService = memoryService;
+  }
+
+  /**
+   * Creates a new {@code Runner}.
+   *
+   * @deprecated Use the constructor with {@code BaseMemoryService} instead even if with a null if
+   *     you don't need the memory service.
+   */
+  @InlineMe(replacement = "this(agent, appName, artifactService, sessionService, null)")
+  @Deprecated
+  public Runner(
+      BaseAgent agent,
+      String appName,
+      BaseArtifactService artifactService,
+      BaseSessionService sessionService) {
+    this(agent, appName, artifactService, sessionService, null);
   }
 
   public BaseAgent agent() {
@@ -80,6 +101,10 @@ public class Runner {
 
   public BaseSessionService sessionService() {
     return this.sessionService;
+  }
+
+  public BaseMemoryService memoryService() {
+    return this.memoryService;
   }
 
   /**
@@ -185,13 +210,10 @@ public class Runner {
               sess -> {
                 BaseAgent rootAgent = this.agent;
                 InvocationContext invocationContext =
-                    InvocationContext.create(
-                        this.sessionService,
-                        this.artifactService,
-                        InvocationContext.newInvocationContextId(),
-                        rootAgent,
+                    newInvocationContext(
                         sess,
-                        newMessage,
+                        Optional.of(newMessage),
+                        /* liveRequestQueue= */ Optional.empty(),
                         runConfig);
 
                 if (newMessage != null) {
@@ -240,7 +262,8 @@ public class Runner {
         }
       }
     }
-    return newInvocationContext(session, liveRequestQueue, runConfigBuilder.build());
+    return newInvocationContext(
+        session, /* newMessage= */ Optional.empty(), liveRequestQueue, runConfigBuilder.build());
   }
 
   /**
@@ -249,16 +272,24 @@ public class Runner {
    * @return a new {@link InvocationContext}.
    */
   private InvocationContext newInvocationContext(
-      Session session, Optional<LiveRequestQueue> liveRequestQueue, RunConfig runConfig) {
+      Session session,
+      Optional<Content> newMessage,
+      Optional<LiveRequestQueue> liveRequestQueue,
+      RunConfig runConfig) {
     BaseAgent rootAgent = this.agent;
     InvocationContext invocationContext =
-        InvocationContext.create(
+        new InvocationContext(
             this.sessionService,
             this.artifactService,
+            this.memoryService,
+            liveRequestQueue,
+            /* branch= */ Optional.empty(),
+            InvocationContext.newInvocationContextId(),
             rootAgent,
             session,
-            liveRequestQueue.orElse(null),
-            runConfig);
+            newMessage,
+            runConfig,
+            /* endInvocation= */ false);
     invocationContext.agent(this.findAgentToRun(session, rootAgent));
     return invocationContext;
   }
