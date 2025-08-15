@@ -19,7 +19,11 @@ package com.google.adk.utils;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
-import com.google.adk.tools.BuiltInCodeExecutionTool;
+import com.google.adk.agents.BaseAgent;
+import com.google.adk.agents.LlmAgent;
+import com.google.adk.agents.LoopAgent;
+import com.google.adk.agents.ParallelAgent;
+import com.google.adk.agents.SequentialAgent;
 import com.google.adk.tools.GoogleSearchTool;
 import java.util.Optional;
 import org.junit.Test;
@@ -35,10 +39,6 @@ public final class ComponentRegistryTest {
 
     Optional<GoogleSearchTool> searchTool = registry.get("google_search", GoogleSearchTool.class);
     assertThat(searchTool).isPresent();
-
-    Optional<BuiltInCodeExecutionTool> codeTool =
-        registry.get("code_execution", BuiltInCodeExecutionTool.class);
-    assertThat(codeTool).isPresent();
   }
 
   @Test
@@ -172,5 +172,39 @@ public final class ComponentRegistryTest {
 
     Optional<Object> customAgent = registry.get("custom_agent");
     assertThat(customAgent).isPresent();
+  }
+
+  @Test
+  public void testResolveAgentClass() {
+    // Test all 4 agent classes can be resolved by simple name
+    Class<? extends BaseAgent> llmAgentClass = ComponentRegistry.resolveAgentClass("LlmAgent");
+    assertThat(llmAgentClass).isEqualTo(LlmAgent.class);
+
+    Class<? extends BaseAgent> loopAgentClass = ComponentRegistry.resolveAgentClass("LoopAgent");
+    assertThat(loopAgentClass).isEqualTo(LoopAgent.class);
+
+    Class<? extends BaseAgent> parallelAgentClass =
+        ComponentRegistry.resolveAgentClass("ParallelAgent");
+    assertThat(parallelAgentClass).isEqualTo(ParallelAgent.class);
+
+    Class<? extends BaseAgent> sequentialAgentClass =
+        ComponentRegistry.resolveAgentClass("SequentialAgent");
+    assertThat(sequentialAgentClass).isEqualTo(SequentialAgent.class);
+
+    // Test default behavior (null/empty returns LlmAgent)
+    assertThat(ComponentRegistry.resolveAgentClass(null)).isEqualTo(LlmAgent.class);
+    assertThat(ComponentRegistry.resolveAgentClass("")).isEqualTo(LlmAgent.class);
+
+    // Test full class name resolution
+    Class<? extends BaseAgent> llmAgentFullName =
+        ComponentRegistry.resolveAgentClass("com.google.adk.agents.LlmAgent");
+    assertThat(llmAgentFullName).isEqualTo(LlmAgent.class);
+
+    // Test unsupported agent class
+    IllegalArgumentException thrown =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> ComponentRegistry.resolveAgentClass("UnsupportedAgent"));
+    assertThat(thrown.getMessage()).contains("not in registry or not a subclass of BaseAgent");
   }
 }

@@ -16,11 +16,21 @@
 
 package com.google.adk.utils;
 
-import com.google.adk.tools.BuiltInCodeExecutionTool;
+import static com.google.common.base.Strings.isNullOrEmpty;
+
+import com.google.adk.agents.BaseAgent;
+import com.google.adk.agents.LlmAgent;
+import com.google.adk.agents.LoopAgent;
+import com.google.adk.agents.ParallelAgent;
+import com.google.adk.agents.SequentialAgent;
+import com.google.adk.tools.AgentTool;
+import com.google.adk.tools.BaseTool;
 import com.google.adk.tools.GoogleSearchTool;
+import com.google.adk.tools.LoadArtifactsTool;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,16 +84,42 @@ public class ComponentRegistry {
 
   private final Map<String, Object> registry = new ConcurrentHashMap<>();
 
-  public ComponentRegistry() {
+  protected ComponentRegistry() {
     initializePreWiredEntries();
   }
 
   /** Initializes the registry with base pre-wired ADK instances. */
   private void initializePreWiredEntries() {
-    registry.put("google_search", new GoogleSearchTool());
-    registry.put("code_execution", new BuiltInCodeExecutionTool());
+    registerAdkAgentClass(LlmAgent.class);
+    registerAdkAgentClass(LoopAgent.class);
+    registerAdkAgentClass(ParallelAgent.class);
+    registerAdkAgentClass(SequentialAgent.class);
+
+    registerAdkToolInstance("google_search", new GoogleSearchTool());
+    registerAdkToolInstance("load_artifacts", new LoadArtifactsTool());
+
+    registerAdkToolClass(AgentTool.class);
+    // TODO: add all python tools that also exist in Java.
 
     logger.debug("Initialized base pre-wired entries in ComponentRegistry");
+  }
+
+  private void registerAdkAgentClass(Class<? extends BaseAgent> agentClass) {
+    registry.put(agentClass.getName(), agentClass);
+    // For python compatibility, also register the name used in ADK Python.
+    registry.put("google.adk.agents." + agentClass.getSimpleName(), agentClass);
+  }
+
+  private void registerAdkToolInstance(String name, @Nonnull Object toolInstance) {
+    registry.put(name, toolInstance);
+    // For python compatibility, also register the name used in ADK Python.
+    registry.put("google.adk.tools." + name, toolInstance);
+  }
+
+  private void registerAdkToolClass(@Nonnull Class<?> toolClass) {
+    registry.put(toolClass.getName(), toolClass);
+    // For python compatibility, also register the name used in ADK Python.
+    registry.put("google.adk.tools." + toolClass.getSimpleName(), toolClass);
   }
 
   /**
@@ -181,5 +217,110 @@ public class ComponentRegistry {
     }
     instance = newInstance;
     logger.info("ComponentRegistry singleton instance updated");
+  }
+
+  /**
+   * Resolves the agent class based on the agent class name from the configuration.
+   *
+   * @param agentClassName the name of the agent class from the config
+   * @return the corresponding agent class
+   * @throws IllegalArgumentException if the agent class is not supported
+   */
+  @SuppressWarnings({"unchecked", "rawtypes"}) // For type casting.
+  public static Class<? extends BaseAgent> resolveAgentClass(String agentClassName) {
+    // If no agent_class is specified, it will default to LlmAgent.
+    if (isNullOrEmpty(agentClassName)) {
+      return LlmAgent.class;
+    }
+
+    ComponentRegistry registry = getInstance();
+
+    if (agentClassName.contains(".")) {
+      // If agentClassName contains '.', use it directly
+      Optional<Class> agentClass = registry.get(agentClassName, Class.class);
+      if (agentClass.isPresent() && BaseAgent.class.isAssignableFrom(agentClass.get())) {
+        return (Class<? extends BaseAgent>) agentClass.get();
+      }
+    } else {
+      // First try the simple name
+      Optional<Class> agentClass = registry.get(agentClassName, Class.class);
+      if (agentClass.isPresent() && BaseAgent.class.isAssignableFrom(agentClass.get())) {
+        return (Class<? extends BaseAgent>) agentClass.get();
+      }
+
+      // If not found, try with com.google.adk.agents prefix
+      agentClass = registry.get("com.google.adk.agents." + agentClassName, Class.class);
+      if (agentClass.isPresent() && BaseAgent.class.isAssignableFrom(agentClass.get())) {
+        return (Class<? extends BaseAgent>) agentClass.get();
+      }
+    }
+
+    throw new IllegalArgumentException(
+        "agentClass '" + agentClassName + "' is not in registry or not a subclass of BaseAgent.");
+  }
+
+  /**
+   * Resolves the tool instance based on the tool name from the configuration.
+   *
+   * @param name the name of the tool from the config
+   * @return an Optional containing the tool instance if found, empty otherwise
+   */
+  public static Optional<BaseTool> resolveToolInstance(String name) {
+    if (isNullOrEmpty(name)) {
+      return Optional.empty();
+    }
+
+    ComponentRegistry registry = getInstance();
+
+    if (name.contains(".")) {
+      // If name contains '.', use it directly
+      return registry.get(name, BaseTool.class);
+    } else {
+      // First try the simple name
+      Optional<BaseTool> toolInstance = registry.get(name, BaseTool.class);
+      if (toolInstance.isPresent()) {
+        return toolInstance;
+      }
+
+      // If not found, try with google.adk.tools prefix
+      return registry.get("google.adk.tools." + name, BaseTool.class);
+    }
+  }
+
+  /**
+   * Resolves the tool class based on the tool class name from the configuration.
+   *
+   * @param toolClassName the name of the tool class from the config
+   * @return an Optional containing the tool class if found, empty otherwise
+   */
+  @SuppressWarnings({"unchecked", "rawtypes"}) // For type casting.
+  public static Optional<Class<? extends BaseTool>> resolveToolClass(String toolClassName) {
+    if (isNullOrEmpty(toolClassName)) {
+      return Optional.empty();
+    }
+
+    ComponentRegistry registry = getInstance();
+
+    if (toolClassName.contains(".")) {
+      // If toolClassName contains '.', use it directly
+      Optional<Class> toolClass = registry.get(toolClassName, Class.class);
+      if (toolClass.isPresent() && BaseTool.class.isAssignableFrom(toolClass.get())) {
+        return Optional.of((Class<? extends BaseTool>) toolClass.get());
+      }
+    } else {
+      // First try the simple name
+      Optional<Class> toolClass = registry.get(toolClassName, Class.class);
+      if (toolClass.isPresent() && BaseTool.class.isAssignableFrom(toolClass.get())) {
+        return Optional.of((Class<? extends BaseTool>) toolClass.get());
+      }
+
+      // If not found, try with google.adk.tools prefix
+      toolClass = registry.get("google.adk.tools." + toolClassName, Class.class);
+      if (toolClass.isPresent() && BaseTool.class.isAssignableFrom(toolClass.get())) {
+        return Optional.of((Class<? extends BaseTool>) toolClass.get());
+      }
+    }
+
+    return Optional.empty();
   }
 }
