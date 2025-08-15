@@ -25,6 +25,7 @@ import com.google.adk.agents.ParallelAgent;
 import com.google.adk.agents.SequentialAgent;
 import com.google.adk.tools.AgentTool;
 import com.google.adk.tools.BaseTool;
+import com.google.adk.tools.ExitLoopTool;
 import com.google.adk.tools.GoogleSearchTool;
 import com.google.adk.tools.LoadArtifactsTool;
 import java.util.Map;
@@ -97,6 +98,7 @@ public class ComponentRegistry {
 
     registerAdkToolInstance("google_search", new GoogleSearchTool());
     registerAdkToolInstance("load_artifacts", new LoadArtifactsTool());
+    registerAdkToolInstance("exit_loop", ExitLoopTool.INSTANCE);
 
     registerAdkToolClass(AgentTool.class);
     // TODO: add all python tools that also exist in Java.
