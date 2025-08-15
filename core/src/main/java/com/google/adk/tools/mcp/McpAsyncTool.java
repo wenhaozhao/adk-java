@@ -74,7 +74,7 @@ public final class McpAsyncTool extends AbstractMcpTool<McpAsyncClient> {
     super(mcpTool, mcpSession, mcpSessionManager, objectMapper);
   }
 
-  private Single<McpSchema.InitializeResult> reintializeSession() {
+  private Single<McpSchema.InitializeResult> reinitializeSession() {
     McpAsyncClient client = this.mcpSessionManager.createAsyncSession();
     return Single.fromCompletionStage(
         client
@@ -114,6 +114,6 @@ public final class McpAsyncTool extends AbstractMcpTool<McpAsyncClient> {
                     .doOnNext(
                         error ->
                             logger.error("Retrying callTool due to: {}", error.getMessage(), error))
-                    .flatMapSingle(_ignore -> this.reintializeSession()));
+                    .flatMapSingle(_ignore -> this.reinitializeSession()));
   }
 }
