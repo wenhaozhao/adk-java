@@ -22,13 +22,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.adk.tools.BaseTool;
 import com.google.common.collect.ImmutableMap;
 import com.google.genai.types.FunctionDeclaration;
-import com.google.genai.types.Schema;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.Content;
 import io.modelcontextprotocol.spec.McpSchema.JsonSchema;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -76,32 +74,17 @@ public abstract class AbstractMcpTool<T> extends BaseTool {
     return this.mcpSession;
   }
 
-  protected Schema toGeminiSchema(JsonSchema openApiSchema) {
-    try {
-      return GeminiSchemaUtil.toGeminiSchema(openApiSchema, this.objectMapper);
-    } catch (IOException | IllegalArgumentException e) {
-      throw new IllegalArgumentException(
-          "Error generating function declaration for tool '" + this.name() + "': " + e.getMessage(),
-          e);
-    }
-  }
-
   @Override
   public Optional<FunctionDeclaration> declaration() {
-    try {
-      Schema schema = toGeminiSchema(this.mcpTool.inputSchema());
-      return Optional.ofNullable(schema)
-          .map(
-              value ->
-                  FunctionDeclaration.builder()
-                      .name(this.name())
-                      .description(this.description())
-                      .parameters(value)
-                      .build());
-    } catch (IllegalArgumentException e) {
-      System.err.println(e.getMessage());
-      return Optional.empty();
-    }
+    JsonSchema schema = this.mcpTool.inputSchema();
+    return Optional.ofNullable(schema)
+        .map(
+            value ->
+                FunctionDeclaration.builder()
+                    .name(this.name())
+                    .description(this.description())
+                    .parametersJsonSchema(value)
+                    .build());
   }
 
   @SuppressWarnings("PreferredInterfaceType") // BaseTool.runAsync() returns Map<String, Object>
