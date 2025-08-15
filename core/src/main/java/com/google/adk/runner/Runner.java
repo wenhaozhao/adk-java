@@ -48,6 +48,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import javax.annotation.Nullable;
 
 /** The main class for the GenAI Agents runner. */
 public class Runner {
@@ -55,7 +56,7 @@ public class Runner {
   private final String appName;
   private final BaseArtifactService artifactService;
   private final BaseSessionService sessionService;
-  private final BaseMemoryService memoryService;
+  private final @Nullable BaseMemoryService memoryService;
 
   /** Creates a new {@code Runner}. */
   public Runner(
@@ -63,7 +64,7 @@ public class Runner {
       String appName,
       BaseArtifactService artifactService,
       BaseSessionService sessionService,
-      BaseMemoryService memoryService) {
+      @Nullable BaseMemoryService memoryService) {
     this.agent = agent;
     this.appName = appName;
     this.artifactService = artifactService;
@@ -103,7 +104,7 @@ public class Runner {
     return this.sessionService;
   }
 
-  public BaseMemoryService memoryService() {
+  public @Nullable BaseMemoryService memoryService() {
     return this.memoryService;
   }
 
