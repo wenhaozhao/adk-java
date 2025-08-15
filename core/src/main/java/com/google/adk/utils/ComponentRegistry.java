@@ -96,8 +96,8 @@ public class ComponentRegistry {
     registerAdkAgentClass(ParallelAgent.class);
     registerAdkAgentClass(SequentialAgent.class);
 
-    registerAdkToolInstance("google_search", new GoogleSearchTool());
-    registerAdkToolInstance("load_artifacts", new LoadArtifactsTool());
+    registerAdkToolInstance("google_search", GoogleSearchTool.INSTANCE);
+    registerAdkToolInstance("load_artifacts", LoadArtifactsTool.INSTANCE);
     registerAdkToolInstance("exit_loop", ExitLoopTool.INSTANCE);
 
     registerAdkToolClass(AgentTool.class);
