@@ -17,8 +17,8 @@
 package com.google.adk.agents;
 
 import com.google.adk.artifacts.BaseArtifactService;
-import com.google.adk.exceptions.LlmCallsLimitExceededException;
 import com.google.adk.memory.BaseMemoryService;
+import com.google.adk.models.LlmCallsLimitExceededException;
 import com.google.adk.sessions.BaseSessionService;
 import com.google.adk.sessions.Session;
 import com.google.errorprone.annotations.InlineMe;
