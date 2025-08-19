@@ -26,17 +26,9 @@ import com.google.adk.JsonBaseModel;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
-import com.google.genai.types.Content;
-import com.google.genai.types.FinishReason;
-import com.google.genai.types.FunctionCall;
-import com.google.genai.types.FunctionResponse;
-import com.google.genai.types.GroundingMetadata;
+import com.google.genai.types.*;
 import java.time.Instant;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import javax.annotation.Nullable;
 
 // TODO - b/413761119 update Agent.java when resolved.
@@ -58,6 +50,8 @@ public class Event extends JsonBaseModel {
   private Optional<String> branch = Optional.empty();
   private Optional<GroundingMetadata> groundingMetadata = Optional.empty();
   private long timestamp;
+  private HashMap<String, Object> metadata = new HashMap<>();
+  private HashSet<String> tags = new HashSet<>();
 
   private Event() {}
 
@@ -220,6 +214,51 @@ public class Event extends JsonBaseModel {
     this.timestamp = timestamp;
   }
 
+  @JsonProperty("metadata")
+  public Map<String, Object> metadata() {
+    return this.metadata;
+  }
+
+  public void setMetadata(Map<String, Object> metadata) {
+    this.metadata = new HashMap<>(metadata == null ? new HashMap<>() : metadata);
+  }
+
+  public Event add_metadata(String key, Object value) {
+    this.metadata.put(key, value);
+    return this;
+  }
+
+  public Event add_metadata(Map<String, Object> metadata) {
+    this.metadata.putAll(metadata);
+    return this;
+  }
+
+  @JsonProperty("tags")
+  public Set<String> tags() {
+    return this.tags;
+  }
+
+  public void setTags(Set<String> tags) {
+    if (tags instanceof HashSet<String> new_tags) {
+      this.tags = new_tags;
+    } else {
+      this.tags = new HashSet<>();
+    }
+  }
+
+  public Event add_tags(String... tags) {
+    Event.inner_add_tags(this.tags, Arrays.asList(tags));
+    return this;
+  }
+
+  static void inner_add_tags(HashSet<String> tags, Collection<String> new_tags) {
+    tags.addAll(new_tags.stream().map(String::toLowerCase).toList());
+  }
+
+  public boolean is_tagged(String tag) {
+    return this.tags.contains(tag.toLowerCase());
+  }
+
   /** Returns all function calls from this event. */
   @JsonIgnore
   public final ImmutableList<FunctionCall> functionCalls() {
@@ -303,6 +342,8 @@ public class Event extends JsonBaseModel {
     private Optional<String> branch = Optional.empty();
     private Optional<GroundingMetadata> groundingMetadata = Optional.empty();
     private Optional<Long> timestamp = Optional.empty();
+    private HashSet<String> tags = new HashSet<>();
+    private Map<String, Object> metadata = new HashMap<>();
 
     @JsonCreator
     private static Builder create() {
@@ -485,6 +526,65 @@ public class Event extends JsonBaseModel {
       return groundingMetadata;
     }
 
+    @CanIgnoreReturnValue
+    public Builder tags(Set<String> tags) {
+      if (tags instanceof HashSet<String> new_tags) {
+        this.tags = new_tags;
+      } else {
+        this.tags = new HashSet<>();
+      }
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    public Builder add_tags(Set<String> tags) {
+      if (tags != null) {
+        Event.inner_add_tags(this.tags, tags);
+      }
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    public Builder add_tags(Set<String> tags, boolean overwrite) {
+      this.tags = new HashSet<>();
+      if (tags != null) {
+        Event.inner_add_tags(this.tags, tags);
+      }
+      return this;
+    }
+
+    Set<String> tags() {
+      return tags;
+    }
+
+    @CanIgnoreReturnValue
+    public Builder metadata(Map<String, Object> metadata) {
+      this.metadata = metadata == null ? new HashMap<>() : metadata;
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    public Builder add_metadata(Map<String, Object> metadata) {
+      if (metadata != null) {
+        this.metadata.putAll(metadata);
+      }
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    public Builder add_metadata(String key, Object value) {
+      if (value == null) {
+        this.metadata.remove(key);
+      } else {
+        this.metadata.put(key, value);
+      }
+      return this;
+    }
+
+    Map<String, Object> metadata() {
+      return metadata;
+    }
+
     public Event build() {
       Event event = new Event();
       event.setId(id);
@@ -499,6 +599,8 @@ public class Event extends JsonBaseModel {
       event.setInterrupted(interrupted);
       event.branch(branch);
       event.setGroundingMetadata(groundingMetadata);
+      event.setTags(tags);
+      event.setMetadata(metadata);
 
       event.setActions(actions().orElse(EventActions.builder().build()));
       event.setTimestamp(timestamp().orElse(Instant.now().toEpochMilli()));
@@ -531,7 +633,9 @@ public class Event extends JsonBaseModel {
             .errorMessage(this.errorMessage)
             .interrupted(this.interrupted)
             .branch(this.branch)
-            .groundingMetadata(this.groundingMetadata);
+            .groundingMetadata(this.groundingMetadata)
+            .tags(new HashSet<>(this.tags))
+            .metadata(new HashMap<>(this.metadata));
     if (this.timestamp != 0) {
       builder.timestamp(this.timestamp);
     }
