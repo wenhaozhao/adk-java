@@ -90,7 +90,7 @@ Add the plugin to your `pom.xml`:
         <plugin>
             <groupId>com.google.adk</groupId>
             <artifactId>google-adk-maven-plugin</artifactId>
-            <version>0.2.1-SNAPSHOT</version>
+            <version>0.2.1-SOHUTV-SNAPSHOT</version>
         </plugin>
     </plugins>
 </build>
@@ -271,14 +271,14 @@ Make sure your project has the necessary ADK dependencies:
     <dependency>
         <groupId>com.google.adk</groupId>
         <artifactId>google-adk</artifactId>
-        <version>0.2.1-SNAPSHOT</version>
+        <version>0.2.1-SOHUTV-SNAPSHOT</version>
     </dependency>
 
     <!-- Maven plugin dependency for AgentLoader interface -->
     <dependency>
         <groupId>com.google.adk</groupId>
         <artifactId>google-adk-maven-plugin</artifactId>
-        <version>0.2.1-SNAPSHOT</version>
+        <version>0.2.1-SOHUTV-SNAPSHOT</version>
         <scope>compile</scope>
     </dependency>
 </dependencies>
@@ -296,7 +296,7 @@ Add the plugin to your `pom.xml` for convenience:
         <plugin>
             <groupId>com.google.adk</groupId>
             <artifactId>google-adk-maven-plugin</artifactId>
-            <version>0.2.1-SNAPSHOT</version>
+            <version>0.2.1-SOHUTV-SNAPSHOT</version>
         </plugin>
     </plugins>
 </build>
