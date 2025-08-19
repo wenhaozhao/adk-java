@@ -28,6 +28,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import org.jetbrains.annotations.NotNull;
 
 /** A {@link Session} object that encapsulates the {@link State} and {@link Event}s of a session. */
 @JsonDeserialize(builder = Session.Builder.class)
@@ -40,7 +42,12 @@ public final class Session extends JsonBaseModel {
 
   private final State state;
 
-  private final List<Event> events;
+  /**
+   * 要求必须是可修改的,无锁的ArrayList
+   * <li>它是写可见的
+   * <li>无锁要求是因为一些实现可能使用了 synchronized, 它对 virtual-thread 不友好
+   */
+  @NotNull private volatile CopyOnWriteArrayList<Event> events;
 
   private Instant lastUpdateTime;
 
@@ -144,6 +151,14 @@ public final class Session extends JsonBaseModel {
     return events;
   }
 
+  public void setEvents(@NotNull List<Event> events) {
+    if (events instanceof CopyOnWriteArrayList<Event> cow) {
+      this.events = cow;
+    } else {
+      this.events = new CopyOnWriteArrayList<>(events);
+    }
+  }
+
   @JsonProperty("appName")
   public String appName() {
     return appName;
@@ -192,7 +207,11 @@ public final class Session extends JsonBaseModel {
     this.appName = appName;
     this.userId = userId;
     this.state = state;
-    this.events = events;
+    if (events instanceof CopyOnWriteArrayList<Event> cow) {
+      this.events = cow;
+    } else {
+      this.events = new CopyOnWriteArrayList<>(events);
+    }
     this.lastUpdateTime = lastUpdateTime;
   }
 }
