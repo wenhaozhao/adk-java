@@ -213,7 +213,7 @@ public class Runner {
                 InvocationContext invocationContext =
                     newInvocationContext(
                         sess,
-                        Optional.of(newMessage),
+                        Optional.ofNullable(newMessage),
                         /* liveRequestQueue= */ Optional.empty(),
                         runConfig);
 
