@@ -50,7 +50,11 @@ public class Event extends JsonBaseModel {
   private Optional<String> branch = Optional.empty();
   private Optional<GroundingMetadata> groundingMetadata = Optional.empty();
   private long timestamp;
+
+  @JsonProperty("metadata")
   private HashMap<String, Object> metadata = new HashMap<>();
+
+  @JsonProperty("tags")
   private HashSet<String> tags = new HashSet<>();
 
   private Event() {}
@@ -214,7 +218,6 @@ public class Event extends JsonBaseModel {
     this.timestamp = timestamp;
   }
 
-  @JsonProperty("metadata")
   public Map<String, Object> metadata() {
     return this.metadata;
   }
@@ -233,7 +236,6 @@ public class Event extends JsonBaseModel {
     return this;
   }
 
-  @JsonProperty("tags")
   public Set<String> tags() {
     return this.tags;
   }
