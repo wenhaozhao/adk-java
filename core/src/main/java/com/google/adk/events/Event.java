@@ -529,6 +529,7 @@ public class Event extends JsonBaseModel {
     }
 
     @CanIgnoreReturnValue
+    @JsonProperty("tags")
     public Builder tags(Set<String> tags) {
       if (tags instanceof HashSet<String> new_tags) {
         this.tags = new_tags;
@@ -560,6 +561,7 @@ public class Event extends JsonBaseModel {
     }
 
     @CanIgnoreReturnValue
+    @JsonProperty("metadata")
     public Builder metadata(Map<String, Object> metadata) {
       this.metadata = metadata == null ? new HashMap<>() : metadata;
       return this;
